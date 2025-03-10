@@ -139,10 +139,13 @@ public class SecretScanner {
         List<Secret> foundSecrets = new ArrayList<>();
         
         try {
-            // Get response body as string - we need to do string operations
+            // Get response body as string
             String responseBody = requestResponse.response().bodyToString();
             
-            // Process each pattern against the entire response body
+            // Get the body offset - this tells us where the body begins in the full response
+            int bodyOffset = requestResponse.response().bodyOffset();
+            
+            // Process each pattern against the body
             for (SecretPattern pattern : secretPatterns) {
                 try {
                     Matcher matcher = pattern.getPattern().matcher(responseBody);
@@ -150,31 +153,35 @@ public class SecretScanner {
                     while (matcher.find()) {
                         // Get the secret value and its positions
                         String secretValue;
-                        int startPos;
-                        int endPos;
+                        int bodyStartPos;
+                        int bodyEndPos;
                         
                         if (matcher.groupCount() >= 1) {
                             // Pattern has a capturing group - use it
                             secretValue = matcher.group(1);
-                            startPos = matcher.start(1);
-                            endPos = matcher.end(1);
+                            bodyStartPos = matcher.start(1);
+                            bodyEndPos = matcher.end(1);
                         } else {
                             // No capturing group - use the whole match
                             secretValue = matcher.group(0);
-                            startPos = matcher.start(0);
-                            endPos = matcher.end(0);
+                            bodyStartPos = matcher.start(0);
+                            bodyEndPos = matcher.end(0);
                         }
                         
-                        // Calculate positions with 10 character buffer
-                        int start = Math.max(0, startPos - 10);
-                        int end = Math.min(responseBody.length(), endPos + 10);
+                        // Convert body positions to full response positions by adding bodyOffset
+                        int fullStartPos = bodyOffset + bodyStartPos;
+                        int fullEndPos = bodyOffset + bodyEndPos;
                         
-                        Secret secret = new Secret(pattern.getName(), secretValue, start, end);
+                        // Calculate highlight positions with 10 character buffer
+                        int highlightStart = Math.max(bodyOffset, fullStartPos - 10);
+                        int highlightEnd = Math.min(bodyOffset + responseBody.length(), fullEndPos + 10);
+                        
+                        Secret secret = new Secret(pattern.getName(), secretValue, highlightStart, highlightEnd);
                         foundSecrets.add(secret);
                         
                         api.logging().logToOutput(String.format(
-                            "Found %s: '%s' at position %d-%d (highlighted range: %d-%d)",
-                            pattern.getName(), secretValue, startPos, endPos, start, end
+                            "Found %s: '%s' at body position %d-%d (highlight: %d-%d)",
+                            pattern.getName(), secretValue, bodyStartPos, bodyEndPos, highlightStart, highlightEnd
                         ));
                     }
                 } catch (Exception e) {
