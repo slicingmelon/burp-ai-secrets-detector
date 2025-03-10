@@ -21,6 +21,9 @@ import java.awt.*;
 import java.io.File;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.ArrayList;
 
 public class AISecretsDector implements BurpExtension {
     
