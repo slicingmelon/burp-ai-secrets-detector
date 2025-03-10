@@ -130,12 +130,12 @@ public class AISecretsDector implements BurpExtension {
     
     private void scanResponseForSecrets(HttpRequestResponse requestResponse) {
         try {
-            // Save response to temp file
+            // Save response to temp file - this creates a persistent copy
             HttpRequestResponse tempRequestResponse = requestResponse.copyToTempFile();
             
-            // Create scanner and scan the file
+            // Create scanner and scan directly from the response
             SecretScanner scanner = new SecretScanner(api);
-            SecretScanResult result = scanner.scanFile(tempFile, requestResponse);
+            SecretScanResult result = scanner.scanResponse(tempRequestResponse);
             
             // Process scan results
             if (result.hasSecrets()) {
@@ -155,10 +155,7 @@ public class AISecretsDector implements BurpExtension {
                 );
             }
             
-            // Clean up temp file
-            if (!tempFile.delete()) {
-                api.logging().logToError("Failed to delete temporary file: " + tempFile.getAbsolutePath());
-            }
+            // No need to manually delete any temporary files
             
         } catch (Exception e) {
             api.logging().logToError("Error scanning response: " + e.getMessage());

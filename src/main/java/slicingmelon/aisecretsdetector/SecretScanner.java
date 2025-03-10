@@ -119,24 +119,24 @@ public class SecretScanner {
         return patterns;
     }
     
-    public SecretScanResult scanFile(File file, HttpRequestResponse requestResponse) throws IOException {
+    public SecretScanResult scanResponse(HttpRequestResponse requestResponse) {
         List<Secret> foundSecrets = new ArrayList<>();
         
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            String line;
-            int lineNumber = 0;
+        // Read the response body line by line
+        String responseBody = requestResponse.response().bodyToString();
+        String[] lines = responseBody.split("\\r?\\n");
+        
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            int lineNumber = i + 1;
             
-            while ((line = reader.readLine()) != null) {
-                lineNumber++;
+            for (SecretPattern pattern : secretPatterns) {
+                Matcher matcher = pattern.getPattern().matcher(line);
                 
-                for (SecretPattern pattern : secretPatterns) {
-                    Matcher matcher = pattern.getPattern().matcher(line);
-                    
-                    while (matcher.find()) {
-                        String secretValue = matcher.groupCount() >= 1 ? matcher.group(1) : matcher.group(0);
-                        Secret secret = new Secret(pattern.getName(), secretValue, lineNumber);
-                        foundSecrets.add(secret);
-                    }
+                while (matcher.find()) {
+                    String secretValue = matcher.groupCount() >= 1 ? matcher.group(1) : matcher.group(0);
+                    Secret secret = new Secret(pattern.getName(), secretValue, lineNumber);
+                    foundSecrets.add(secret);
                 }
             }
         }
