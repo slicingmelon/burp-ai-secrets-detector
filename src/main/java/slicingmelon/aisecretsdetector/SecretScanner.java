@@ -21,12 +21,14 @@ public class SecretScanner {
     public static class Secret {
         private final String type;
         private final String value;
-        private final int lineNumber;
+        private final int startIndex;
+        private final int endIndex;
         
-        public Secret(String type, String value, int lineNumber) {
+        public Secret(String type, String value, int startIndex, int endIndex) {
             this.type = type;
             this.value = value;
-            this.lineNumber = lineNumber;
+            this.startIndex = startIndex;
+            this.endIndex = endIndex;
         }
         
         public String getType() {
@@ -37,8 +39,12 @@ public class SecretScanner {
             return value;
         }
         
-        public int getLineNumber() {
-            return lineNumber;
+        public int getStartIndex() {
+            return startIndex;
+        }
+        
+        public int getEndIndex() {
+            return endIndex;
         }
     }
     
@@ -121,23 +127,20 @@ public class SecretScanner {
     
     public SecretScanResult scanResponse(HttpRequestResponse requestResponse) {
         List<Secret> foundSecrets = new ArrayList<>();
-        
-        // Read the response body line by line
         String responseBody = requestResponse.response().bodyToString();
-        String[] lines = responseBody.split("\\r?\\n");
         
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i];
-            int lineNumber = i + 1;
+        for (SecretPattern pattern : secretPatterns) {
+            Matcher matcher = pattern.getPattern().matcher(responseBody);
             
-            for (SecretPattern pattern : secretPatterns) {
-                Matcher matcher = pattern.getPattern().matcher(line);
-                
-                while (matcher.find()) {
-                    String secretValue = matcher.groupCount() >= 1 ? matcher.group(1) : matcher.group(0);
-                    Secret secret = new Secret(pattern.getName(), secretValue, lineNumber);
-                    foundSecrets.add(secret);
-                }
+            while (matcher.find()) {
+                String secretValue = matcher.groupCount() >= 1 ? matcher.group(1) : matcher.group(0);
+                Secret secret = new Secret(
+                    pattern.getName(),
+                    secretValue,
+                    matcher.start(),
+                    matcher.end()
+                );
+                foundSecrets.add(secret);
             }
         }
         
