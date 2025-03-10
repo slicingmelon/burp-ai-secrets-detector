@@ -77,7 +77,7 @@ public class AISecretsDector implements BurpExtension {
                 // Create HttpRequestResponse for better context and tracking
                 HttpRequestResponse requestResponse = HttpRequestResponse.httpRequestResponse(
                     responseReceived.initiatingRequest(),
-                    responseReceived.response()
+                    responseReceived
                 );
                 
                 // Submit the response for secret scanning
@@ -149,8 +149,9 @@ public class AISecretsDector implements BurpExtension {
                 
                 // Mark the request in the UI
                 HttpRequestResponse annotatedRequestResponse = requestResponse
-                        //.withResponseHighlight(HighlightColor.RED)
-                        .withAnnotations(Annotations.annotations("Secrets detected: " + result.getSecretCount()));
+                        .withAnnotations(Annotations.annotations(
+                                "Secrets detected: " + result.getSecretCount(),
+                                HighlightColor.RED));
                 
                 // Update in the site map
                 api.siteMap().add(annotatedRequestResponse);
