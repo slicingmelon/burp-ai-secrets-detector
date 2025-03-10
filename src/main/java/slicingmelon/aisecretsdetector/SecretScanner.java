@@ -127,20 +127,28 @@ public class SecretScanner {
     
     public SecretScanResult scanResponse(HttpRequestResponse requestResponse) {
         List<Secret> foundSecrets = new ArrayList<>();
-        String responseBody = requestResponse.response().bodyToString();
         
-        for (SecretPattern pattern : secretPatterns) {
-            Matcher matcher = pattern.getPattern().matcher(responseBody);
+        // Read the response body line by line
+        String responseBody = requestResponse.response().bodyToString();
+        String[] lines = responseBody.split("\\r?\\n");
+        
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            int lineNumber = i + 1;
             
-            while (matcher.find()) {
-                String secretValue = matcher.groupCount() >= 1 ? matcher.group(1) : matcher.group(0);
-                Secret secret = new Secret(
-                    pattern.getName(),
-                    secretValue,
-                    matcher.start(),
-                    matcher.end()
-                );
-                foundSecrets.add(secret);
+            for (SecretPattern pattern : secretPatterns) {
+                Matcher matcher = pattern.getPattern().matcher(line);
+                
+                while (matcher.find()) {
+                    String secretValue = matcher.groupCount() >= 1 ? matcher.group(1) : matcher.group(0);
+
+                    // Calculate positions with 10 character buffer
+                    int start = Math.max(0, matcher.start(1) - 10);
+                    int end = Math.min(responseBody.length(), matcher.end(1) + 10);
+
+                    Secret secret = new Secret(pattern.getName(), secretValue, start, end);
+                    foundSecrets.add(secret);
+                }
             }
         }
         
