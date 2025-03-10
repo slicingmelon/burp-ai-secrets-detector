@@ -7,7 +7,14 @@ import burp.api.montoya.http.handler.*;
 import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.persistence.PersistedObject;
 import burp.api.montoya.core.Annotations;
-
+import burp.api.montoya.core.Marker;
+import burp.api.montoya.scanner.AuditResult;
+import burp.api.montoya.scanner.ConsolidationAction;
+import burp.api.montoya.scanner.ScanCheck;
+import burp.api.montoya.scanner.audit.insertionpoint.AuditInsertionPoint;
+import burp.api.montoya.scanner.audit.issues.AuditIssue;
+import burp.api.montoya.scanner.audit.issues.AuditIssueConfidence;
+import burp.api.montoya.scanner.audit.issues.AuditIssueSeverity;
 
 import javax.swing.*;
 import java.awt.*;
@@ -147,22 +154,73 @@ public class AISecretsDector implements BurpExtension {
             if (result.hasSecrets()) {
                 api.logging().logToOutput("Secrets found in response from: " + requestResponse.request().url());
                 
-                // Mark the request in the UI
-                HttpRequestResponse annotatedRequestResponse = requestResponse
-                        .withAnnotations(Annotations.annotations(
-                                "Secrets detected: " + result.getSecretCount(),
-                                HighlightColor.RED));
+                // Create markers to highlight where the secrets are in the response
+                List<Marker> responseMarkers = new ArrayList<>();
+                String responseBody = requestResponse.response().toString();
                 
-                // Update in the site map
-                api.siteMap().add(annotatedRequestResponse);
+                for (SecretScanner.Secret secret : result.getDetectedSecrets()) {
+                    // Find the line in the response
+                    String[] lines = responseBody.split("\\r?\\n");
+                    if (secret.getLineNumber() <= lines.length) {
+                        String line = lines[secret.getLineNumber() - 1];
+                        int lineStartIndex = responseBody.indexOf(line);
+                        
+                        if (lineStartIndex >= 0) {
+                            int secretStart = lineStartIndex + line.indexOf(secret.getValue());
+                            int secretEnd = secretStart + secret.getValue().length();
+                            
+                            // Create a marker for this secret
+                            if (secretStart >= 0 && secretEnd <= responseBody.length()) {
+                                responseMarkers.add(Marker.marker(secretStart, secretEnd));
+                            }
+                        }
+                    }
+                    
+                    api.logging().logToOutput("Secret found: " + secret.getType() + " at line " + secret.getLineNumber());
+                }
                 
-                // Log detailed findings
-                result.getDetectedSecrets().forEach(secret -> 
-                    api.logging().logToOutput("Secret found: " + secret.getType() + " at line " + secret.getLineNumber())
+                // Mark the request/response with the found secrets
+                HttpRequestResponse markedRequestResponse = requestResponse.withResponseMarkers(responseMarkers);
+                
+                // Build detailed description of the finding
+                StringBuilder detailBuilder = new StringBuilder();
+                detailBuilder.append("<p>The following secrets were detected in the response:</p>");
+                detailBuilder.append("<ul>");
+                for (SecretScanner.Secret secret : result.getDetectedSecrets()) {
+                    detailBuilder.append("<li><b>").append(secret.getType()).append("</b>: ");
+                    // Mask the actual secret value for security
+                    detailBuilder.append("******").append(" (Line ").append(secret.getLineNumber()).append(")</li>");
+                }
+                detailBuilder.append("</ul>");
+                
+                // Create remediation advice
+                String remediation = "<p>Sensitive information such as API keys, tokens, and other secrets should not be included in HTTP responses. " +
+                        "Review the application code to ensure secrets are not leaked to clients.</p>" +
+                        "<p>Consider implementing the following:</p>" +
+                        "<ul>" +
+                        "<li>Remove all hardcoded secrets from source code</li>" +
+                        "<li>Store secrets in secure vaults or environment variables</li>" +
+                        "<li>Implement proper access controls for sensitive data</li>" +
+                        "<li>Sanitize error messages and responses to prevent leaking implementation details</li>" +
+                        "</ul>";
+                
+                // Create an audit issue
+                AuditIssue auditIssue = AuditIssue.auditIssue(
+                        "Exposed Secret: " + result.getDetectedSecrets().get(0).getType(),
+                        detailBuilder.toString(),
+                        remediation,
+                        requestResponse.request().url(),
+                        AuditIssueSeverity.HIGH,
+                        AuditIssueConfidence.FIRM,
+                        "Leaked secrets can lead to unauthorized access and system compromise.",
+                        "Properly secure all secrets and sensitive information to prevent exposure.",
+                        AuditIssueSeverity.HIGH,
+                        markedRequestResponse
                 );
+                
+                // Add the issue to Burp's issues list
+                api.siteMap().add(auditIssue);
             }
-            
-            // No need to manually delete any temporary files
             
         } catch (Exception e) {
             api.logging().logToError("Error scanning response: " + e.getMessage());
