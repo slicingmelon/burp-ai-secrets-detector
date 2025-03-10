@@ -131,7 +131,7 @@ public class AISecretsDector implements BurpExtension {
     private void scanResponseForSecrets(HttpRequestResponse requestResponse) {
         try {
             // Save response to temp file
-            File tempFile = api.utilities().copyToTempFile(requestResponse.response().toByteArray());
+            HttpRequestResponse tempRequestResponse = requestResponse.copyToTempFile();
             
             // Create scanner and scan the file
             SecretScanner scanner = new SecretScanner(api);
