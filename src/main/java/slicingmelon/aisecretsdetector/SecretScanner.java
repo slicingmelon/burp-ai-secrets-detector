@@ -128,27 +128,42 @@ public class SecretScanner {
     public SecretScanResult scanResponse(HttpRequestResponse requestResponse) {
         List<Secret> foundSecrets = new ArrayList<>();
         
-        // Read the response body line by line
+        // Read the response body
         String responseBody = requestResponse.response().bodyToString();
-        String[] lines = responseBody.split("\\r?\\n");
         
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i];
-            int lineNumber = i + 1;
+        // Process each pattern against the entire response body
+        for (SecretPattern pattern : secretPatterns) {
+            Matcher matcher = pattern.getPattern().matcher(responseBody);
             
-            for (SecretPattern pattern : secretPatterns) {
-                Matcher matcher = pattern.getPattern().matcher(line);
+            while (matcher.find()) {
+                String secretValue;
+                int startPosition;
+                int endPosition;
                 
-                while (matcher.find()) {
-                    String secretValue = matcher.groupCount() >= 1 ? matcher.group(1) : matcher.group(0);
-
-                    // Calculate positions with 10 character buffer
-                    int start = Math.max(0, matcher.start(1) - 10);
-                    int end = Math.min(responseBody.length(), matcher.end(1) + 10);
-
-                    Secret secret = new Secret(pattern.getName(), secretValue, start, end);
-                    foundSecrets.add(secret);
+                // Handle patterns with or without capturing groups
+                if (matcher.groupCount() >= 1) {
+                    // Use capturing group if available
+                    secretValue = matcher.group(1);
+                    startPosition = matcher.start(1);
+                    endPosition = matcher.end(1);
+                } else {
+                    // Use whole match if no capturing group
+                    secretValue = matcher.group(0);
+                    startPosition = matcher.start(0);
+                    endPosition = matcher.end(0);
                 }
+    
+                // Calculate positions with 10 character buffer
+                int start = Math.max(0, startPosition - 10);
+                int end = Math.min(responseBody.length(), endPosition + 10);
+                
+                Secret secret = new Secret(pattern.getName(), secretValue, start, end);
+                foundSecrets.add(secret);
+                
+                api.logging().logToOutput(String.format(
+                    "Found %s: %s at position %d-%d (highlighted range: %d-%d)",
+                    pattern.getName(), secretValue, startPosition, endPosition, start, end
+                ));
             }
         }
         
