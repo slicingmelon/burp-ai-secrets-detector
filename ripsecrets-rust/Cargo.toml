@@ -1,0 +1,36 @@
+[package]
+name = "ripsecrets"
+description = "A command-line tool to prevent committing secret keys into your source code"
+version = "0.1.8"
+edition = "2021"
+repository = "https://github.com/sirwart/ripsecrets"
+homepage = "https://github.com/sirwart/ripsecrets"
+license = "MIT"
+readme = "README.md"
+keywords = ["security", "secret", "search"]
+categories = ["command-line-utilities", "text-processing"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+grep = "0.2.8"
+ignore = "0.4.18"
+num_cpus = "1.13.1"
+regex = "1.9.5"
+termcolor = "1.1.2"
+memoize = "0.3.0"
+tempfile = "3.3.0"
+clap = { version = "4.2.5", features = ["derive"] }
+lazy_static = "1.4.0"
+
+[dev-dependencies]
+criterion = { version = "0.3", features = ["html_reports"] }
+
+[[bench]]
+name = "find_secrets"
+harness = false
+
+[build-dependencies]
+clap = { version = "4.2.5", features = ["derive"] }
+clap_complete = "4.5.40"
+clap_mangen = "0.2.15"
