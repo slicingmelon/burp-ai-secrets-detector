@@ -98,26 +98,36 @@ public class SecretScanner {
     }
     
     private List<SecretPattern> initializeSecretPatterns() {
-        // This is where we'll initialize the secret patterns from RipSecrets
-        // For now, adding a few basic patterns as placeholders
         List<SecretPattern> patterns = new ArrayList<>();
         
-        // AWS key pattern
+        // AWS Access Key - no capturing group needed, matches the entire key
         patterns.add(new SecretPattern(
                 "AWS Access Key",
                 Pattern.compile("(?<![A-Za-z0-9/+])[A-Za-z0-9/+=]{40}(?![A-Za-z0-9/+=])")
         ));
         
-        // Generic API key pattern
+        // API Key - use capturing group to get just the key
         patterns.add(new SecretPattern(
                 "API Key",
                 Pattern.compile("(?i)(?:api[_-]?key|apikey|secret)['\"]?\\s*[:=]\\s*['\"]([A-Za-z0-9]{16,64})['\"]")
         ));
         
+        // Simple API key pattern without context - add this to catch the key in your example
+        patterns.add(new SecretPattern(
+                "API Key (Simple)",
+                Pattern.compile("\"([A-Za-z0-9]{24,40})\"")
+        ));
+        
         // GitHub token pattern
         patterns.add(new SecretPattern(
                 "GitHub Token",
-                Pattern.compile("(?:github|gh)[_\\-]?(?:pat|token)['\"]?\\s*[:=]\\s*['\"]([a-zA-Z0-9_]{35,40})['\"]")
+                Pattern.compile("(?:github|gh)[_\\-]?(?:pat|token)['\"]?\\s*[:=]\\s*['\"]?([a-zA-Z0-9_]{35,40})['\"]?")
+        ));
+        
+        // GitHub Personal Access Token pattern - direct match
+        patterns.add(new SecretPattern(
+                "GitHub PAT",
+                Pattern.compile("ghp_[A-Za-z0-9]{36}")
         ));
         
         // TODO: Port more patterns from RipSecrets
@@ -128,43 +138,51 @@ public class SecretScanner {
     public SecretScanResult scanResponse(HttpRequestResponse requestResponse) {
         List<Secret> foundSecrets = new ArrayList<>();
         
-        // Read the response body
-        String responseBody = requestResponse.response().bodyToString();
-        
-        // Process each pattern against the entire response body
-        for (SecretPattern pattern : secretPatterns) {
-            Matcher matcher = pattern.getPattern().matcher(responseBody);
+        try {
+            // Get response body as string - we need to do string operations
+            String responseBody = requestResponse.response().bodyToString();
             
-            while (matcher.find()) {
-                String secretValue;
-                int startPosition;
-                int endPosition;
-                
-                // Handle patterns with or without capturing groups
-                if (matcher.groupCount() >= 1) {
-                    // Use capturing group if available
-                    secretValue = matcher.group(1);
-                    startPosition = matcher.start(1);
-                    endPosition = matcher.end(1);
-                } else {
-                    // Use whole match if no capturing group
-                    secretValue = matcher.group(0);
-                    startPosition = matcher.start(0);
-                    endPosition = matcher.end(0);
+            // Process each pattern against the entire response body
+            for (SecretPattern pattern : secretPatterns) {
+                try {
+                    Matcher matcher = pattern.getPattern().matcher(responseBody);
+                    
+                    while (matcher.find()) {
+                        // Get the secret value and its positions
+                        String secretValue;
+                        int startPos;
+                        int endPos;
+                        
+                        if (matcher.groupCount() >= 1) {
+                            // Pattern has a capturing group - use it
+                            secretValue = matcher.group(1);
+                            startPos = matcher.start(1);
+                            endPos = matcher.end(1);
+                        } else {
+                            // No capturing group - use the whole match
+                            secretValue = matcher.group(0);
+                            startPos = matcher.start(0);
+                            endPos = matcher.end(0);
+                        }
+                        
+                        // Calculate positions with 10 character buffer
+                        int start = Math.max(0, startPos - 10);
+                        int end = Math.min(responseBody.length(), endPos + 10);
+                        
+                        Secret secret = new Secret(pattern.getName(), secretValue, start, end);
+                        foundSecrets.add(secret);
+                        
+                        api.logging().logToOutput(String.format(
+                            "Found %s: '%s' at position %d-%d (highlighted range: %d-%d)",
+                            pattern.getName(), secretValue, startPos, endPos, start, end
+                        ));
+                    }
+                } catch (Exception e) {
+                    api.logging().logToError("Error with pattern " + pattern.getName() + ": " + e.getMessage());
                 }
-    
-                // Calculate positions with 10 character buffer
-                int start = Math.max(0, startPosition - 10);
-                int end = Math.min(responseBody.length(), endPosition + 10);
-                
-                Secret secret = new Secret(pattern.getName(), secretValue, start, end);
-                foundSecrets.add(secret);
-                
-                api.logging().logToOutput(String.format(
-                    "Found %s: %s at position %d-%d (highlighted range: %d-%d)",
-                    pattern.getName(), secretValue, startPosition, endPosition, start, end
-                ));
             }
+        } catch (Exception e) {
+            api.logging().logToError("Error scanning response: " + e.getMessage());
         }
         
         return new SecretScanResult(requestResponse, foundSecrets);
