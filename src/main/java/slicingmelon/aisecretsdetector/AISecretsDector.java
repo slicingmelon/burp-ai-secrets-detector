@@ -2,11 +2,14 @@ package slicingmelon.aisecretsdetector;
 
 import burp.api.montoya.BurpExtension;
 import burp.api.montoya.MontoyaApi;
+import burp.api.montoya.core.HighlightColor;
+import burp.api.montoya.http.handler.*;
+import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.persistence.PersistedObject;
-import burp.api.montoya.ui.UserInterface;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.File;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -15,6 +18,33 @@ public class AISecretsDector implements BurpExtension {
     private MontoyaApi api;
     private ExecutorService executorService;
     private ConfigSettings configSettings;
+    
+    // Simple config class to avoid creating extra files
+    private static class ConfigSettings {
+        private int workers;
+        private boolean inScopeOnly;
+        
+        public ConfigSettings(int workers, boolean inScopeOnly) {
+            this.workers = workers;
+            this.inScopeOnly = inScopeOnly;
+        }
+        
+        public int getWorkers() {
+            return workers;
+        }
+        
+        public void setWorkers(int workers) {
+            this.workers = workers;
+        }
+        
+        public boolean isInScopeOnly() {
+            return inScopeOnly;
+        }
+        
+        public void setInScopeOnly(boolean inScopeOnly) {
+            this.inScopeOnly = inScopeOnly;
+        }
+    }
     
     @Override
     public void initialize(MontoyaApi api) {
@@ -28,7 +58,32 @@ public class AISecretsDector implements BurpExtension {
         initializeWorkers();
         
         // Register HTTP handler
-        api.http().registerHttpHandler(new SecretsDetectorHttpHandler(api, executorService, configSettings));
+        api.http().registerHttpHandler(new HttpHandler() {
+            @Override
+            public RequestToBeSentAction handleHttpRequestToBeSent(HttpRequestToBeSent requestToBeSent) {
+                // We're only interested in responses, not modifying requests
+                return RequestToBeSentAction.continueWith(requestToBeSent);
+            }
+            
+            @Override
+            public ResponseReceivedAction handleHttpResponseReceived(HttpResponseReceived responseReceived) {
+                // Check if we should process this response based on configuration
+                if (configSettings.isInScopeOnly() && !responseReceived.initiatingRequest().isInScope()) {
+                    return ResponseReceivedAction.continueWith(responseReceived);
+                }
+                
+                // Create HttpRequestResponse for better context and tracking
+                HttpRequestResponse requestResponse = HttpRequestResponse.httpRequestResponse(
+                    responseReceived.initiatingRequest(),
+                    responseReceived.response()
+                );
+                
+                // Submit the response for secret scanning
+                executorService.submit(() -> scanResponseForSecrets(requestResponse));
+                
+                return ResponseReceivedAction.continueWith(responseReceived);
+            }
+        });
         
         // Create and register UI components
         SwingUtilities.invokeLater(() -> {
@@ -71,6 +126,44 @@ public class AISecretsDector implements BurpExtension {
     private void updateWorkers() {
         shutdownWorkers();
         initializeWorkers();
+    }
+    
+    private void scanResponseForSecrets(HttpRequestResponse requestResponse) {
+        try {
+            // Save response to temp file
+            File tempFile = api.utilities().copyToTempFile(requestResponse.response().toByteArray());
+            
+            // Create scanner and scan the file
+            SecretScanner scanner = new SecretScanner(api);
+            SecretScanResult result = scanner.scanFile(tempFile, requestResponse);
+            
+            // Process scan results
+            if (result.hasSecrets()) {
+                api.logging().logToOutput("Secrets found in response from: " + requestResponse.request().url());
+                
+                // Mark the request in the UI
+                HttpRequestResponse annotatedRequestResponse = requestResponse
+                        .withResponseHighlight(HighlightColor.RED)
+                        .withResponseNote("Secrets detected: " + result.getSecretCount());
+                
+                // Update in the site map
+                api.siteMap().add(annotatedRequestResponse);
+                
+                // Log detailed findings
+                result.getDetectedSecrets().forEach(secret -> 
+                    api.logging().logToOutput("Secret found: " + secret.getType() + " at line " + secret.getLineNumber())
+                );
+            }
+            
+            // Clean up temp file
+            if (!tempFile.delete()) {
+                api.logging().logToError("Failed to delete temporary file: " + tempFile.getAbsolutePath());
+            }
+            
+        } catch (Exception e) {
+            api.logging().logToError("Error scanning response: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
     
     private JComponent createConfigPanel() {
@@ -125,7 +218,7 @@ public class AISecretsDector implements BurpExtension {
         
         panel.add(settingsPanel, BorderLayout.NORTH);
         
-        // Add results display area
+        // Add results display area (can be enhanced later)
         JTabbedPane tabbedPane = new JTabbedPane();
         tabbedPane.addTab("Detection Results", new JScrollPane(new JTable()));
         panel.add(tabbedPane, BorderLayout.CENTER);
