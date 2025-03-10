@@ -159,58 +159,36 @@ public class AISecretsDector implements BurpExtension {
                 
                 // Create markers to highlight where the secrets are in the response
                 List<Marker> responseMarkers = new ArrayList<>();
-                String responseBody = requestResponse.response().toString();
                 
                 for (SecretScanner.Secret secret : result.getDetectedSecrets()) {
-                    // Find the line in the response
-                    String[] lines = responseBody.split("\\r?\\n");
-                    if (secret.getLineNumber() <= lines.length) {
-                        String line = lines[secret.getLineNumber() - 1];
-                        int lineStartIndex = responseBody.indexOf(line);
-                        
-                        if (lineStartIndex >= 0) {
-                            int secretStart = lineStartIndex + line.indexOf(secret.getValue());
-                            int secretEnd = secretStart + secret.getValue().length();
-                            
-                            // Create a marker for this secret
-                            if (secretStart >= 0 && secretEnd <= responseBody.length()) {
-                                responseMarkers.add(Marker.marker(secretStart, secretEnd));
-                            }
-                        }
-                    }
+                    // Create a marker for this secret using exact positions
+                    responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
                     
-                    api.logging().logToOutput("Secret found: " + secret.getType() + " at line " + secret.getLineNumber());
+                    api.logging().logToOutput(String.format(
+                        "Secret found: %s at position %d-%d", 
+                        secret.getType(), 
+                        secret.getStartIndex(), 
+                        secret.getEndIndex()
+                    ));
                 }
                 
                 // Mark the request/response with the found secrets
                 HttpRequestResponse markedRequestResponse = requestResponse.withResponseMarkers(responseMarkers);
                 
-                // Build detailed description of the finding
-                StringBuilder detailBuilder = new StringBuilder();
-                detailBuilder.append("<p>The following secrets were detected in the response:</p>");
-                detailBuilder.append("<ul>");
-                for (SecretScanner.Secret secret : result.getDetectedSecrets()) {
-                    detailBuilder.append("<li><b>").append(secret.getType()).append("</b>: ");
-                    // Mask the actual secret value for security
-                    detailBuilder.append("******").append(" (Line ").append(secret.getLineNumber()).append(")</li>");
-                }
-                detailBuilder.append("</ul>");
+                // Build generic description
+                String detail = String.format(
+                    "<p>%d secrets were detected in the response. Click the highlights to view them.</p>",
+                    result.getSecretCount()
+                );
                 
                 // Create remediation advice
                 String remediation = "<p>Sensitive information such as API keys, tokens, and other secrets should not be included in HTTP responses. " +
-                        "Review the application code to ensure secrets are not leaked to clients.</p>" +
-                        "<p>Consider implementing the following:</p>" +
-                        "<ul>" +
-                        "<li>Remove all hardcoded secrets from source code</li>" +
-                        "<li>Store secrets in secure vaults or environment variables</li>" +
-                        "<li>Implement proper access controls for sensitive data</li>" +
-                        "<li>Sanitize error messages and responses to prevent leaking implementation details</li>" +
-                        "</ul>";
+                        "Review the application code to ensure secrets are not leaked to clients.</p>";
                 
                 // Create an audit issue
                 AuditIssue auditIssue = AuditIssue.auditIssue(
-                        "Exposed Secret: " + result.getDetectedSecrets().get(0).getType(),
-                        detailBuilder.toString(),
+                        "Exposed Secrets Detected",
+                        detail,
                         remediation,
                         requestResponse.request().url(),
                         AuditIssueSeverity.HIGH,
