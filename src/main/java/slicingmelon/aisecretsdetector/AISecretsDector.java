@@ -6,6 +6,8 @@ import burp.api.montoya.core.HighlightColor;
 import burp.api.montoya.http.handler.*;
 import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.persistence.PersistedObject;
+import burp.api.montoya.core.Annotations;
+
 
 import javax.swing.*;
 import java.awt.*;
@@ -101,8 +103,12 @@ public class AISecretsDector implements BurpExtension {
     }
     
     private ConfigSettings loadConfigSettings(PersistedObject persistedData) {
-        int workers = persistedData.getInteger("workers").orElse(5);
-        boolean inScopeOnly = persistedData.getBoolean("in_scope_only").orElse(true);
+        // Fix using null check approach
+        Integer workersValue = persistedData.getInteger("workers");
+        int workers = (workersValue != null) ? workersValue : 5;
+        
+        Boolean inScopeOnlyValue = persistedData.getBoolean("in_scope_only");
+        boolean inScopeOnly = (inScopeOnlyValue != null) ? inScopeOnlyValue : true;
         
         return new ConfigSettings(workers, inScopeOnly);
     }
@@ -135,7 +141,7 @@ public class AISecretsDector implements BurpExtension {
             
             // Create scanner and scan directly from the response
             SecretScanner scanner = new SecretScanner(api);
-            SecretScanResult result = scanner.scanResponse(tempRequestResponse);
+            SecretScanner.SecretScanResult result = scanner.scanResponse(tempRequestResponse);
             
             // Process scan results
             if (result.hasSecrets()) {
@@ -143,8 +149,8 @@ public class AISecretsDector implements BurpExtension {
                 
                 // Mark the request in the UI
                 HttpRequestResponse annotatedRequestResponse = requestResponse
-                        .withResponseHighlight(HighlightColor.RED)
-                        .withResponseNote("Secrets detected: " + result.getSecretCount());
+                        //.withResponseHighlight(HighlightColor.RED)
+                        .withAnnotations(Annotations.annotations("Secrets detected: " + result.getSecretCount()));
                 
                 // Update in the site map
                 api.siteMap().add(annotatedRequestResponse);
