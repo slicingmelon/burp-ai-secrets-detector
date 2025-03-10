@@ -4,6 +4,8 @@
 !README.md
 !LICENSE
 !.gitignore
+!gradlew
+!gradlew.bat
 
 
 !src/main/java/slicingmelon/aisecretsdetector/*.java
