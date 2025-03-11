@@ -100,37 +100,23 @@ public class SecretScanner {
     private List<SecretPattern> initializeSecretPatterns() {
         List<SecretPattern> patterns = new ArrayList<>();
         
-        // AWS Access Key - no capturing group needed, matches the entire key
+        // AWS Access Key - format AKIA... followed by 16 characters
         patterns.add(new SecretPattern(
                 "AWS Access Key",
-                Pattern.compile("(?<![A-Za-z0-9/+])[A-Za-z0-9/+=]{40}(?![A-Za-z0-9/+=])")
+                Pattern.compile("\\b((?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16})\\b")
         ));
         
-        // API Key - use capturing group to get just the key
-        patterns.add(new SecretPattern(
-                "API Key",
-                Pattern.compile("(?i)(?:api[_-]?key|apikey|secret)['\"]?\\s*[:=]\\s*['\"]([A-Za-z0-9]{16,64})['\"]")
-        ));
-        
-        // Simple API key pattern without context - add this to catch the key in your example
-        patterns.add(new SecretPattern(
-                "API Key (Simple)",
-                Pattern.compile("\"([A-Za-z0-9]{24,40})\"")
-        ));
-        
-        // GitHub token pattern
-        patterns.add(new SecretPattern(
-                "GitHub Token",
-                Pattern.compile("(?:github|gh)[_\\-]?(?:pat|token)['\"]?\\s*[:=]\\s*['\"]?([a-zA-Z0-9_]{35,40})['\"]?")
-        ));
-        
-        // GitHub Personal Access Token pattern - direct match
+        // GitHub PAT - format ghp_... followed by 36 characters
         patterns.add(new SecretPattern(
                 "GitHub PAT",
-                Pattern.compile("ghp_[A-Za-z0-9]{36}")
+                Pattern.compile("(?:gh[oprsu]|github_pat)_[\\dA-Za-z_]{36}")
         ));
         
-        // TODO: Port more patterns from RipSecrets
+        // GCP API Key - format AIzaSy... followed by 33 characters
+        patterns.add(new SecretPattern(
+                "GCP API Key",
+                Pattern.compile("AIzaSy[\\dA-Za-z_-]{33}")
+        ));
         
         return patterns;
     }
@@ -151,30 +137,18 @@ public class SecretScanner {
                     Matcher matcher = pattern.getPattern().matcher(responseBody);
                     
                     while (matcher.find()) {
-                        // Get the secret value and its positions
-                        String secretValue;
-                        int bodyStartPos;
-                        int bodyEndPos;
-                        
-                        if (matcher.groupCount() >= 1) {
-                            // Pattern has a capturing group - use it
-                            secretValue = matcher.group(1);
-                            bodyStartPos = matcher.start(1);
-                            bodyEndPos = matcher.end(1);
-                        } else {
-                            // No capturing group - use the whole match
-                            secretValue = matcher.group(0);
-                            bodyStartPos = matcher.start(0);
-                            bodyEndPos = matcher.end(0);
-                        }
+                        // Get the secret value and its positions - use the whole match for all patterns
+                        String secretValue = matcher.group(0);
+                        int bodyStartPos = matcher.start(0);
+                        int bodyEndPos = matcher.end(0);
                         
                         // Convert body positions to full response positions by adding bodyOffset
                         int fullStartPos = bodyOffset + bodyStartPos;
                         int fullEndPos = bodyOffset + bodyEndPos;
                         
-                        // Calculate highlight positions with 10 character buffer
-                        int highlightStart = Math.max(bodyOffset, fullStartPos - 10);
-                        int highlightEnd = Math.min(bodyOffset + responseBody.length(), fullEndPos + 10);
+                        // Calculate highlight positions with 20 character buffer for better visibility
+                        int highlightStart = Math.max(bodyOffset, fullStartPos - 20);
+                        int highlightEnd = Math.min(bodyOffset + responseBody.length(), fullEndPos + 20);
                         
                         Secret secret = new Secret(pattern.getName(), secretValue, highlightStart, highlightEnd);
                         foundSecrets.add(secret);
