@@ -168,12 +168,12 @@ public class SecretScanner {
                 false
         ));
         
-        // Facebook Access Token
+        // Square Access Token
         patterns.add(new SecretPattern(
-                "Facebook Access Token",
-                Pattern.compile("EAAA[\\dA-Za-z+=-]{60}"),
-                false
-        ));
+            "Square Access Token",
+            Pattern.compile("\\bEAAA[\\dA-Za-z+=-]{60}\\b"),
+            false
+    ));
         
         // Azure Storage Account Key
         patterns.add(new SecretPattern(
