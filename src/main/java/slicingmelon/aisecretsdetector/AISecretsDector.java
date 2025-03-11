@@ -204,7 +204,7 @@ public class AISecretsDector implements BurpExtension {
     /*
     * Extract existing secrets for a URL from Burp's site map
     */
-    private Set<String> extractExistingSecretsForUrl(String url) {
+    private Set<String> extractExistingSecretsForUrl2(String url) {
         Set<String> existingSecrets = new HashSet<>();
         
         try {
@@ -219,6 +219,37 @@ public class AISecretsDector implements BurpExtension {
                         // Extract secrets from markers
                         Set<String> secretsFromMarkers = extractSecretsFromMarkers(evidence);
                         existingSecrets.addAll(secretsFromMarkers);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            api.logging().logToError("Error extracting existing secrets: " + e.getMessage());
+        }
+        
+        return existingSecrets;
+    }
+
+    /*
+    * Extract existing secrets for a URL from Burp's site map
+    */
+    private Set<String> extractExistingSecretsForUrl(String url) {
+        Set<String> existingSecrets = new HashSet<>();
+        
+        try {
+            // Find all audit issues in site map
+            for (AuditIssue issue : api.siteMap().issues()) {
+                // Only consider our own "Exposed Secrets Detected" issues
+                if (issue.name().equals("Exposed Secrets Detected") && issue.baseUrl().equals(url)) {
+                    api.logging().logToOutput("Found existing issue for URL: " + url);
+                    
+                    // Extract secrets from all evidence in this issue
+                    for (HttpRequestResponse evidence : issue.requestResponses()) {
+                        // Extract secrets from notes instead of markers
+                        if (evidence.annotations() != null && evidence.annotations().notes() != null) {
+                            String notes = evidence.annotations().notes();
+                            Set<String> secretsFromNotes = extractSecretsFromNotes(notes);
+                            existingSecrets.addAll(secretsFromNotes);
+                        }
                     }
                 }
             }
