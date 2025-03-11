@@ -2,7 +2,7 @@ package slicingmelon.aisecretsdetector;
 
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.HttpRequestResponse;
-
+import burp.api.montoya.http.message.responses.HttpResponse;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -67,16 +67,16 @@ public class SecretScanner {
     }
     
     public static class SecretScanResult {
-        private final HttpRequestResponse requestResponse;
+        private final HttpResponse response;
         private final List<Secret> detectedSecrets;
         
-        public SecretScanResult(HttpRequestResponse requestResponse, List<Secret> detectedSecrets) {
-            this.requestResponse = requestResponse;
+        public SecretScanResult(HttpResponse response, List<Secret> detectedSecrets) {
+            this.response = response;
             this.detectedSecrets = detectedSecrets;
         }
         
-        public HttpRequestResponse getRequestResponse() {
-            return requestResponse;
+        public HttpResponse getResponse() {
+            return response;
         }
         
         public List<Secret> getDetectedSecrets() {
@@ -135,15 +135,15 @@ public class SecretScanner {
         return patterns;
     }
     
-    public SecretScanResult scanResponse(HttpRequestResponse requestResponse) {
+    public SecretScanResult scanResponse(HttpResponse response) {
         List<Secret> foundSecrets = new ArrayList<>();
         
         try {
             // Get response body as string
-            String responseBody = requestResponse.response().bodyToString();
+            String responseBody = response.bodyToString();
             
             // Get the body offset - this tells us where the body begins in the full response
-            int bodyOffset = requestResponse.response().bodyOffset();
+            int bodyOffset = response.bodyOffset();
             
             // Process each pattern against the body
             for (SecretPattern pattern : secretPatterns) {
@@ -192,6 +192,6 @@ public class SecretScanner {
             api.logging().logToError("Error scanning response: " + e.getMessage());
         }
         
-        return new SecretScanResult(requestResponse, foundSecrets);
+        return new SecretScanResult(response, foundSecrets);
     }
 }

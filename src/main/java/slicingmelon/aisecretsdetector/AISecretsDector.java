@@ -5,6 +5,7 @@ import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.core.HighlightColor;
 import burp.api.montoya.http.handler.*;
 import burp.api.montoya.http.message.HttpRequestResponse;
+import burp.api.montoya.http.message.responses.HttpResponse;
 import burp.api.montoya.persistence.PersistedObject;
 import burp.api.montoya.core.Annotations;
 import burp.api.montoya.core.Marker;
@@ -57,14 +58,8 @@ public class AISecretsDector implements BurpExtension {
                     return ResponseReceivedAction.continueWith(responseReceived);
                 }
                 
-                // Create HttpRequestResponse for better context and tracking
-                HttpRequestResponse requestResponse = HttpRequestResponse.httpRequestResponse(
-                    responseReceived.initiatingRequest(),
-                    responseReceived
-                );
-                
-                // Submit the response for secret scanning
-                executorService.submit(() -> scanResponseForSecrets(requestResponse));
+                // Submit the response directly to reduce memory allocations
+                executorService.submit(() -> scanResponseForSecrets(responseReceived));
                 
                 return ResponseReceivedAction.continueWith(responseReceived);
             }
@@ -100,18 +95,19 @@ public class AISecretsDector implements BurpExtension {
         initializeWorkers();
     }
     
-    private void scanResponseForSecrets(HttpRequestResponse requestResponse) {
+    private void scanResponseForSecrets(HttpResponseReceived responseReceived) {
         try {
-            // Save response to temp file - this creates a persistent copy
-            HttpRequestResponse tempRequestResponse = requestResponse.copyToTempFile();
+            // Save response to temp file first (minimize memory usage)
+            HttpResponse tempResponse = responseReceived.copyToTempFile();
             
-            // Create scanner and scan directly from the response
+            // Create scanner and scan directly from the temp file response
             SecretScanner scanner = new SecretScanner(api);
-            SecretScanner.SecretScanResult result = scanner.scanResponse(tempRequestResponse);
+            SecretScanner.SecretScanResult result = scanner.scanResponse(tempResponse);
             
             // Process scan results
             if (result.hasSecrets()) {
-                api.logging().logToOutput("Secrets found in response from: " + requestResponse.request().url());
+                String url = responseReceived.initiatingRequest().url().toString();
+                api.logging().logToOutput("Secrets found in response from: " + url);
                 
                 // Create markers to highlight where the secrets are in the response
                 List<Marker> responseMarkers = new ArrayList<>();
@@ -127,6 +123,12 @@ public class AISecretsDector implements BurpExtension {
                         secret.getEndIndex()
                     ));
                 }
+                
+                // Create HttpRequestResponse only when we need it for markers and issue reporting
+                HttpRequestResponse requestResponse = HttpRequestResponse.httpRequestResponse(
+                    responseReceived.initiatingRequest(),
+                    tempResponse  // Use the temp file version of response
+                );
                 
                 // Mark the request/response with the found secrets
                 HttpRequestResponse markedRequestResponse = requestResponse.withResponseMarkers(responseMarkers);
@@ -146,7 +148,7 @@ public class AISecretsDector implements BurpExtension {
                         "Exposed Secrets Detected",
                         detail,
                         remediation,
-                        requestResponse.request().url(),
+                        url,
                         AuditIssueSeverity.HIGH,
                         AuditIssueConfidence.FIRM,
                         "Leaked secrets can lead to unauthorized access and system compromise.",
