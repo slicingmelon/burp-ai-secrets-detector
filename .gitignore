@@ -9,3 +9,4 @@
 
 
 !src/main/java/slicingmelon/aisecretsdetector/*.java
+!build/libs/*.jar
