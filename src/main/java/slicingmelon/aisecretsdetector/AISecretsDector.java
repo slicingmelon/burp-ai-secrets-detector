@@ -340,16 +340,16 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
         }
         
         try {
-            // Get base URLs from issues
-            String existingPath = extractPathFromUrl(existingIssue.baseUrl());
-            String newPath = extractPathFromUrl(newIssue.baseUrl());
+            // Use baseUrl directly from AuditIssue
+            String existingBaseUrl = existingIssue.baseUrl();
+            String newBaseUrl = newIssue.baseUrl();
             
-            // Log the paths we're comparing
-            api.logging().logToOutput("Comparing paths: " + existingPath + " vs " + newPath);
+            // Log the URLs we're comparing
+            api.logging().logToOutput("Comparing base URLs: " + existingBaseUrl + " vs " + newBaseUrl);
             
-            // Check if they're the same endpoint
-            if (existingPath.equals(newPath)) {
-                api.logging().logToOutput("Consolidation triggered for path: " + existingPath);
+            // Check if they're the same endpoint (baseUrl comparison)
+            if (existingBaseUrl.equals(newBaseUrl)) {
+                api.logging().logToOutput("Consolidation triggered for URL: " + existingBaseUrl);
                 
                 // Get evidence request/responses from issues
                 List<HttpRequestResponse> existingEvidence = existingIssue.requestResponses();
@@ -358,34 +358,39 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
                 api.logging().logToOutput("Existing evidence count: " + existingEvidence.size());
                 api.logging().logToOutput("New evidence count: " + newEvidence.size());
                 
-                // Extract notes from evidence
-                String existingNotes = "";
-                String newNotes = "";
+                // Extract secrets from response markers
+                Set<String> existingSecrets = new HashSet<>();
+                Set<String> newSecrets = new HashSet<>();
                 
-                if (!existingEvidence.isEmpty() && existingEvidence.get(0).annotations() != null) {
-                    existingNotes = existingEvidence.get(0).annotations().notes();
-                    api.logging().logToOutput("Existing notes: " + existingNotes);
-                } else {
-                    api.logging().logToOutput("No existing notes found");
+                if (!existingEvidence.isEmpty()) {
+                    existingSecrets = extractSecretsFromMarkers(existingEvidence.get(0));
+                    api.logging().logToOutput("Extracted " + existingSecrets.size() + " secrets from existing markers");
                 }
                 
-                if (!newEvidence.isEmpty() && newEvidence.get(0).annotations() != null) {
-                    newNotes = newEvidence.get(0).annotations().notes();
-                    api.logging().logToOutput("New notes: " + newNotes);
-                } else {
-                    api.logging().logToOutput("No new notes found");
+                if (!newEvidence.isEmpty()) {
+                    newSecrets = extractSecretsFromMarkers(newEvidence.get(0));
+                    api.logging().logToOutput("Extracted " + newSecrets.size() + " secrets from new markers");
                 }
                 
-                // Compare notes to check for new secrets
-                if (notesContainNewSecrets(existingNotes, newNotes)) {
-                    api.logging().logToOutput("Found new secrets for the same endpoint: " + newPath);
+                // Compare secrets to check for new ones
+                boolean hasNewSecrets = false;
+                for (String newSecret : newSecrets) {
+                    if (!existingSecrets.contains(newSecret)) {
+                        api.logging().logToOutput("Found new secret during consolidation: " + newSecret);
+                        hasNewSecrets = true;
+                        break;
+                    }
+                }
+                
+                if (hasNewSecrets) {
+                    api.logging().logToOutput("Found new secrets for the same endpoint: " + existingBaseUrl);
                     return ConsolidationAction.KEEP_BOTH; // Found new secrets
                 } else {
-                    api.logging().logToOutput("No new secrets for the same endpoint: " + newPath);
+                    api.logging().logToOutput("No new secrets for the same endpoint: " + existingBaseUrl);
                     return ConsolidationAction.KEEP_EXISTING; // No new secrets
                 }
             } else {
-                api.logging().logToOutput("Different paths - keeping both issues");
+                api.logging().logToOutput("Different base URLs - keeping both issues");
             }
         } catch (Exception e) {
             api.logging().logToError("Error during issue consolidation: " + e.getMessage());
@@ -395,6 +400,61 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
         // Different endpoints or error occurred
         return ConsolidationAction.KEEP_BOTH;
     }
+
+    /**
+ * Extract actual secrets from response markers by removing the padding
+ */
+private Set<String> extractSecretsFromMarkers(HttpRequestResponse requestResponse) {
+    Set<String> extractedSecrets = new HashSet<>();
+    
+    if (requestResponse == null || requestResponse.response() == null) {
+        api.logging().logToOutput("No response to extract markers from");
+        return extractedSecrets;
+    }
+    
+    String responseBody = requestResponse.response().bodyToString();
+    int bodyOffset = requestResponse.response().bodyOffset();
+    List<Marker> markers = requestResponse.responseMarkers();
+    
+    if (markers == null || markers.isEmpty()) {
+        api.logging().logToOutput("No markers found in response");
+        return extractedSecrets;
+    }
+    
+    for (Marker marker : markers) {
+        try {
+            // Get marker start and end from the Range object
+            int startPos = marker.range().startIndexInclusive();
+            int endPos = marker.range().endIndexExclusive();
+            
+            // Adjust marker positions to account for the padding (we added 20 chars on each side)
+            int adjustedStartPos = startPos + 20;
+            int adjustedEndPos = endPos - 20;
+            
+            // If adjusted positions are invalid, log and continue without extraction
+            if (adjustedStartPos >= adjustedEndPos || 
+                adjustedStartPos < bodyOffset || 
+                adjustedEndPos > bodyOffset + responseBody.length()) {
+                
+                api.logging().logToOutput("Invalid marker adjustment, cannot extract secret properly");
+                continue;
+            }
+            
+            // Extract the actual secret without padding
+            String secret = requestResponse.response().toString().substring(
+                adjustedStartPos, adjustedEndPos);
+            
+            if (secret != null && !secret.isEmpty()) {
+                extractedSecrets.add(secret);
+                api.logging().logToOutput("Extracted secret from marker: " + secret);
+            }
+        } catch (Exception e) {
+            api.logging().logToError("Error extracting secret from marker: " + e.getMessage());
+        }
+    }
+    
+    return extractedSecrets;
+}
     
     private boolean notesContainNewSecrets(String existingNotes, String newNotes) {
         if (existingNotes == null || existingNotes.trim().isEmpty()) {
