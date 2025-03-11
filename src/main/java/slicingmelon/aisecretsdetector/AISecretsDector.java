@@ -36,17 +36,14 @@ public class AISecretsDector implements BurpExtension {
         this.api = api;
         api.extension().setName("AI Secrets Detector");
         
-        // Initialize configuration with a callback for when settings change
         config = new Config(api, this::updateWorkers);
         
         // Initialize worker thread pool
         initializeWorkers();
         
-        // Re-enable HTTP handler for real-time detection
         api.http().registerHttpHandler(new HttpHandler() {
             @Override
             public RequestToBeSentAction handleHttpRequestToBeSent(HttpRequestToBeSent requestToBeSent) {
-                // We're only interested in responses, not modifying requests
                 return RequestToBeSentAction.continueWith(requestToBeSent);
             }
             
@@ -65,7 +62,7 @@ public class AISecretsDector implements BurpExtension {
                     return ResponseReceivedAction.continueWith(responseReceived);
                 }
                 
-                // Check if we should process this response based on scope configuration
+                // Check if in scope only
                 if (config.getConfigSettings().isInScopeOnly() && !responseReceived.initiatingRequest().isInScope()) {
                     return ResponseReceivedAction.continueWith(responseReceived);
                 }
@@ -77,13 +74,11 @@ public class AISecretsDector implements BurpExtension {
             }
         });
         
-        // Create and register UI components
         SwingUtilities.invokeLater(() -> {
             JComponent configPanel = config.createConfigPanel();
             api.userInterface().registerSuiteTab("AI Secrets Detector", configPanel);
         });
         
-        // Register unloading handler
         api.extension().registerUnloadingHandler(() -> {
             api.logging().logToOutput("AI Secrets Detector extension unloading...");
             shutdownWorkers();
@@ -115,11 +110,10 @@ public class AISecretsDector implements BurpExtension {
             // Save response to temp file first (minimize memory usage)
             HttpResponse tempResponse = responseReceived.copyToTempFile();
             
-            // Create scanner and scan directly from the temp file response
             SecretScanner scanner = new SecretScanner(api);
             SecretScanner.SecretScanResult result = scanner.scanResponse(tempResponse);
             
-            // Process scan results
+            // Process found secrets
             if (result.hasSecrets()) {
                 String url = responseReceived.initiatingRequest().url().toString();
                 api.logging().logToOutput("HTTP Handler: Secrets found in response from: " + url);
@@ -130,14 +124,11 @@ public class AISecretsDector implements BurpExtension {
                 Map<String, Set<String>> secretTypeMap = new HashMap<>();
                 
                 for (SecretScanner.Secret secret : result.getDetectedSecrets()) {
-                    // Create a marker for this secret using exact positions for UI highlighting
                     responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
                     
-                    // Get the secret value directly from the Secret object
                     String secretValue = secret.getValue(); 
                     String secretType = secret.getType();
                     
-                    // Add to set of secrets found in this response
                     if (secretValue != null && !secretValue.isEmpty()) {
                         newSecrets.add(secretValue);
                         
@@ -172,7 +163,6 @@ public class AISecretsDector implements BurpExtension {
                         tempResponse  // Use the temp file version of response
                     );
                     
-                    // Mark the request/response with the found secrets (no notes)
                     HttpRequestResponse markedRequestResponse = requestResponse
                         .withResponseMarkers(responseMarkers);
                     
@@ -228,11 +218,11 @@ public class AISecretsDector implements BurpExtension {
         Set<String> existingSecrets = new HashSet<>();
         
         try {
-            // Extract the base URL without query parameters using URI parser
+            // fix bug .. extract the base URL without query parameters using URI parser
             String baseUrl = url;
             try {
                 URI uri = new URI(url);
-                // Reconstruct URL without query
+   
                 baseUrl = new URI(uri.getScheme(), 
                                   uri.getUserInfo(), 
                                   uri.getHost(), 
@@ -249,10 +239,8 @@ public class AISecretsDector implements BurpExtension {
                 baseUrl = url.contains("?") ? url.split("\\?")[0] : url;
             }
             
-            // Use the base URL for the filter
             SiteMapFilter urlFilter = SiteMapFilter.prefixFilter(baseUrl);
             
-            // Get all issues matching our filter
             List<AuditIssue> filteredIssues = api.siteMap().issues(urlFilter);
             
             api.logging().logToOutput("Found " + filteredIssues.size() + " filtered issues for base URL: " + baseUrl);
@@ -308,11 +296,10 @@ public class AISecretsDector implements BurpExtension {
         
         for (Marker marker : markers) {
             try {
-                // Get marker start and end from the Range object
                 int startPos = marker.range().startIndexInclusive();
                 int endPos = marker.range().endIndexExclusive();
                 
-                // Adjust marker positions to account for the padding (we added 20 chars on each side)
+                // Adjust marker positions to account for the padding (20 chars on each side)
                 int adjustedStartPos = startPos + 20;
                 int adjustedEndPos = endPos - 20;
                 
