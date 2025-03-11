@@ -116,38 +116,40 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
     
     @Override
     public ConsolidationAction consolidateIssues(AuditIssue newIssue, AuditIssue existingIssue) {
-        // Custom consolidation logic for our issues
-        
         // Only handle our own issues
         if (!existingIssue.name().equals("Exposed Secrets Detected") || !newIssue.name().equals("Exposed Secrets Detected")) {
             return ConsolidationAction.KEEP_BOTH; // Not our issues, let Burp handle them
         }
         
         try {
-            // Get URL paths to compare
-            URL existingUrl = new URL(existingIssue.baseUrl());
-            URL newUrl = new URL(newIssue.baseUrl());
+            // Get base URLs from issues
+            String existingPath = extractPathFromUrl(existingIssue.baseUrl());
+            String newPath = extractPathFromUrl(newIssue.baseUrl());
             
             // Check if they're the same endpoint
-            if (existingUrl.getPath().equals(newUrl.getPath())) {
-                // Same endpoint, check if there are new secrets in the notes
+            if (existingPath.equals(newPath)) {
+                // Get evidence request/responses from issues
+                List<HttpRequestResponse> existingEvidence = existingIssue.requestResponses();
+                List<HttpRequestResponse> newEvidence = newIssue.requestResponses();
+                
+                // Extract notes from evidence
                 String existingNotes = "";
                 String newNotes = "";
                 
-                // Extract notes from issue evidence
-                if (existingIssue.httpMessages().length > 0 && existingIssue.httpMessages()[0].annotations() != null) {
-                    existingNotes = existingIssue.httpMessages()[0].annotations().notes();
+                if (!existingEvidence.isEmpty() && existingEvidence.get(0).annotations() != null) {
+                    existingNotes = existingEvidence.get(0).annotations().notes();
                 }
                 
-                if (newIssue.httpMessages().length > 0 && newIssue.httpMessages()[0].annotations() != null) {
-                    newNotes = newIssue.httpMessages()[0].annotations().notes();
+                if (!newEvidence.isEmpty() && newEvidence.get(0).annotations() != null) {
+                    newNotes = newEvidence.get(0).annotations().notes();
                 }
                 
+                // Compare notes to check for new secrets
                 if (notesContainNewSecrets(existingNotes, newNotes)) {
-                    api.logging().logToOutput("Found new secrets for the same endpoint: " + newUrl.getPath());
+                    api.logging().logToOutput("Found new secrets for the same endpoint: " + newPath);
                     return ConsolidationAction.KEEP_BOTH; // Found new secrets
                 } else {
-                    api.logging().logToOutput("No new secrets for the same endpoint: " + newUrl.getPath());
+                    api.logging().logToOutput("No new secrets for the same endpoint: " + newPath);
                     return ConsolidationAction.KEEP_EXISTING; // No new secrets
                 }
             }
@@ -203,6 +205,16 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
         }
         
         return secrets;
+    }
+
+    private String extractPathFromUrl(String urlString) {
+        try {
+            java.net.URI uri = new java.net.URI(urlString);
+            return uri.getPath();
+        } catch (Exception e) {
+            // If URI parsing fails, just use the whole string for comparison
+            return urlString;
+        }
     }
     
     private void scanResponseForSecrets(HttpResponseReceived responseReceived) {
