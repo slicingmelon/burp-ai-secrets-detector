@@ -25,8 +25,11 @@ import java.util.concurrent.Executors;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.net.URL;
+import java.util.Set;
 
-public class AISecretsDector implements BurpExtension {
+public class AISecretsDector implements BurpExtension, ScanCheck {
     
     private MontoyaApi api;
     private ExecutorService executorService;
@@ -65,6 +68,9 @@ public class AISecretsDector implements BurpExtension {
             }
         });
         
+        // Register this class as a ScanCheck for issue consolidation
+        api.scanner().registerScanCheck(this);
+        
         // Create and register UI components
         SwingUtilities.invokeLater(() -> {
             JComponent configPanel = config.createConfigPanel();
@@ -95,6 +101,110 @@ public class AISecretsDector implements BurpExtension {
         initializeWorkers();
     }
     
+    // Required ScanCheck methods
+    @Override
+    public AuditResult activeAudit(HttpRequestResponse baseRequestResponse, AuditInsertionPoint auditInsertionPoint) {
+        // Not used but required - return empty result
+        return AuditResult.auditResult(new ArrayList<>());
+    }
+    
+    @Override
+    public AuditResult passiveAudit(HttpRequestResponse baseRequestResponse) {
+        // Not used but required - return empty result
+        return AuditResult.auditResult(new ArrayList<>());
+    }
+    
+    @Override
+    public ConsolidationAction consolidateIssues(AuditIssue newIssue, AuditIssue existingIssue) {
+        // Custom consolidation logic for our issues
+        
+        // Only handle our own issues
+        if (!existingIssue.name().equals("Exposed Secrets Detected") || !newIssue.name().equals("Exposed Secrets Detected")) {
+            return ConsolidationAction.KEEP_BOTH; // Not our issues, let Burp handle them
+        }
+        
+        try {
+            // Get URL paths to compare
+            URL existingUrl = new URL(existingIssue.baseUrl());
+            URL newUrl = new URL(newIssue.baseUrl());
+            
+            // Check if they're the same endpoint
+            if (existingUrl.getPath().equals(newUrl.getPath())) {
+                // Same endpoint, check if there are new secrets in the notes
+                String existingNotes = "";
+                String newNotes = "";
+                
+                // Extract notes from issue evidence
+                if (existingIssue.httpMessages().length > 0 && existingIssue.httpMessages()[0].annotations() != null) {
+                    existingNotes = existingIssue.httpMessages()[0].annotations().notes();
+                }
+                
+                if (newIssue.httpMessages().length > 0 && newIssue.httpMessages()[0].annotations() != null) {
+                    newNotes = newIssue.httpMessages()[0].annotations().notes();
+                }
+                
+                if (notesContainNewSecrets(existingNotes, newNotes)) {
+                    api.logging().logToOutput("Found new secrets for the same endpoint: " + newUrl.getPath());
+                    return ConsolidationAction.KEEP_BOTH; // Found new secrets
+                } else {
+                    api.logging().logToOutput("No new secrets for the same endpoint: " + newUrl.getPath());
+                    return ConsolidationAction.KEEP_EXISTING; // No new secrets
+                }
+            }
+        } catch (Exception e) {
+            api.logging().logToError("Error during issue consolidation: " + e.getMessage());
+        }
+        
+        // Different endpoints or error occurred
+        return ConsolidationAction.KEEP_BOTH;
+    }
+    
+    private boolean notesContainNewSecrets(String existingNotes, String newNotes) {
+        if (existingNotes == null || existingNotes.isEmpty()) {
+            return true; // No existing notes, so new notes contain new secrets
+        }
+        
+        if (newNotes == null || newNotes.isEmpty()) {
+            return false; // No new notes, so no new secrets
+        }
+        
+        // Extract secrets from notes
+        Set<String> existingSecrets = extractSecretsFromNotes(existingNotes);
+        Set<String> newSecrets = extractSecretsFromNotes(newNotes);
+        
+        // Check if any new secrets are not in existing secrets
+        for (String newSecret : newSecrets) {
+            if (!existingSecrets.contains(newSecret)) {
+                return true; // Found a new secret
+            }
+        }
+        
+        return false; // No new secrets
+    }
+    
+    private Set<String> extractSecretsFromNotes(String notes) {
+        Set<String> secrets = new HashSet<>();
+        
+        // Parse notes assuming format:
+        // Detected secrets:
+        // - <type>: <value>
+        // - <type>: <value>
+        
+        String[] lines = notes.split("\n");
+        for (String line : lines) {
+            if (line.startsWith("- ")) {
+                // Extract everything after the colon as the secret value
+                int colonPos = line.indexOf(": ");
+                if (colonPos > 0 && colonPos + 2 < line.length()) {
+                    String secretValue = line.substring(colonPos + 2).trim();
+                    secrets.add(secretValue);
+                }
+            }
+        }
+        
+        return secrets;
+    }
+    
     private void scanResponseForSecrets(HttpResponseReceived responseReceived) {
         try {
             // Save response to temp file first (minimize memory usage)
@@ -112,9 +222,30 @@ public class AISecretsDector implements BurpExtension {
                 // Create markers to highlight where the secrets are in the response
                 List<Marker> responseMarkers = new ArrayList<>();
                 
+                // Build notes with detected secrets for consolidation
+                StringBuilder secretNotes = new StringBuilder("Detected secrets:\n");
+                
                 for (SecretScanner.Secret secret : result.getDetectedSecrets()) {
                     // Create a marker for this secret using exact positions
                     responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
+                    
+                    // Extract the actual secret value for notes
+                    String secretValue = "";
+                    try {
+                        secretValue = tempResponse.bodyToString().substring(
+                            secret.getStartIndex(), 
+                            secret.getEndIndex()
+                        );
+                    } catch (Exception e) {
+                        secretValue = "[extraction failed]";
+                    }
+                    
+                    // Add to notes
+                    secretNotes.append(String.format(
+                        "- %s: %s\n", 
+                        secret.getType(),
+                        secretValue
+                    ));
                     
                     api.logging().logToOutput(String.format(
                         "Secret found: %s at position %d-%d", 
@@ -130,8 +261,11 @@ public class AISecretsDector implements BurpExtension {
                     tempResponse  // Use the temp file version of response
                 );
                 
-                // Mark the request/response with the found secrets
-                HttpRequestResponse markedRequestResponse = requestResponse.withResponseMarkers(responseMarkers);
+                // Mark the request/response with the found secrets and add notes
+                HttpRequestResponse markedRequestResponse = requestResponse
+                    .withResponseMarkers(responseMarkers)
+                    .withAnnotations(Annotations.annotations()
+                        .withNotes(secretNotes.toString()));
                 
                 // Build generic description
                 String detail = String.format(
@@ -148,7 +282,7 @@ public class AISecretsDector implements BurpExtension {
                         "Exposed Secrets Detected",
                         detail,
                         remediation,
-                        url,
+                        requestResponse.request().url(),
                         AuditIssueSeverity.HIGH,
                         AuditIssueConfidence.FIRM,
                         "Leaked secrets can lead to unauthorized access and system compromise.",
