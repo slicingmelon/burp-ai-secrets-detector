@@ -28,6 +28,9 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
+import java.net.URI;
+import java.net.URISyntaxException;
+
 
 public class AISecretsDector implements BurpExtension {
     
@@ -203,31 +206,52 @@ public class AISecretsDector implements BurpExtension {
         Set<String> existingSecrets = new HashSet<>();
         
         try {
-            // Create a filter to get issues for this URL using the available prefixFilter
-            // This will return issues with URLs that start with our URL
-            SiteMapFilter urlFilter = SiteMapFilter.prefixFilter(url);
+            // Extract the base URL without query parameters using URI parser
+            String baseUrl = url;
+            try {
+                URI uri = new URI(url);
+                // Reconstruct URL without query
+                baseUrl = new URI(uri.getScheme(), 
+                                  uri.getUserInfo(), 
+                                  uri.getHost(), 
+                                  uri.getPort(),
+                                  uri.getPath(), 
+                                  null, // No query
+                                  null) // No fragment
+                         .toString();
+                
+                api.logging().logToOutput("Normalized URL from " + url + " to " + baseUrl);
+            } catch (URISyntaxException e) {
+                // If URI parsing fails, fall back to string splitting
+                api.logging().logToOutput("Failed to parse URL with URI parser, falling back to string splitting");
+                baseUrl = url.contains("?") ? url.split("\\?")[0] : url;
+            }
+            
+            // Use the base URL for the filter
+            SiteMapFilter urlFilter = SiteMapFilter.prefixFilter(baseUrl);
             
             // Get all issues matching our filter
             List<AuditIssue> filteredIssues = api.siteMap().issues(urlFilter);
             
-            // Log how many filtered issues we found
-            api.logging().logToOutput("Found " + filteredIssues.size() + " filtered issues for URL prefix: " + url);
+            api.logging().logToOutput("Found " + filteredIssues.size() + " filtered issues for base URL: " + baseUrl);
             
-            // Process only our "Exposed Secrets Detected" issues with exact URL match
+            // Process only our "Exposed Secrets Detected" issues
             for (AuditIssue issue : filteredIssues) {
-                // Double-check that this is an exact URL match and our issue type
-                if (issue.name().equals("Exposed Secrets Detected") && issue.baseUrl().equals(url)) {
-                    api.logging().logToOutput("Processing existing secret issue for URL: " + url);
-                    
-                    // Process evidence efficiently
-                    for (HttpRequestResponse evidence : issue.requestResponses()) {
-                        List<Marker> markers = evidence.responseMarkers();
+                if (issue.name().equals("Exposed Secrets Detected")) {
+                    // Check if base URLs match (we know issue.baseUrl() doesn't have query params)
+                    if (issue.baseUrl().equals(baseUrl)) {
+                        api.logging().logToOutput("Processing existing secret issue from: " + issue.baseUrl());
                         
-                        if (markers != null && !markers.isEmpty()) {
-                            api.logging().logToOutput("Processing " + markers.size() + " markers from evidence");
+                        // Process evidence efficiently
+                        for (HttpRequestResponse evidence : issue.requestResponses()) {
+                            List<Marker> markers = evidence.responseMarkers();
                             
-                            Set<String> secretsFromMarkers = extractSecretsFromMarkers(evidence);
-                            existingSecrets.addAll(secretsFromMarkers);
+                            if (markers != null && !markers.isEmpty()) {
+                                api.logging().logToOutput("Processing " + markers.size() + " markers from evidence");
+                                
+                                Set<String> secretsFromMarkers = extractSecretsFromMarkers(evidence);
+                                existingSecrets.addAll(secretsFromMarkers);
+                            }
                         }
                     }
                 }
