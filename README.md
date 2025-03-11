@@ -68,7 +68,11 @@ The extension includes several optimizations for performance and resource effici
 
 These optimizations ensure the extension remains lightweight and responsive even when processing large volumes of traffic.
 
+## TO DO
 
+- The extension needs thorough testing to minimize false positives before enabling AI integration, as each false positive would unnecessarily consume tokens.
+- While it's not currently possible to use custom AI models through the Montoya API, and Burp's built-in AI is a paid service with token limitations, the next version will have the option to leverage Burp's AI for additional verification of detected secrets once the base detection rate is refined.
+  
 ## Credits
 
 This extension is inspired by and ports the randomness detection algorithm from [RipSecrets](https://github.com/sirwart/ripsecrets), a tool designed to find secrets accidentally committed to repositories.
