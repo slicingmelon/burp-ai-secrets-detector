@@ -116,8 +116,12 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
     
     @Override
     public ConsolidationAction consolidateIssues(AuditIssue newIssue, AuditIssue existingIssue) {
+        // Add debug at the very beginning to confirm this method is called
+        api.logging().logToOutput("CONSOLIDATION METHOD CALLED for issues: " + newIssue.name() + " and " + existingIssue.name());
+        
         // Only handle our own issues
         if (!existingIssue.name().equals("Exposed Secrets Detected") || !newIssue.name().equals("Exposed Secrets Detected")) {
+            api.logging().logToOutput("Not our issues - keeping both");
             return ConsolidationAction.KEEP_BOTH; // Not our issues, let Burp handle them
         }
         
@@ -126,16 +130,17 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
             String existingPath = extractPathFromUrl(existingIssue.baseUrl());
             String newPath = extractPathFromUrl(newIssue.baseUrl());
             
+            // Log the paths we're comparing
+            api.logging().logToOutput("Comparing paths: " + existingPath + " vs " + newPath);
+            
             // Check if they're the same endpoint
             if (existingPath.equals(newPath)) {
-                // Add more debug logging here
                 api.logging().logToOutput("Consolidation triggered for path: " + existingPath);
                 
                 // Get evidence request/responses from issues
                 List<HttpRequestResponse> existingEvidence = existingIssue.requestResponses();
                 List<HttpRequestResponse> newEvidence = newIssue.requestResponses();
                 
-                // Add debug logging for the evidence
                 api.logging().logToOutput("Existing evidence count: " + existingEvidence.size());
                 api.logging().logToOutput("New evidence count: " + newEvidence.size());
                 
@@ -165,6 +170,8 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
                     api.logging().logToOutput("No new secrets for the same endpoint: " + newPath);
                     return ConsolidationAction.KEEP_EXISTING; // No new secrets
                 }
+            } else {
+                api.logging().logToOutput("Different paths - keeping both issues");
             }
         } catch (Exception e) {
             api.logging().logToError("Error during issue consolidation: " + e.getMessage());
