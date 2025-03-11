@@ -26,7 +26,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.net.URL;
 import java.util.Set;
 
 public class AISecretsDector implements BurpExtension {
@@ -68,9 +67,6 @@ public class AISecretsDector implements BurpExtension {
             }
         });
         
-        // Register this class as a ScanCheck for issue consolidation
-        //api.scanner().registerScanCheck(this);
-        
         // Create and register UI components
         SwingUtilities.invokeLater(() -> {
             JComponent configPanel = config.createConfigPanel();
@@ -101,9 +97,9 @@ public class AISecretsDector implements BurpExtension {
         initializeWorkers();
     }
 
-        /**
-     * Process HTTP response and compare with existing issues
-     */
+    /*
+    * Process HTTP response and compare with existing issues
+    */
     private void processHttpResponse(HttpResponseReceived responseReceived) {
         try {
             // Save response to temp file first (minimize memory usage)
@@ -205,9 +201,9 @@ public class AISecretsDector implements BurpExtension {
         }
     }
 
-    /**
-     * Extract existing secrets for a URL from Burp's site map
-     */
+    /*
+    * Extract existing secrets for a URL from Burp's site map
+    */
     private Set<String> extractExistingSecretsForUrl(String url) {
         Set<String> existingSecrets = new HashSet<>();
         
@@ -233,9 +229,9 @@ public class AISecretsDector implements BurpExtension {
         return existingSecrets;
     }
     
-    /**
-     * Extract actual secrets from response markers by removing the padding
-     */
+    /*
+    * Extract actual secrets from response markers by removing the padding
+    */
     private Set<String> extractSecretsFromMarkers(HttpRequestResponse requestResponse) {
         Set<String> extractedSecrets = new HashSet<>();
         
