@@ -137,7 +137,6 @@ public class AISecretsDector implements BurpExtension {
                     if (secretValue != null && !secretValue.isEmpty()) {
                         newSecrets.add(secretValue);
                         
-                        // Track what types of secrets we found
                         if (!secretTypeMap.containsKey(secretType)) {
                             secretTypeMap.put(secretType, new HashSet<>());
                         }
