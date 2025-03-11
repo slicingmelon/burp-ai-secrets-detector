@@ -16,6 +16,7 @@ import burp.api.montoya.scanner.audit.insertionpoint.AuditInsertionPoint;
 import burp.api.montoya.scanner.audit.issues.AuditIssue;
 import burp.api.montoya.scanner.audit.issues.AuditIssueConfidence;
 import burp.api.montoya.scanner.audit.issues.AuditIssueSeverity;
+import burp.api.montoya.sitemap.SiteMapFilter;
 
 import javax.swing.*;
 import java.awt.*;
@@ -202,11 +203,21 @@ public class AISecretsDector implements BurpExtension {
         Set<String> existingSecrets = new HashSet<>();
         
         try {
-            // Find only issues related to the URL
-            for (AuditIssue issue : api.siteMap().issues()) {
-                // Performance improvement: Only process our issues with matching URL
+            // Create a filter to get issues for this URL using the available prefixFilter
+            // This will return issues with URLs that start with our URL
+            SiteMapFilter urlFilter = SiteMapFilter.prefixFilter(url);
+            
+            // Get all issues matching our filter
+            List<AuditIssue> filteredIssues = api.siteMap().issues(urlFilter);
+            
+            // Log how many filtered issues we found
+            api.logging().logToOutput("Found " + filteredIssues.size() + " filtered issues for URL prefix: " + url);
+            
+            // Process only our "Exposed Secrets Detected" issues with exact URL match
+            for (AuditIssue issue : filteredIssues) {
+                // Double-check that this is an exact URL match and our issue type
                 if (issue.name().equals("Exposed Secrets Detected") && issue.baseUrl().equals(url)) {
-                    api.logging().logToOutput("Found existing issue for URL: " + url);
+                    api.logging().logToOutput("Processing existing secret issue for URL: " + url);
                     
                     // Process evidence efficiently
                     for (HttpRequestResponse evidence : issue.requestResponses()) {
