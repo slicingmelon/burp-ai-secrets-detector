@@ -67,15 +67,26 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
                     responseReceived
                 );
                 
-                // Submit to our worker thread pool
+                // Submit to our worker thread pool to run the passive audit directly
                 executorService.submit(() -> {
-                    // Use the passiveAudit method to scan and report issues
-                    AuditResult result = passiveAudit(requestResponse);
-                    
-                    // Report any issues found to the scanner
-                    for (AuditIssue issue : result.auditIssues()) {
-                        api.logging().logToOutput("Reporting issue via Scanner API: " + issue.name());
-                        api.scanner().reportIssue(issue); 
+                    try {
+                        // Process directly via our passiveAudit method
+                        AuditResult result = passiveAudit(requestResponse);
+                        
+                        if (!result.auditIssues().isEmpty()) {
+                            api.logging().logToOutput("Passive audit found " + result.auditIssues().size() + 
+                                                     " issues for: " + requestResponse.request().url());
+                            
+                            // The issues will be automatically reported to the scanner
+                            // by returning them from passiveAudit, but we need to also 
+                            // add them to the site map to see them in real-time
+                            for (AuditIssue issue : result.auditIssues()) {
+                                api.siteMap().add(issue);
+                            }
+                        }
+                    } catch (Exception e) {
+                        api.logging().logToError("Error processing response: " + e.getMessage());
+                        e.printStackTrace();
                     }
                 });
                 
