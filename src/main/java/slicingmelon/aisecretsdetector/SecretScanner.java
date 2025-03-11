@@ -354,19 +354,15 @@ public class SecretScanner {
                 return new SecretScanResult(response, foundSecrets);
             }
             
-            // Get response body as string
             String responseBody = response.bodyToString();
             
-            // Get the body offset - this tells us where the body begins in the full response
             int bodyOffset = response.bodyOffset();
             
-            // Process each pattern against the body
             for (SecretPattern pattern : secretPatterns) {
                 try {
                     Matcher matcher = pattern.getPattern().matcher(responseBody);
                     
                     while (matcher.find()) {
-                        // Get the secret value
                         String secretValue;
                         int bodyStartPos; 
                         int bodyEndPos;
@@ -430,7 +426,6 @@ public class SecretScanner {
             return false;
         }
         
-        // Check if it contains at least one digit
         boolean containsDigit = false;
         for (byte b : data) {
             if (b >= '0' && b <= '9') {
@@ -467,7 +462,6 @@ public class SecretScanner {
      * Checks if a byte sequence appears to be hexadecimal
      */
     private boolean isHex(byte[] data) {
-        // Check if the string matches the hex regex (all characters are hex digits)
         for (byte b : data) {
             if (!((b >= '0' && b <= '9') || (b >= 'a' && b <= 'f') || (b >= 'A' && b <= 'F'))) {
                 return false;

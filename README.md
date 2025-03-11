@@ -22,13 +22,12 @@ The extension contains a comprehensive set of regular expressions designed to ma
 - JWT/JWE Tokens
 - GCP API Keys
 - Various private key formats (RSA, DSA, EC, SSH, etc.)
-- And many more
+- And more
 
-These patterns are highly specific, resulting in minimal false positives when searching for secrets with standardized formats.
 
 ### 2. Random String Detection Algorithm
 
-For detecting secrets that don't follow standardized patterns, the extension implements a sophisticated randomness analysis algorithm ported from RipSecrets. This algorithm:
+For detecting secrets that don't follow standardized patterns, the extension implements a randomness analysis algorithm ported from RipSecrets. This algorithm:
 
 1. **Identifies potential secrets** by looking for variable assignments matching patterns like `key = "value"`, `token: "value"`, etc.
 
@@ -43,17 +42,17 @@ For detecting secrets that don't follow standardized patterns, the extension imp
    - Contain at least one digit
    - Pass a randomness probability threshold
 
-This dual-detection approach ensures high accuracy in finding both standardized secrets and custom tokens or API keys that might be specific to particular applications.
+This dual-detection approach provider high accuracy in finding both common and random secrets or API keys that might be hardcoded in HTTP responses.
 
 ## Content Type Filtering
 
-The extension is smart enough to skip binary content types (images, videos, fonts, etc.) where secrets are unlikely to be found, improving performance and reducing noise.
+The scanning phase is set to skip binary content types (images, videos, fonts, etc.) where secrets are unlikely to be found.
 
 ## Configuration
 
 The extension allows you to configure:
 - Number of worker threads for background scanning
-- Whether to scan only in-scope requests
+- Whether to scan only in-scope targets
 - Which Burp tools to enable scanning for (Proxy, Scanner, Extensions, Repeater, etc.)
 
 ## Optimizations

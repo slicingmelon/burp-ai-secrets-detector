@@ -102,7 +102,7 @@ public class AISecretsDector implements BurpExtension {
         initializeWorkers();
     }
 
-    /*
+    /**
     * Process HTTP response and compare with existing issues
     */
     private void processHttpResponse(HttpResponseReceived responseReceived) {
@@ -142,7 +142,6 @@ public class AISecretsDector implements BurpExtension {
                     }
                 }
                 
-                // Find existing issues for this URL
                 Set<String> existingSecrets = extractExistingSecretsForUrl(url);
                 api.logging().logToOutput("HTTP Handler: Found " + existingSecrets.size() + " existing secrets for URL: " + url);
                 
@@ -155,9 +154,8 @@ public class AISecretsDector implements BurpExtension {
                     }
                 }
                 
-                // Only create a new issue if we have new secrets
                 if (hasNewSecrets) {
-                    // Create HttpRequestResponse for markers and issue reporting
+                    // Create back the HttpRequestResponse object for markers and issue reporting (needed by AuditIssue)
                     HttpRequestResponse requestResponse = HttpRequestResponse.httpRequestResponse(
                         responseReceived.initiatingRequest(),
                         tempResponse  // Use the temp file version of response
@@ -179,7 +177,6 @@ public class AISecretsDector implements BurpExtension {
                     detailBuilder.append("</ul><p>Click the highlights in the response to view the actual secrets.</p>");
                     String detail = detailBuilder.toString();
                     
-                    // Create remediation advice
                     String remediation = "<p>Sensitive information such as API keys, tokens, and other secrets should not be included in HTTP responses. " +
                             "Review the application code to ensure secrets are not leaked to clients.</p>";
                     
@@ -211,7 +208,7 @@ public class AISecretsDector implements BurpExtension {
         }
     }
 
-    /*
+    /**
     * Extract existing secrets for a URL from Burp's site map
     */
     private Set<String> extractExistingSecretsForUrl(String url) {
@@ -248,7 +245,6 @@ public class AISecretsDector implements BurpExtension {
             // Process only our "Exposed Secrets Detected" issues
             for (AuditIssue issue : filteredIssues) {
                 if (issue.name().equals("Exposed Secrets Detected")) {
-                    // Check if base URLs match (we know issue.baseUrl() doesn't have query params)
                     if (issue.baseUrl().equals(baseUrl)) {
                         api.logging().logToOutput("Processing existing secret issue from: " + issue.baseUrl());
                         
