@@ -162,57 +162,67 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
     }
     
     private boolean notesContainNewSecrets(String existingNotes, String newNotes) {
-        if (existingNotes == null || existingNotes.isEmpty()) {
-            return true; // No existing notes, so new notes contain new secrets
+        if (existingNotes == null || existingNotes.trim().isEmpty()) {
+            return newNotes != null && !newNotes.trim().isEmpty();
         }
         
-        if (newNotes == null || newNotes.isEmpty()) {
-            return false; // No new notes, so no new secrets
+        if (newNotes == null || newNotes.trim().isEmpty()) {
+            return false;
         }
         
-        // Extract secrets from notes
+        // Extract secrets from notes (simplified format now)
         Set<String> existingSecrets = extractSecretsFromNotes(existingNotes);
         Set<String> newSecrets = extractSecretsFromNotes(newNotes);
+        
+        // Debug logging to see what's being compared
+        api.logging().logToOutput("Existing secrets count: " + existingSecrets.size());
+        api.logging().logToOutput("New secrets count: " + newSecrets.size());
         
         // Check if any new secrets are not in existing secrets
         for (String newSecret : newSecrets) {
             if (!existingSecrets.contains(newSecret)) {
-                return true; // Found a new secret
+                api.logging().logToOutput("Found new secret during consolidation: " + newSecret);
+                return true;
             }
         }
         
-        return false; // No new secrets
+        return false;
     }
     
     private Set<String> extractSecretsFromNotes(String notes) {
         Set<String> secrets = new HashSet<>();
         
-        // Parse notes assuming format:
-        // Detected secrets:
-        // - <type>: <value>
-        // - <type>: <value>
-        
-        String[] lines = notes.split("\n");
-        for (String line : lines) {
-            if (line.startsWith("- ")) {
-                // Extract everything after the colon as the secret value
-                int colonPos = line.indexOf(": ");
-                if (colonPos > 0 && colonPos + 2 < line.length()) {
-                    String secretValue = line.substring(colonPos + 2).trim();
-                    secrets.add(secretValue);
+        // Each line is now a secret
+        if (notes != null && !notes.isEmpty()) {
+            String[] lines = notes.split("\n");
+            for (String line : lines) {
+                line = line.trim();
+                if (!line.isEmpty()) {
+                    secrets.add(line);
                 }
             }
         }
         
         return secrets;
     }
+    
 
     private String extractPathFromUrl(String urlString) {
         try {
+            // Add extra handling for just path
             java.net.URI uri = new java.net.URI(urlString);
-            return uri.getPath();
+            String path = uri.getPath();
+            
+            // Default to "/" if path is empty
+            if (path == null || path.isEmpty()) {
+                path = "/";
+            }
+            
+            api.logging().logToOutput("Extracted path for consolidation: " + path + " from " + urlString);
+            return path;
+            
         } catch (Exception e) {
-            // If URI parsing fails, just use the whole string for comparison
+            api.logging().logToError("Error extracting path from URL: " + e.getMessage());
             return urlString;
         }
     }
@@ -234,30 +244,23 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
                 // Create markers to highlight where the secrets are in the response
                 List<Marker> responseMarkers = new ArrayList<>();
                 
-                // Build notes with detected secrets for consolidation
-                StringBuilder secretNotes = new StringBuilder("Detected secrets:\n");
+                // Build simple notes with just the secrets - one per line
+                StringBuilder secretNotes = new StringBuilder();
                 
                 for (SecretScanner.Secret secret : result.getDetectedSecrets()) {
-                    // Create a marker for this secret using exact positions
+                    // Create a marker for this secret using exact positions for UI highlighting
                     responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
                     
-                    // Extract the actual secret value for notes
-                    String secretValue = "";
-                    try {
-                        secretValue = tempResponse.bodyToString().substring(
-                            secret.getStartIndex(), 
-                            secret.getEndIndex()
-                        );
-                    } catch (Exception e) {
-                        secretValue = "[extraction failed]";
-                    }
+                    // Get the secret value directly from the Secret object
+                    String secretValue = secret.getValue(); // Assuming there's a getValue() method
                     
-                    // Add to notes
-                    secretNotes.append(String.format(
-                        "- %s: %s\n", 
-                        secret.getType(),
-                        secretValue
-                    ));
+                    // If there's no getValue() method, we might need to use a different approach
+                    // like secret.getType() + " detected" or some other identifier
+                    
+                    // Add to notes - just the secret value per line (if not null)
+                    if (secretValue != null && !secretValue.isEmpty()) {
+                        secretNotes.append(secretValue).append("\n");
+                    }
                     
                     api.logging().logToOutput(String.format(
                         "Secret found: %s at position %d-%d", 
@@ -267,7 +270,7 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
                     ));
                 }
                 
-                // Create HttpRequestResponse only when we need it for markers and issue reporting
+                // Create HttpRequestResponse for markers and issue reporting
                 HttpRequestResponse requestResponse = HttpRequestResponse.httpRequestResponse(
                     responseReceived.initiatingRequest(),
                     tempResponse  // Use the temp file version of response
