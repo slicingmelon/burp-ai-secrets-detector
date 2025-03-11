@@ -21,8 +21,8 @@ public class SecretScanner {
     
     private final MontoyaApi api;
     private final List<SecretPattern> secretPatterns;
-   // private static final String RANDOM_STRING_REGEX = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-)\\s*[\\t \"'`]?([\\w+./=~-]{15,80})(?:[\\t\\n \"'`]|$)";
-    private static final String RANDOM_STRING_REGEX = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-|:\\s+\")\\s*[\\t \"'`]?([\\w+./=~-]{15,80})(?:[\\t\\n \"'`]|$)";
+    private static final String RANDOM_STRING_REGEX = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-)\\s*[\\t \"'`]?([\\w+./=~-]{15,80})(?:[\\t\\n \"'`]|$)";
+    //private static final String RANDOM_STRING_REGEX = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-|:\\s+\")\\s*[\\t \"'`]?([\\w+./=~-]{15,80})(?:[\\t\\n \"'`]|$)";
 
     // Secret detection related classes
     public static class Secret {
