@@ -128,9 +128,16 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
             
             // Check if they're the same endpoint
             if (existingPath.equals(newPath)) {
+                // Add more debug logging here
+                api.logging().logToOutput("Consolidation triggered for path: " + existingPath);
+                
                 // Get evidence request/responses from issues
                 List<HttpRequestResponse> existingEvidence = existingIssue.requestResponses();
                 List<HttpRequestResponse> newEvidence = newIssue.requestResponses();
+                
+                // Add debug logging for the evidence
+                api.logging().logToOutput("Existing evidence count: " + existingEvidence.size());
+                api.logging().logToOutput("New evidence count: " + newEvidence.size());
                 
                 // Extract notes from evidence
                 String existingNotes = "";
@@ -138,10 +145,16 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
                 
                 if (!existingEvidence.isEmpty() && existingEvidence.get(0).annotations() != null) {
                     existingNotes = existingEvidence.get(0).annotations().notes();
+                    api.logging().logToOutput("Existing notes: " + existingNotes);
+                } else {
+                    api.logging().logToOutput("No existing notes found");
                 }
                 
                 if (!newEvidence.isEmpty() && newEvidence.get(0).annotations() != null) {
                     newNotes = newEvidence.get(0).annotations().notes();
+                    api.logging().logToOutput("New notes: " + newNotes);
+                } else {
+                    api.logging().logToOutput("No new notes found");
                 }
                 
                 // Compare notes to check for new secrets
@@ -155,6 +168,7 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
             }
         } catch (Exception e) {
             api.logging().logToError("Error during issue consolidation: " + e.getMessage());
+            e.printStackTrace();
         }
         
         // Different endpoints or error occurred
@@ -170,13 +184,13 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
             return false;
         }
         
-        // Extract secrets from notes (simplified format now)
+        // Extract secrets from notes (one per line)
         Set<String> existingSecrets = extractSecretsFromNotes(existingNotes);
         Set<String> newSecrets = extractSecretsFromNotes(newNotes);
         
         // Debug logging to see what's being compared
-        api.logging().logToOutput("Existing secrets count: " + existingSecrets.size());
-        api.logging().logToOutput("New secrets count: " + newSecrets.size());
+        api.logging().logToOutput("Consolidation - Existing secrets count: " + existingSecrets.size());
+        api.logging().logToOutput("Consolidation - New secrets count: " + newSecrets.size());
         
         // Check if any new secrets are not in existing secrets
         for (String newSecret : newSecrets) {
@@ -192,13 +206,14 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
     private Set<String> extractSecretsFromNotes(String notes) {
         Set<String> secrets = new HashSet<>();
         
-        // Each line is now a secret
+        // Each line is one raw secret
         if (notes != null && !notes.isEmpty()) {
             String[] lines = notes.split("\n");
             for (String line : lines) {
                 line = line.trim();
                 if (!line.isEmpty()) {
                     secrets.add(line);
+                    api.logging().logToOutput("Extracted raw secret from notes: " + line);
                 }
             }
         }
@@ -252,14 +267,12 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
                     responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
                     
                     // Get the secret value directly from the Secret object
-                    String secretValue = secret.getValue(); // Assuming there's a getValue() method
+                    String secretValue = secret.getValue(); 
                     
-                    // If there's no getValue() method, we might need to use a different approach
-                    // like secret.getType() + " detected" or some other identifier
-                    
-                    // Add to notes - just the secret value per line (if not null)
+                    // Add to notes - just the raw secret value per line (if not null)
                     if (secretValue != null && !secretValue.isEmpty()) {
                         secretNotes.append(secretValue).append("\n");
+                        api.logging().logToOutput("Adding raw secret to notes: " + secretValue);
                     }
                     
                     api.logging().logToOutput(String.format(
@@ -276,11 +289,23 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
                     tempResponse  // Use the temp file version of response
                 );
                 
+                // Log the notes that will be added
+                api.logging().logToOutput("Adding notes to request/response with raw secrets");
+                
                 // Mark the request/response with the found secrets and add notes
                 HttpRequestResponse markedRequestResponse = requestResponse
                     .withResponseMarkers(responseMarkers)
                     .withAnnotations(Annotations.annotations()
                         .withNotes(secretNotes.toString()));
+                
+                // Debug check if annotations were properly added
+                if (markedRequestResponse.annotations() != null && 
+                    markedRequestResponse.annotations().notes() != null) {
+                    api.logging().logToOutput("Annotations added successfully with " + 
+                                             result.getSecretCount() + " raw secrets");
+                } else {
+                    api.logging().logToOutput("WARNING: Annotations were not added correctly");
+                }
                 
                 // Build generic description
                 String detail = String.format(
@@ -306,7 +331,8 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
                         markedRequestResponse
                 );
                 
-                // Add the issue to Burp's issues list
+                // Add the issue to Burp's issues list and log the action
+                api.logging().logToOutput("Adding audit issue for URL: " + requestResponse.request().url());
                 api.siteMap().add(auditIssue);
             }
             
