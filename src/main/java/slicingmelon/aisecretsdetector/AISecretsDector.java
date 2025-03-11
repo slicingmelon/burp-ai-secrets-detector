@@ -11,6 +11,7 @@ import burp.api.montoya.scanner.audit.issues.AuditIssueConfidence;
 import burp.api.montoya.scanner.audit.issues.AuditIssueSeverity;
 import burp.api.montoya.sitemap.SiteMapFilter;
 import burp.api.montoya.core.ToolType;
+import burp.api.montoya.http.message.MimeType;
 
 import javax.swing.*;
 import java.util.concurrent.ExecutorService;
@@ -61,6 +62,10 @@ public class AISecretsDector implements BurpExtension {
                 if (!isFromEnabledTool) {
                     return ResponseReceivedAction.continueWith(responseReceived);
                 }
+
+                if (shouldSkipMimeType(responseReceived.mimeType())) {
+                    return ResponseReceivedAction.continueWith(responseReceived);
+                }
                 
                 // Check if in scope only
                 if (config.getConfigSettings().isInScopeOnly() && !responseReceived.initiatingRequest().isInScope()) {
@@ -102,7 +107,7 @@ public class AISecretsDector implements BurpExtension {
         initializeWorkers();
     }
 
-    /*
+    /**
     * Process HTTP response and compare with existing issues
     */
     private void processHttpResponse(HttpResponseReceived responseReceived) {
@@ -132,7 +137,6 @@ public class AISecretsDector implements BurpExtension {
                     if (secretValue != null && !secretValue.isEmpty()) {
                         newSecrets.add(secretValue);
                         
-                        // Track what types of secrets we found
                         if (!secretTypeMap.containsKey(secretType)) {
                             secretTypeMap.put(secretType, new HashSet<>());
                         }
@@ -142,7 +146,6 @@ public class AISecretsDector implements BurpExtension {
                     }
                 }
                 
-                // Find existing issues for this URL
                 Set<String> existingSecrets = extractExistingSecretsForUrl(url);
                 api.logging().logToOutput("HTTP Handler: Found " + existingSecrets.size() + " existing secrets for URL: " + url);
                 
@@ -155,9 +158,8 @@ public class AISecretsDector implements BurpExtension {
                     }
                 }
                 
-                // Only create a new issue if we have new secrets
                 if (hasNewSecrets) {
-                    // Create HttpRequestResponse for markers and issue reporting
+                    // Create back the HttpRequestResponse object for markers and issue reporting (needed by AuditIssue)
                     HttpRequestResponse requestResponse = HttpRequestResponse.httpRequestResponse(
                         responseReceived.initiatingRequest(),
                         tempResponse  // Use the temp file version of response
@@ -179,7 +181,6 @@ public class AISecretsDector implements BurpExtension {
                     detailBuilder.append("</ul><p>Click the highlights in the response to view the actual secrets.</p>");
                     String detail = detailBuilder.toString();
                     
-                    // Create remediation advice
                     String remediation = "<p>Sensitive information such as API keys, tokens, and other secrets should not be included in HTTP responses. " +
                             "Review the application code to ensure secrets are not leaked to clients.</p>";
                     
@@ -211,7 +212,7 @@ public class AISecretsDector implements BurpExtension {
         }
     }
 
-    /*
+    /**
     * Extract existing secrets for a URL from Burp's site map
     */
     private Set<String> extractExistingSecretsForUrl(String url) {
@@ -232,7 +233,7 @@ public class AISecretsDector implements BurpExtension {
                                   null) // No fragment
                          .toString();
                 
-                api.logging().logToOutput("Normalized URL from " + url + " to " + baseUrl);
+                //api.logging().logToOutput("Normalized URL from " + url + " to " + baseUrl);
             } catch (URISyntaxException e) {
                 // If URI parsing fails, fall back to string splitting
                 api.logging().logToOutput("Failed to parse URL with URI parser, falling back to string splitting");
@@ -248,7 +249,6 @@ public class AISecretsDector implements BurpExtension {
             // Process only our "Exposed Secrets Detected" issues
             for (AuditIssue issue : filteredIssues) {
                 if (issue.name().equals("Exposed Secrets Detected")) {
-                    // Check if base URLs match (we know issue.baseUrl() doesn't have query params)
                     if (issue.baseUrl().equals(baseUrl)) {
                         api.logging().logToOutput("Processing existing secret issue from: " + issue.baseUrl());
                         
@@ -326,5 +326,29 @@ public class AISecretsDector implements BurpExtension {
         }
         
         return extractedSecrets;
+    }
+
+    // Skip binary content types that are unlikely to contain secrets
+    public boolean shouldSkipMimeType(MimeType mimeType) {
+        switch (mimeType) {
+            case IMAGE_BMP:
+            case IMAGE_GIF:
+            case IMAGE_JPEG:
+            case IMAGE_PNG:
+            case IMAGE_SVG_XML:
+            case IMAGE_TIFF:
+            case IMAGE_UNKNOWN:
+
+            case FONT_WOFF:
+            case FONT_WOFF2:
+            case SOUND:
+            case VIDEO:
+            case APPLICATION_FLASH:
+            case RTF:
+                return true;
+            // Process all other MIME types
+            default:
+                return false;
+        }
     }
 }

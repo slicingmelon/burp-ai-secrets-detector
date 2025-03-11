@@ -2,7 +2,7 @@ package slicingmelon.aisecretsdetector;
 
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.responses.HttpResponse;
-import burp.api.montoya.http.message.MimeType;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.HashMap;
@@ -314,59 +314,22 @@ public class SecretScanner {
         return patterns;
     }
 
-    private boolean shouldSkipMimeType(MimeType mimeType) {
-        // Skip binary content types that are unlikely to contain secrets
-        switch (mimeType) {
-            // Images
-            case IMAGE_BMP:
-            case IMAGE_GIF:
-            case IMAGE_JPEG:
-            case IMAGE_PNG:
-            case IMAGE_SVG_XML:
-            case IMAGE_TIFF:
-            case IMAGE_UNKNOWN:
-            // Fonts
-            case FONT_WOFF:
-            case FONT_WOFF2:
-            // Media
-            case SOUND:
-            case VIDEO:
-            // Other binary formats
-            case APPLICATION_FLASH:
-            case RTF:
-                return true;
-            // Process all other MIME types
-            default:
-                return false;
-        }
-    }
-    
     public SecretScanResult scanResponse(HttpResponse response) {
         List<Secret> foundSecrets = new ArrayList<>();
         
+        // Track unique secrets by value to avoid duplicates within the same response
+        Set<String> uniqueSecretValues = new HashSet<>();
+        
         try {
-            // Check MIME type first to exclude binary content
-            MimeType mimeType = response.mimeType();
-            
-            // Skip responses that are unlikely to contain text-based secrets
-            if (shouldSkipMimeType(mimeType)) {
-                api.logging().logToOutput("Skipping scan of " + mimeType + " content");
-                return new SecretScanResult(response, foundSecrets);
-            }
-            
-            // Get response body as string
             String responseBody = response.bodyToString();
             
-            // Get the body offset - this tells us where the body begins in the full response
             int bodyOffset = response.bodyOffset();
             
-            // Process each pattern against the body
             for (SecretPattern pattern : secretPatterns) {
                 try {
                     Matcher matcher = pattern.getPattern().matcher(responseBody);
                     
                     while (matcher.find()) {
-                        // Get the secret value
                         String secretValue;
                         int bodyStartPos; 
                         int bodyEndPos;
@@ -388,6 +351,14 @@ public class SecretScanner {
                             bodyEndPos = matcher.end(0);
                         }
                         
+                        // Skip if we've already found this secret value in this response
+                        if (uniqueSecretValues.contains(secretValue)) {
+                            api.logging().logToOutput("Skipping duplicate secret: " + secretValue);
+                            continue;
+                        }
+                        
+                        uniqueSecretValues.add(secretValue);
+                        
                         // Convert body positions to full response positions by adding bodyOffset
                         int fullStartPos = bodyOffset + bodyStartPos;
                         int fullEndPos = bodyOffset + bodyEndPos;
@@ -399,10 +370,10 @@ public class SecretScanner {
                         Secret secret = new Secret(pattern.getName(), secretValue, highlightStart, highlightEnd);
                         foundSecrets.add(secret);
                         
-                        api.logging().logToOutput(String.format(
-                            "Found %s: '%s' at body position %d-%d (highlight: %d-%d)",
-                            pattern.getName(), secretValue, bodyStartPos, bodyEndPos, highlightStart, highlightEnd
-                        ));
+                        // api.logging().logToOutput(String.format(
+                        //     "Found %s: '%s' at body position %d-%d (highlight: %d-%d)",
+                        //     pattern.getName(), secretValue, bodyStartPos, bodyEndPos, highlightStart, highlightEnd
+                        // ));
                     }
                 } catch (Exception e) {
                     api.logging().logToError("Error with pattern " + pattern.getName() + ": " + e.getMessage());
@@ -430,7 +401,6 @@ public class SecretScanner {
             return false;
         }
         
-        // Check if it contains at least one digit
         boolean containsDigit = false;
         for (byte b : data) {
             if (b >= '0' && b <= '9') {
@@ -467,7 +437,6 @@ public class SecretScanner {
      * Checks if a byte sequence appears to be hexadecimal
      */
     private boolean isHex(byte[] data) {
-        // Check if the string matches the hex regex (all characters are hex digits)
         for (byte b : data) {
             if (!((b >= '0' && b <= '9') || (b >= 'a' && b <= 'f') || (b >= 'A' && b <= 'F'))) {
                 return false;
