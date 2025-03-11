@@ -11,6 +11,7 @@ import burp.api.montoya.scanner.audit.issues.AuditIssueConfidence;
 import burp.api.montoya.scanner.audit.issues.AuditIssueSeverity;
 import burp.api.montoya.sitemap.SiteMapFilter;
 import burp.api.montoya.core.ToolType;
+import burp.api.montoya.http.message.MimeType;
 
 import javax.swing.*;
 import java.util.concurrent.ExecutorService;
@@ -59,6 +60,10 @@ public class AISecretsDector implements BurpExtension {
                 }
                 
                 if (!isFromEnabledTool) {
+                    return ResponseReceivedAction.continueWith(responseReceived);
+                }
+
+                if (shouldSkipMimeType(responseReceived.mimeType())) {
                     return ResponseReceivedAction.continueWith(responseReceived);
                 }
                 
@@ -322,5 +327,29 @@ public class AISecretsDector implements BurpExtension {
         }
         
         return extractedSecrets;
+    }
+
+    // Skip binary content types that are unlikely to contain secrets
+    public boolean shouldSkipMimeType(MimeType mimeType) {
+        switch (mimeType) {
+            case IMAGE_BMP:
+            case IMAGE_GIF:
+            case IMAGE_JPEG:
+            case IMAGE_PNG:
+            case IMAGE_SVG_XML:
+            case IMAGE_TIFF:
+            case IMAGE_UNKNOWN:
+
+            case FONT_WOFF:
+            case FONT_WOFF2:
+            case SOUND:
+            case VIDEO:
+            case APPLICATION_FLASH:
+            case RTF:
+                return true;
+            // Process all other MIME types
+            default:
+                return false;
+        }
     }
 }

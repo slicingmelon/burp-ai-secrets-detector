@@ -2,7 +2,7 @@ package slicingmelon.aisecretsdetector;
 
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.responses.HttpResponse;
-import burp.api.montoya.http.message.MimeType;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.HashMap;
@@ -314,46 +314,12 @@ public class SecretScanner {
         return patterns;
     }
 
-    private boolean shouldSkipMimeType(MimeType mimeType) {
-        // Skip binary content types that are unlikely to contain secrets
-        switch (mimeType) {
-            // Images
-            case IMAGE_BMP:
-            case IMAGE_GIF:
-            case IMAGE_JPEG:
-            case IMAGE_PNG:
-            case IMAGE_SVG_XML:
-            case IMAGE_TIFF:
-            case IMAGE_UNKNOWN:
-            // Fonts
-            case FONT_WOFF:
-            case FONT_WOFF2:
-            // Media
-            case SOUND:
-            case VIDEO:
-            // Other binary formats
-            case APPLICATION_FLASH:
-            case RTF:
-                return true;
-            // Process all other MIME types
-            default:
-                return false;
-        }
-    }
+
     
     public SecretScanResult scanResponse(HttpResponse response) {
         List<Secret> foundSecrets = new ArrayList<>();
         
         try {
-            // Check MIME type first to exclude binary content
-            MimeType mimeType = response.mimeType();
-            
-            // Skip responses that are unlikely to contain text-based secrets
-            if (shouldSkipMimeType(mimeType)) {
-                api.logging().logToOutput("Skipping scan of " + mimeType + " content");
-                return new SecretScanResult(response, foundSecrets);
-            }
-            
             String responseBody = response.bodyToString();
             
             int bodyOffset = response.bodyOffset();
