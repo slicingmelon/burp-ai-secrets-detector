@@ -29,7 +29,7 @@ import java.util.HashSet;
 import java.net.URL;
 import java.util.Set;
 
-public class AISecretsDector implements BurpExtension, ScanCheck {
+public class AISecretsDector implements BurpExtension {
     
     private MontoyaApi api;
     private ExecutorService executorService;
@@ -46,56 +46,30 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
         // Initialize worker thread pool
         initializeWorkers();
         
-        // Register HTTP handler
-        // api.http().registerHttpHandler(new HttpHandler() {
-        //     @Override
-        //     public RequestToBeSentAction handleHttpRequestToBeSent(HttpRequestToBeSent requestToBeSent) {
-        //         // We're only interested in responses, not modifying requests
-        //         return RequestToBeSentAction.continueWith(requestToBeSent);
-        //     }
+        // Re-enable HTTP handler for real-time detection
+        api.http().registerHttpHandler(new HttpHandler() {
+            @Override
+            public RequestToBeSentAction handleHttpRequestToBeSent(HttpRequestToBeSent requestToBeSent) {
+                // We're only interested in responses, not modifying requests
+                return RequestToBeSentAction.continueWith(requestToBeSent);
+            }
             
-        //     @Override
-        //     public ResponseReceivedAction handleHttpResponseReceived(HttpResponseReceived responseReceived) {
-        //         // Check if we should process this response based on configuration
-        //         if (config.getConfigSettings().isInScopeOnly() && !responseReceived.initiatingRequest().isInScope()) {
-        //             return ResponseReceivedAction.continueWith(responseReceived);
-        //         }
+            @Override
+            public ResponseReceivedAction handleHttpResponseReceived(HttpResponseReceived responseReceived) {
+                // Check if we should process this response based on configuration
+                if (config.getConfigSettings().isInScopeOnly() && !responseReceived.initiatingRequest().isInScope()) {
+                    return ResponseReceivedAction.continueWith(responseReceived);
+                }
                 
-        //         // Convert to HttpRequestResponse for the scanner
-        //         HttpRequestResponse requestResponse = HttpRequestResponse.httpRequestResponse(
-        //             responseReceived.initiatingRequest(),
-        //             responseReceived
-        //         );
+                // Submit to our worker thread pool for processing
+                executorService.submit(() -> processHttpResponse(responseReceived));
                 
-        //         // Submit to our worker thread pool to run the passive audit directly
-        //         executorService.submit(() -> {
-        //             try {
-        //                 // Process directly via our passiveAudit method
-        //                 AuditResult result = passiveAudit(requestResponse);
-                        
-        //                 if (!result.auditIssues().isEmpty()) {
-        //                     api.logging().logToOutput("Passive audit found " + result.auditIssues().size() + 
-        //                                              " issues for: " + requestResponse.request().url());
-                            
-        //                     // The issues will be automatically reported to the scanner
-        //                     // by returning them from passiveAudit, but we need to also 
-        //                     // add them to the site map to see them in real-time
-        //                     for (AuditIssue issue : result.auditIssues()) {
-        //                         api.siteMap().add(issue);
-        //                     }
-        //                 }
-        //             } catch (Exception e) {
-        //                 api.logging().logToError("Error processing response: " + e.getMessage());
-        //                 e.printStackTrace();
-        //             }
-        //         });
-                
-        //         return ResponseReceivedAction.continueWith(responseReceived);
-        //     }
-        // });
+                return ResponseReceivedAction.continueWith(responseReceived);
+            }
+        });
         
         // Register this class as a ScanCheck for issue consolidation
-        api.scanner().registerScanCheck(this);
+        //api.scanner().registerScanCheck(this);
         
         // Create and register UI components
         SwingUtilities.invokeLater(() -> {
@@ -126,335 +100,193 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
         shutdownWorkers();
         initializeWorkers();
     }
-    
-    // Required ScanCheck methods
-    @Override
-    public AuditResult activeAudit(HttpRequestResponse baseRequestResponse, AuditInsertionPoint auditInsertionPoint) {
-        // For active scans, we'll scan the base request/response similar to passive
+
+        /**
+     * Process HTTP response and compare with existing issues
+     */
+    private void processHttpResponse(HttpResponseReceived responseReceived) {
         try {
-            api.logging().logToOutput("Active audit called for: " + baseRequestResponse.request().url());
-            
             // Save response to temp file first (minimize memory usage)
-            HttpResponse tempResponse = baseRequestResponse.response().copyToTempFile();
+            HttpResponse tempResponse = responseReceived.copyToTempFile();
             
             // Create scanner and scan directly from the temp file response
             SecretScanner scanner = new SecretScanner(api);
             SecretScanner.SecretScanResult result = scanner.scanResponse(tempResponse);
             
-            // If no secrets found, return empty result
-            if (!result.hasSecrets()) {
-                return AuditResult.auditResult(new ArrayList<>());
-            }
-            
-            String url = baseRequestResponse.request().url().toString();
-            api.logging().logToOutput("Active Audit: Secrets found in response from: " + url);
-            
-            // Create markers to highlight where the secrets are in the response
-            List<Marker> responseMarkers = new ArrayList<>();
-            
-            // Build simple notes with just the secrets - one per line
-            StringBuilder secretNotes = new StringBuilder();
-            
-            // Set to track unique secrets to avoid duplicates
-            Set<String> uniqueSecrets = new HashSet<>();
-            
-            for (SecretScanner.Secret secret : result.getDetectedSecrets()) {
-                // Create a marker for this secret using exact positions for UI highlighting
-                responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
+            // Process scan results
+            if (result.hasSecrets()) {
+                String url = responseReceived.initiatingRequest().url().toString();
+                api.logging().logToOutput("HTTP Handler: Secrets found in response from: " + url);
                 
-                // Get the secret value directly from the Secret object
-                String secretValue = secret.getValue();
-                
-                // Add to notes - just the raw secret value per line (if not null and unique)
-                if (secretValue != null && !secretValue.isEmpty() && !uniqueSecrets.contains(secretValue)) {
-                    uniqueSecrets.add(secretValue);
-                    secretNotes.append(secretValue).append("\n");
-                    api.logging().logToOutput("Active Audit: Adding raw secret to notes: " + secretValue);
-                }
-            }
-            
-            // Create a fixed annotations object with the notes
-            Annotations annotations = Annotations.annotations().withNotes(secretNotes.toString());
-            
-            // Mark the request/response with the found secrets and add notes
-            HttpRequestResponse markedRequestResponse = baseRequestResponse
-                .withResponseMarkers(responseMarkers)
-                .withAnnotations(annotations);
-            
-            // Debug logging for annotations
-            api.logging().logToOutput("Active Audit: Created annotations with notes: " + annotations.notes());
-            api.logging().logToOutput("Active Audit: Marked request has notes: " + 
-                                     (markedRequestResponse.annotations() != null ? 
-                                      markedRequestResponse.annotations().notes() : "null"));
-            
-            // Build generic description
-            String detail = String.format(
-                "<p>%d unique secrets were detected in the response. Click the highlights to view them.</p>",
-                uniqueSecrets.size()
-            );
-            
-            // Create remediation advice
-            String remediation = "<p>Sensitive information such as API keys, tokens, and other secrets should not be included in HTTP responses. " +
-                    "Review the application code to ensure secrets are not leaked to clients.</p>";
-            
-            // Create an audit issue - ensure we're properly passing the notes
-            AuditIssue auditIssue = AuditIssue.auditIssue(
-                    "Exposed Secrets Detected",
-                    detail,
-                    remediation,
-                    baseRequestResponse.request().url(),
-                    AuditIssueSeverity.HIGH,
-                    AuditIssueConfidence.FIRM,
-                    "Leaked secrets can lead to unauthorized access and system compromise.",
-                    "Properly secure all secrets and sensitive information to prevent exposure.",
-                    AuditIssueSeverity.HIGH,
-                    markedRequestResponse
-            );
-            
-            // Check annotations in the created issue
-            List<HttpRequestResponse> evidences = auditIssue.requestResponses();
-            if (!evidences.isEmpty() && evidences.get(0).annotations() != null) {
-                api.logging().logToOutput("Active Audit: Issue evidence has notes: " + evidences.get(0).annotations().notes());
-            } else {
-                api.logging().logToOutput("Active Audit: WARNING - Issue evidence has no notes!");
-            }
-            
-            // Return the audit result with the issue
-            List<AuditIssue> issues = new ArrayList<>();
-            issues.add(auditIssue);
-            return AuditResult.auditResult(issues);
-            
-        } catch (Exception e) {
-            api.logging().logToError("Error in active audit: " + e.getMessage());
-            e.printStackTrace();
-            return AuditResult.auditResult(new ArrayList<>());
-        }
-    }
-    
-    @Override
-    public AuditResult passiveAudit(HttpRequestResponse baseRequestResponse) {
-        try {
-            // Save response to temp file first (minimize memory usage)
-            HttpResponse tempResponse = baseRequestResponse.response().copyToTempFile();
-            
-            // Create scanner and scan directly from the temp file response
-            SecretScanner scanner = new SecretScanner(api);
-            SecretScanner.SecretScanResult result = scanner.scanResponse(tempResponse);
-            
-            // If no secrets found, return empty result
-            if (!result.hasSecrets()) {
-                return AuditResult.auditResult(new ArrayList<>());
-            }
-            
-            String url = baseRequestResponse.request().url().toString();
-            api.logging().logToOutput("Secrets found in response from: " + url);
-            
-            // Create markers to highlight where the secrets are in the response
-            List<Marker> responseMarkers = new ArrayList<>();
-            
-            // Build simple notes with just the secrets - one per line
-            StringBuilder secretNotes = new StringBuilder();
-            
-            // Set to track unique secrets to avoid duplicates
-            Set<String> uniqueSecrets = new HashSet<>();
-            
-            for (SecretScanner.Secret secret : result.getDetectedSecrets()) {
-                responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
-                
-                String secretValue = secret.getValue();
-                
-                if (secretValue != null && !secretValue.isEmpty() && !uniqueSecrets.contains(secretValue)) {
-                    uniqueSecrets.add(secretValue);
-                    secretNotes.append(secretValue).append("\n");
-                    api.logging().logToOutput("Adding raw secret to notes: " + secretValue);
-                }
-            }
-            
-            // Create explicit annotations before attaching to request
-            Annotations annotations = Annotations.annotations().withNotes(secretNotes.toString());
-            
-            // Mark the request/response with the found secrets and add notes
-            HttpRequestResponse markedRequestResponse = baseRequestResponse
-                .withResponseMarkers(responseMarkers)
-                .withAnnotations(annotations);
-            
-            // Debug check if annotations were properly added
-            api.logging().logToOutput("Created annotations with notes: " + annotations.notes());
-            api.logging().logToOutput("Marked request has notes: " + 
-                                    (markedRequestResponse.annotations() != null ? 
-                                     markedRequestResponse.annotations().notes() : "null"));
-            
-            // Build generic description
-            String detail = String.format(
-                "<p>%d unique secrets were detected in the response. Click the highlights to view them.</p>",
-                uniqueSecrets.size()
-            );
-            
-            // Create remediation advice
-            String remediation = "<p>Sensitive information such as API keys, tokens, and other secrets should not be included in HTTP responses. " +
-                    "Review the application code to ensure secrets are not leaked to clients.</p>";
-            
-            // Create an audit issue
-            AuditIssue auditIssue = AuditIssue.auditIssue(
-                    "Exposed Secrets Detected",
-                    detail,
-                    remediation,
-                    baseRequestResponse.request().url(),
-                    AuditIssueSeverity.HIGH,
-                    AuditIssueConfidence.FIRM,
-                    "Leaked secrets can lead to unauthorized access and system compromise.",
-                    "Properly secure all secrets and sensitive information to prevent exposure.",
-                    AuditIssueSeverity.HIGH,
-                    markedRequestResponse
-            );
-            
-            // Verify the issue has notes
-            List<HttpRequestResponse> evidences = auditIssue.requestResponses();
-            if (!evidences.isEmpty() && evidences.get(0).annotations() != null) {
-                api.logging().logToOutput("Issue evidence has notes: " + evidences.get(0).annotations().notes());
-            } else {
-                api.logging().logToOutput("WARNING - Issue evidence has no notes!");
-            }
-            
-            // Return the audit result with the issue
-            List<AuditIssue> issues = new ArrayList<>();
-            issues.add(auditIssue);
-            return AuditResult.auditResult(issues);
-            
-        } catch (Exception e) {
-            api.logging().logToError("Error in passive audit: " + e.getMessage());
-            e.printStackTrace();
-            return AuditResult.auditResult(new ArrayList<>());
-        }
-    }
-    
-    @Override
-    public ConsolidationAction consolidateIssues(AuditIssue newIssue, AuditIssue existingIssue) {
-        // Add debug at the very beginning to confirm this method is called
-        api.logging().logToOutput("CONSOLIDATION METHOD CALLED for issues: " + newIssue.name() + " and " + existingIssue.name());
-        
-        // Only handle our own issues
-        if (!existingIssue.name().equals("Exposed Secrets Detected") || !newIssue.name().equals("Exposed Secrets Detected")) {
-            api.logging().logToOutput("Not our issues - keeping both");
-            return ConsolidationAction.KEEP_BOTH; // Not our issues, let Burp handle them
-        }
-        
-        try {
-            // Use baseUrl directly from AuditIssue
-            String existingBaseUrl = existingIssue.baseUrl();
-            String newBaseUrl = newIssue.baseUrl();
-            
-            // Log the URLs we're comparing
-            api.logging().logToOutput("Comparing base URLs: " + existingBaseUrl + " vs " + newBaseUrl);
-            
-            // Check if they're the same endpoint (baseUrl comparison)
-            if (existingBaseUrl.equals(newBaseUrl)) {
-                api.logging().logToOutput("Consolidation triggered for URL: " + existingBaseUrl);
-                
-                // Get evidence request/responses from issues
-                List<HttpRequestResponse> existingEvidence = existingIssue.requestResponses();
-                List<HttpRequestResponse> newEvidence = newIssue.requestResponses();
-                
-                api.logging().logToOutput("Existing evidence count: " + existingEvidence.size());
-                api.logging().logToOutput("New evidence count: " + newEvidence.size());
-                
-                // Extract secrets from response markers
-                Set<String> existingSecrets = new HashSet<>();
+                // Create markers to highlight where the secrets are in the response
+                List<Marker> responseMarkers = new ArrayList<>();
                 Set<String> newSecrets = new HashSet<>();
                 
-                if (!existingEvidence.isEmpty()) {
-                    existingSecrets = extractSecretsFromMarkers(existingEvidence.get(0));
-                    api.logging().logToOutput("Extracted " + existingSecrets.size() + " secrets from existing markers");
-                }
+                // Build simple notes with just the secrets - one per line
+                StringBuilder secretNotes = new StringBuilder();
                 
-                if (!newEvidence.isEmpty()) {
-                    newSecrets = extractSecretsFromMarkers(newEvidence.get(0));
-                    api.logging().logToOutput("Extracted " + newSecrets.size() + " secrets from new markers");
-                }
-                
-                // Compare secrets to check for new ones
-                boolean hasNewSecrets = false;
-                for (String newSecret : newSecrets) {
-                    if (!existingSecrets.contains(newSecret)) {
-                        api.logging().logToOutput("Found new secret during consolidation: " + newSecret);
-                        hasNewSecrets = true;
-                        break;
+                for (SecretScanner.Secret secret : result.getDetectedSecrets()) {
+                    // Create a marker for this secret using exact positions for UI highlighting
+                    responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
+                    
+                    // Get the secret value directly from the Secret object
+                    String secretValue = secret.getValue(); 
+                    
+                    // Add to set of secrets found in this response
+                    if (secretValue != null && !secretValue.isEmpty()) {
+                        newSecrets.add(secretValue);
+                        secretNotes.append(secretValue).append("\n");
+                        api.logging().logToOutput("HTTP Handler: Found secret: " + secretValue);
                     }
                 }
                 
-                if (hasNewSecrets) {
-                    api.logging().logToOutput("Found new secrets for the same endpoint: " + existingBaseUrl);
-                    return ConsolidationAction.KEEP_BOTH; // Found new secrets
-                } else {
-                    api.logging().logToOutput("No new secrets for the same endpoint: " + existingBaseUrl);
-                    return ConsolidationAction.KEEP_EXISTING; // No new secrets
+                // Find existing issues for this URL
+                Set<String> existingSecrets = extractExistingSecretsForUrl(url);
+                api.logging().logToOutput("HTTP Handler: Found " + existingSecrets.size() + " existing secrets for URL: " + url);
+                
+                // Check if we have new secrets for this URL
+                boolean hasNewSecrets = false;
+                for (String newSecret : newSecrets) {
+                    if (!existingSecrets.contains(newSecret)) {
+                        hasNewSecrets = true;
+                        api.logging().logToOutput("HTTP Handler: Found new secret: " + newSecret);
+                    }
                 }
-            } else {
-                api.logging().logToOutput("Different base URLs - keeping both issues");
+                
+                // Only create a new issue if we have new secrets
+                if (hasNewSecrets) {
+                    // Create HttpRequestResponse for markers and issue reporting
+                    HttpRequestResponse requestResponse = HttpRequestResponse.httpRequestResponse(
+                        responseReceived.initiatingRequest(),
+                        tempResponse  // Use the temp file version of response
+                    );
+                    
+                    // Mark the request/response with the found secrets and add notes
+                    HttpRequestResponse markedRequestResponse = requestResponse
+                        .withResponseMarkers(responseMarkers)
+                        .withAnnotations(Annotations.annotations()
+                            .withNotes(secretNotes.toString()));
+                    
+                    // Build generic description
+                    String detail = String.format(
+                        "<p>%d secrets were detected in the response. Click the highlights to view them.</p>",
+                        newSecrets.size()
+                    );
+                    
+                    // Create remediation advice
+                    String remediation = "<p>Sensitive information such as API keys, tokens, and other secrets should not be included in HTTP responses. " +
+                            "Review the application code to ensure secrets are not leaked to clients.</p>";
+                    
+                    // Create an audit issue
+                    AuditIssue auditIssue = AuditIssue.auditIssue(
+                            "Exposed Secrets Detected",
+                            detail,
+                            remediation,
+                            requestResponse.request().url(),
+                            AuditIssueSeverity.HIGH,
+                            AuditIssueConfidence.FIRM,
+                            "Leaked secrets can lead to unauthorized access and system compromise.",
+                            "Properly secure all secrets and sensitive information to prevent exposure.",
+                            AuditIssueSeverity.HIGH,
+                            markedRequestResponse
+                    );
+                    
+                    // Add the issue to Burp's issues list and log the action
+                    api.logging().logToOutput("HTTP Handler: Adding NEW audit issue for URL: " + requestResponse.request().url());
+                    api.siteMap().add(auditIssue);
+                } else {
+                    api.logging().logToOutput("HTTP Handler: No new secrets found for URL: " + url + ", skipping issue creation");
+                }
             }
+            
         } catch (Exception e) {
-            api.logging().logToError("Error during issue consolidation: " + e.getMessage());
+            api.logging().logToError("Error processing HTTP response: " + e.getMessage());
             e.printStackTrace();
         }
-        
-        // Different endpoints or error occurred
-        return ConsolidationAction.KEEP_BOTH;
     }
 
     /**
- * Extract actual secrets from response markers by removing the padding
- */
-private Set<String> extractSecretsFromMarkers(HttpRequestResponse requestResponse) {
-    Set<String> extractedSecrets = new HashSet<>();
-    
-    if (requestResponse == null || requestResponse.response() == null) {
-        api.logging().logToOutput("No response to extract markers from");
-        return extractedSecrets;
-    }
-    
-    String responseBody = requestResponse.response().bodyToString();
-    int bodyOffset = requestResponse.response().bodyOffset();
-    List<Marker> markers = requestResponse.responseMarkers();
-    
-    if (markers == null || markers.isEmpty()) {
-        api.logging().logToOutput("No markers found in response");
-        return extractedSecrets;
-    }
-    
-    for (Marker marker : markers) {
+     * Extract existing secrets for a URL from Burp's site map
+     */
+    private Set<String> extractExistingSecretsForUrl(String url) {
+        Set<String> existingSecrets = new HashSet<>();
+        
         try {
-            // Get marker start and end from the Range object
-            int startPos = marker.range().startIndexInclusive();
-            int endPos = marker.range().endIndexExclusive();
-            
-            // Adjust marker positions to account for the padding (we added 20 chars on each side)
-            int adjustedStartPos = startPos + 20;
-            int adjustedEndPos = endPos - 20;
-            
-            // If adjusted positions are invalid, log and continue without extraction
-            if (adjustedStartPos >= adjustedEndPos || 
-                adjustedStartPos < bodyOffset || 
-                adjustedEndPos > bodyOffset + responseBody.length()) {
-                
-                api.logging().logToOutput("Invalid marker adjustment, cannot extract secret properly");
-                continue;
-            }
-            
-            // Extract the actual secret without padding
-            String secret = requestResponse.response().toString().substring(
-                adjustedStartPos, adjustedEndPos);
-            
-            if (secret != null && !secret.isEmpty()) {
-                extractedSecrets.add(secret);
-                api.logging().logToOutput("Extracted secret from marker: " + secret);
+            // Find all audit issues in site map
+            for (AuditIssue issue : api.siteMap().issues()) {
+                // Only consider our own "Exposed Secrets Detected" issues
+                if (issue.name().equals("Exposed Secrets Detected") && issue.baseUrl().equals(url)) {
+                    api.logging().logToOutput("Found existing issue for URL: " + url);
+                    
+                    // Extract secrets from all evidence in this issue
+                    for (HttpRequestResponse evidence : issue.requestResponses()) {
+                        // Extract secrets from markers
+                        Set<String> secretsFromMarkers = extractSecretsFromMarkers(evidence);
+                        existingSecrets.addAll(secretsFromMarkers);
+                    }
+                }
             }
         } catch (Exception e) {
-            api.logging().logToError("Error extracting secret from marker: " + e.getMessage());
+            api.logging().logToError("Error extracting existing secrets: " + e.getMessage());
         }
+        
+        return existingSecrets;
     }
     
-    return extractedSecrets;
-}
+    /**
+     * Extract actual secrets from response markers by removing the padding
+     */
+    private Set<String> extractSecretsFromMarkers(HttpRequestResponse requestResponse) {
+        Set<String> extractedSecrets = new HashSet<>();
+        
+        if (requestResponse == null || requestResponse.response() == null) {
+            api.logging().logToOutput("No response to extract markers from");
+            return extractedSecrets;
+        }
+        
+        String responseBody = requestResponse.response().bodyToString();
+        int bodyOffset = requestResponse.response().bodyOffset();
+        List<Marker> markers = requestResponse.responseMarkers();
+        
+        if (markers == null || markers.isEmpty()) {
+            api.logging().logToOutput("No markers found in response");
+            return extractedSecrets;
+        }
+        
+        for (Marker marker : markers) {
+            try {
+                // Get marker start and end from the Range object
+                int startPos = marker.range().startIndexInclusive();
+                int endPos = marker.range().endIndexExclusive();
+                
+                // Adjust marker positions to account for the padding (we added 20 chars on each side)
+                int adjustedStartPos = startPos + 20;
+                int adjustedEndPos = endPos - 20;
+                
+                // If adjusted positions are invalid, log and continue without extraction
+                if (adjustedStartPos >= adjustedEndPos || 
+                    adjustedStartPos < bodyOffset || 
+                    adjustedEndPos > bodyOffset + responseBody.length()) {
+                    
+                    api.logging().logToOutput("Invalid marker adjustment, cannot extract secret properly");
+                    continue;
+                }
+                
+                // Extract the actual secret without padding
+                String secret = requestResponse.response().toString().substring(
+                    adjustedStartPos, adjustedEndPos);
+                
+                if (secret != null && !secret.isEmpty()) {
+                    extractedSecrets.add(secret);
+                    api.logging().logToOutput("Extracted secret from marker: " + secret);
+                }
+            } catch (Exception e) {
+                api.logging().logToError("Error extracting secret from marker: " + e.getMessage());
+            }
+        }
+        
+        return extractedSecrets;
+    }
     
     private boolean notesContainNewSecrets(String existingNotes, String newNotes) {
         if (existingNotes == null || existingNotes.trim().isEmpty()) {
@@ -500,27 +332,6 @@ private Set<String> extractSecretsFromMarkers(HttpRequestResponse requestRespons
         }
         
         return secrets;
-    }
-    
-
-    private String extractPathFromUrl(String urlString) {
-        try {
-            // Add extra handling for just path
-            java.net.URI uri = new java.net.URI(urlString);
-            String path = uri.getPath();
-            
-            // Default to "/" if path is empty
-            if (path == null || path.isEmpty()) {
-                path = "/";
-            }
-            
-            api.logging().logToOutput("Extracted path for consolidation: " + path + " from " + urlString);
-            return path;
-            
-        } catch (Exception e) {
-            api.logging().logToError("Error extracting path from URL: " + e.getMessage());
-            return urlString;
-        }
     }
     
     private void scanResponseForSecrets(HttpResponseReceived responseReceived) {
