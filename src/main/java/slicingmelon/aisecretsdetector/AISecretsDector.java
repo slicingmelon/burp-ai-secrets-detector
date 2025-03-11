@@ -28,6 +28,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Set;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -135,6 +137,7 @@ public class AISecretsDector implements BurpExtension {
                 // Create markers to highlight where the secrets are in the response
                 List<Marker> responseMarkers = new ArrayList<>();
                 Set<String> newSecrets = new HashSet<>();
+                Map<String, Set<String>> secretTypeMap = new HashMap<>();
                 
                 for (SecretScanner.Secret secret : result.getDetectedSecrets()) {
                     // Create a marker for this secret using exact positions for UI highlighting
@@ -142,11 +145,19 @@ public class AISecretsDector implements BurpExtension {
                     
                     // Get the secret value directly from the Secret object
                     String secretValue = secret.getValue(); 
+                    String secretType = secret.getType();
                     
                     // Add to set of secrets found in this response
                     if (secretValue != null && !secretValue.isEmpty()) {
                         newSecrets.add(secretValue);
-                        api.logging().logToOutput("HTTP Handler: Found secret: " + secretValue);
+                        
+                        // Track what types of secrets we found
+                        if (!secretTypeMap.containsKey(secretType)) {
+                            secretTypeMap.put(secretType, new HashSet<>());
+                        }
+                        secretTypeMap.get(secretType).add(secretValue);
+                        
+                        api.logging().logToOutput("HTTP Handler: Found " + secretType + ": " + secretValue);
                     }
                 }
                 
@@ -175,11 +186,18 @@ public class AISecretsDector implements BurpExtension {
                     HttpRequestResponse markedRequestResponse = requestResponse
                         .withResponseMarkers(responseMarkers);
                     
-                    // Build generic description
-                    String detail = String.format(
-                        "<p>%d secrets were detected in the response. Click the highlights to view them.</p>",
-                        newSecrets.size()
-                    );
+                    // Build detailed description with secret types
+                    StringBuilder detailBuilder = new StringBuilder();
+                    detailBuilder.append(String.format("<p>%d secrets were detected in the response:</p><ul>", newSecrets.size()));
+                    
+                    // Add each type of secret found
+                    for (Map.Entry<String, Set<String>> entry : secretTypeMap.entrySet()) {
+                        detailBuilder.append(String.format("<li><b>%s</b>: %d found</li>", 
+                                entry.getKey(), entry.getValue().size()));
+                    }
+                    
+                    detailBuilder.append("</ul><p>Click the highlights in the response to view the actual secrets.</p>");
+                    String detail = detailBuilder.toString();
                     
                     // Create remediation advice
                     String remediation = "<p>Sensitive information such as API keys, tokens, and other secrets should not be included in HTTP responses. " +
@@ -206,7 +224,7 @@ public class AISecretsDector implements BurpExtension {
                     api.logging().logToOutput("HTTP Handler: No new secrets found for URL: " + url + ", skipping issue creation");
                 }
             }
-            
+        
         } catch (Exception e) {
             api.logging().logToError("Error processing HTTP response: " + e.getMessage());
             e.printStackTrace();
