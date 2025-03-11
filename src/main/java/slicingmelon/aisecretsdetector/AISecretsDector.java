@@ -201,33 +201,64 @@ public class AISecretsDector implements BurpExtension {
         }
     }
 
-    /*
-    * Extract existing secrets for a URL from Burp's site map
-    */
-    private Set<String> extractExistingSecretsForUrl2(String url) {
-        Set<String> existingSecrets = new HashSet<>();
+    // /*
+    // * Extract existing secrets for a URL from Burp's site map
+    // */
+    // private Set<String> extractExistingSecretsForUrl2(String url) {
+    //     Set<String> existingSecrets = new HashSet<>();
         
-        try {
-            // Find all audit issues in site map
-            for (AuditIssue issue : api.siteMap().issues()) {
-                // Only consider our own "Exposed Secrets Detected" issues
-                if (issue.name().equals("Exposed Secrets Detected") && issue.baseUrl().equals(url)) {
-                    api.logging().logToOutput("Found existing issue for URL: " + url);
+    //     try {
+    //         // Find all audit issues in site map
+    //         for (AuditIssue issue : api.siteMap().issues()) {
+    //             // Only consider our own "Exposed Secrets Detected" issues
+    //             if (issue.name().equals("Exposed Secrets Detected") && issue.baseUrl().equals(url)) {
+    //                 api.logging().logToOutput("Found existing issue for URL: " + url);
                     
-                    // Extract secrets from all evidence in this issue
-                    for (HttpRequestResponse evidence : issue.requestResponses()) {
-                        // Extract secrets from markers
-                        Set<String> secretsFromMarkers = extractSecretsFromMarkers(evidence);
-                        existingSecrets.addAll(secretsFromMarkers);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            api.logging().logToError("Error extracting existing secrets: " + e.getMessage());
-        }
+    //                 // Extract secrets from all evidence in this issue
+    //                 for (HttpRequestResponse evidence : issue.requestResponses()) {
+    //                     // Extract secrets from markers
+    //                     Set<String> secretsFromMarkers = extractSecretsFromMarkers(evidence);
+    //                     existingSecrets.addAll(secretsFromMarkers);
+    //                 }
+    //             }
+    //         }
+    //     } catch (Exception e) {
+    //         api.logging().logToError("Error extracting existing secrets: " + e.getMessage());
+    //     }
         
-        return existingSecrets;
-    }
+    //     return existingSecrets;
+    // }
+
+    // /*
+    // * Extract existing secrets for a URL from Burp's site map
+    // */
+    // private Set<String> extractExistingSecretsForUrl(String url) {
+    //     Set<String> existingSecrets = new HashSet<>();
+        
+    //     try {
+    //         // Find all audit issues in site map
+    //         for (AuditIssue issue : api.siteMap().issues()) {
+    //             // Only consider our own "Exposed Secrets Detected" issues
+    //             if (issue.name().equals("Exposed Secrets Detected") && issue.baseUrl().equals(url)) {
+    //                 api.logging().logToOutput("Found existing issue for URL: " + url);
+                    
+    //                 // Extract secrets from all evidence in this issue
+    //                 for (HttpRequestResponse evidence : issue.requestResponses()) {
+    //                     // Extract secrets from notes instead of markers
+    //                     if (evidence.annotations() != null && evidence.annotations().notes() != null) {
+    //                         String notes = evidence.annotations().notes();
+    //                         Set<String> secretsFromNotes = extractSecretsFromNotes(notes);
+    //                         existingSecrets.addAll(secretsFromNotes);
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     } catch (Exception e) {
+    //         api.logging().logToError("Error extracting existing secrets: " + e.getMessage());
+    //     }
+        
+    //     return existingSecrets;
+    // }
 
     /*
     * Extract existing secrets for a URL from Burp's site map
@@ -237,24 +268,81 @@ public class AISecretsDector implements BurpExtension {
         
         try {
             // Find all audit issues in site map
+            int issueCount = 0;
+            
             for (AuditIssue issue : api.siteMap().issues()) {
+                issueCount++;
+                
                 // Only consider our own "Exposed Secrets Detected" issues
                 if (issue.name().equals("Exposed Secrets Detected") && issue.baseUrl().equals(url)) {
                     api.logging().logToOutput("Found existing issue for URL: " + url);
                     
-                    // Extract secrets from all evidence in this issue
+                    // Enhanced notes extraction with detailed debugging
+                    int totalEvidenceCount = 0;
+                    int evidenceWithNotesCount = 0;
+                    int evidenceWithMarkersCount = 0;
+                    
                     for (HttpRequestResponse evidence : issue.requestResponses()) {
-                        // Extract secrets from notes instead of markers
-                        if (evidence.annotations() != null && evidence.annotations().notes() != null) {
+                        totalEvidenceCount++;
+                        
+                        // Try to extract from notes first
+                        boolean notesFound = false;
+                        if (evidence.annotations() != null) {
+                            api.logging().logToOutput("Evidence #" + totalEvidenceCount + " has annotations object");
+                            
                             String notes = evidence.annotations().notes();
-                            Set<String> secretsFromNotes = extractSecretsFromNotes(notes);
-                            existingSecrets.addAll(secretsFromNotes);
+                            if (notes != null && !notes.isEmpty()) {
+                                api.logging().logToOutput("Found notes in evidence #" + totalEvidenceCount + ": " + notes);
+                                Set<String> secretsFromNotes = extractSecretsFromNotes(notes);
+                                existingSecrets.addAll(secretsFromNotes);
+                                evidenceWithNotesCount++;
+                                notesFound = true;
+                            } else {
+                                api.logging().logToOutput("Evidence #" + totalEvidenceCount + 
+                                    " has annotations but notes are null or empty");
+                            }
+                        } else {
+                            api.logging().logToOutput("Evidence #" + totalEvidenceCount + " has null annotations");
+                        }
+                        
+                        // If no notes were found, extract from markers
+                        if (!notesFound) {
+                            List<Marker> markers = evidence.responseMarkers();
+                            
+                            if (markers != null && !markers.isEmpty()) {
+                                api.logging().logToOutput("Evidence #" + totalEvidenceCount + 
+                                    " has " + markers.size() + " markers");
+                                
+                                Set<String> secretsFromMarkers = extractSecretsFromMarkers(evidence);
+                                if (!secretsFromMarkers.isEmpty()) {
+                                    api.logging().logToOutput("Extracted " + secretsFromMarkers.size() + 
+                                        " secrets from markers in evidence #" + totalEvidenceCount);
+                                    existingSecrets.addAll(secretsFromMarkers);
+                                    evidenceWithMarkersCount++;
+                                } else {
+                                    api.logging().logToOutput("No secrets extracted from markers in evidence #" + 
+                                        totalEvidenceCount);
+                                }
+                            } else {
+                                api.logging().logToOutput("Evidence #" + totalEvidenceCount + 
+                                    " has no markers");
+                            }
                         }
                     }
+                    
+                    api.logging().logToOutput("Summary for URL " + url + ": " +
+                        "Total evidence items: " + totalEvidenceCount + ", " +
+                        "Evidence with notes: " + evidenceWithNotesCount + ", " +
+                        "Evidence with markers (no notes): " + evidenceWithMarkersCount + ", " +
+                        "Total unique secrets found: " + existingSecrets.size());
                 }
             }
+            
+            api.logging().logToOutput("Examined " + issueCount + " total issues in site map");
+            
         } catch (Exception e) {
             api.logging().logToError("Error extracting existing secrets: " + e.getMessage());
+            e.printStackTrace();
         }
         
         return existingSecrets;
