@@ -29,42 +29,15 @@ public class AISecretsDector implements BurpExtension {
     
     private MontoyaApi api;
     private ExecutorService executorService;
-    private ConfigSettings configSettings;
-    
-    // Simple config class to avoid creating extra files
-    private static class ConfigSettings {
-        private int workers;
-        private boolean inScopeOnly;
-        
-        public ConfigSettings(int workers, boolean inScopeOnly) {
-            this.workers = workers;
-            this.inScopeOnly = inScopeOnly;
-        }
-        
-        public int getWorkers() {
-            return workers;
-        }
-        
-        public void setWorkers(int workers) {
-            this.workers = workers;
-        }
-        
-        public boolean isInScopeOnly() {
-            return inScopeOnly;
-        }
-        
-        public void setInScopeOnly(boolean inScopeOnly) {
-            this.inScopeOnly = inScopeOnly;
-        }
-    }
+    private Config config;
     
     @Override
     public void initialize(MontoyaApi api) {
         this.api = api;
         api.extension().setName("AI Secrets Detector");
         
-        // Initialize configuration and load saved settings
-        configSettings = loadConfigSettings(api.persistence().extensionData());
+        // Initialize configuration with a callback for when settings change
+        config = new Config(api, this::updateWorkers);
         
         // Initialize worker thread pool
         initializeWorkers();
@@ -80,7 +53,7 @@ public class AISecretsDector implements BurpExtension {
             @Override
             public ResponseReceivedAction handleHttpResponseReceived(HttpResponseReceived responseReceived) {
                 // Check if we should process this response based on configuration
-                if (configSettings.isInScopeOnly() && !responseReceived.initiatingRequest().isInScope()) {
+                if (config.getConfigSettings().isInScopeOnly() && !responseReceived.initiatingRequest().isInScope()) {
                     return ResponseReceivedAction.continueWith(responseReceived);
                 }
                 
@@ -99,7 +72,7 @@ public class AISecretsDector implements BurpExtension {
         
         // Create and register UI components
         SwingUtilities.invokeLater(() -> {
-            JComponent configPanel = createConfigPanel();
+            JComponent configPanel = config.createConfigPanel();
             api.userInterface().registerSuiteTab("AI Secrets Detector", configPanel);
         });
         
@@ -112,25 +85,8 @@ public class AISecretsDector implements BurpExtension {
         api.logging().logToOutput("AI Secrets Detector extension loaded successfully");
     }
     
-    private ConfigSettings loadConfigSettings(PersistedObject persistedData) {
-        // Fix using null check approach
-        Integer workersValue = persistedData.getInteger("workers");
-        int workers = (workersValue != null) ? workersValue : 5;
-        
-        Boolean inScopeOnlyValue = persistedData.getBoolean("in_scope_only");
-        boolean inScopeOnly = (inScopeOnlyValue != null) ? inScopeOnlyValue : true;
-        
-        return new ConfigSettings(workers, inScopeOnly);
-    }
-    
-    private void saveConfigSettings() {
-        PersistedObject persistedData = api.persistence().extensionData();
-        persistedData.setInteger("workers", configSettings.getWorkers());
-        persistedData.setBoolean("in_scope_only", configSettings.isInScopeOnly());
-    }
-    
     private void initializeWorkers() {
-        executorService = Executors.newFixedThreadPool(configSettings.getWorkers());
+        executorService = Executors.newFixedThreadPool(config.getConfigSettings().getWorkers());
     }
     
     private void shutdownWorkers() {
@@ -207,65 +163,5 @@ public class AISecretsDector implements BurpExtension {
             api.logging().logToError("Error scanning response: " + e.getMessage());
             e.printStackTrace();
         }
-    }
-    
-    private JComponent createConfigPanel() {
-        JPanel panel = new JPanel(new BorderLayout());
-        
-        // Create settings panel
-        JPanel settingsPanel = new JPanel(new GridBagLayout());
-        GridBagConstraints c = new GridBagConstraints();
-        c.fill = GridBagConstraints.HORIZONTAL;
-        c.insets = new Insets(5, 5, 5, 5);
-        
-        // Workers setting
-        JLabel workersLabel = new JLabel("Number of Workers:");
-        c.gridx = 0;
-        c.gridy = 0;
-        settingsPanel.add(workersLabel, c);
-        
-        SpinnerNumberModel workersModel = new SpinnerNumberModel(
-                configSettings.getWorkers(),
-                1,
-                50,
-                1
-        );
-        JSpinner workersSpinner = new JSpinner(workersModel);
-        c.gridx = 1;
-        c.gridy = 0;
-        settingsPanel.add(workersSpinner, c);
-        
-        // In-scope only setting
-        JCheckBox inScopeCheckbox = new JCheckBox("In-Scope Requests Only", configSettings.isInScopeOnly());
-        c.gridx = 0;
-        c.gridy = 1;
-        c.gridwidth = 2;
-        settingsPanel.add(inScopeCheckbox, c);
-        
-        // Save button
-        JButton saveButton = new JButton("Save Configuration");
-        saveButton.addActionListener(e -> {
-            configSettings.setWorkers((Integer) workersSpinner.getValue());
-            configSettings.setInScopeOnly(inScopeCheckbox.isSelected());
-            
-            saveConfigSettings();
-            updateWorkers();
-            
-            api.logging().logToOutput("Configuration saved - Workers: " + configSettings.getWorkers()
-                    + ", In-Scope Only: " + configSettings.isInScopeOnly());
-        });
-        c.gridx = 0;
-        c.gridy = 2;
-        c.gridwidth = 2;
-        settingsPanel.add(saveButton, c);
-        
-        panel.add(settingsPanel, BorderLayout.NORTH);
-        
-        // Add results display area (can be enhanced later)
-        JTabbedPane tabbedPane = new JTabbedPane();
-        tabbedPane.addTab("Detection Results", new JScrollPane(new JTable()));
-        panel.add(tabbedPane, BorderLayout.CENTER);
-        
-        return panel;
     }
 }
