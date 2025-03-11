@@ -224,7 +224,7 @@ public class AISecretsDector implements BurpExtension {
                     api.logging().logToOutput("HTTP Handler: No new secrets found for URL: " + url + ", skipping issue creation");
                 }
             }
-        
+            
         } catch (Exception e) {
             api.logging().logToError("Error processing HTTP response: " + e.getMessage());
             e.printStackTrace();

@@ -21,8 +21,9 @@ public class SecretScanner {
     
     private final MontoyaApi api;
     private final List<SecretPattern> secretPatterns;
-    private static final String RANDOM_STRING_REGEX = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-)\\s*[\\t \"'`]?([\\w+./=~-]{15,80})(?:[\\t\\n \"'`]|$)";
-    
+   // private static final String RANDOM_STRING_REGEX = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-)\\s*[\\t \"'`]?([\\w+./=~-]{15,80})(?:[\\t\\n \"'`]|$)";
+    private static final String RANDOM_STRING_REGEX = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-|:\\s+\")\\s*[\\t \"'`]?([\\w+./=~-]{15,80})(?:[\\t\\n \"'`]|$)";
+
     // Secret detection related classes
     public static class Secret {
         private final String type;
@@ -117,6 +118,12 @@ public class SecretScanner {
                 "URL with Credentials",
                 Pattern.compile("[A-Za-z]+://\\S{3,50}:(\\S{3,50})@[\\dA-Za-z#%&+./:=?_~-]+"),
                 false
+        ));
+
+        patterns.add(new SecretPattern(
+            "AWS Access Key",
+            Pattern.compile("\\b((?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16,20})\\b"),
+            false
         ));
         
         // JWT/JWE
