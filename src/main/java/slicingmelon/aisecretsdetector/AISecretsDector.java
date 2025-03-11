@@ -131,7 +131,11 @@ public class AISecretsDector implements BurpExtension {
                     // Add to set of secrets found in this response
                     if (secretValue != null && !secretValue.isEmpty()) {
                         newSecrets.add(secretValue);
-                        secretNotes.append(secretValue).append("\n");
+                        // Use space as delimiter instead of newlines
+                        if (secretNotes.length() > 0) {
+                            secretNotes.append(" ");
+                        }
+                        secretNotes.append(secretValue);
                         api.logging().logToOutput("HTTP Handler: Found secret: " + secretValue);
                     }
                 }
@@ -434,14 +438,16 @@ public class AISecretsDector implements BurpExtension {
     private Set<String> extractSecretsFromNotes(String notes) {
         Set<String> secrets = new HashSet<>();
         
-        // Each line is one raw secret
+        // Just log the entire notes content for debugging
         if (notes != null && !notes.isEmpty()) {
-            String[] lines = notes.split("\n");
-            for (String line : lines) {
-                line = line.trim();
-                if (!line.isEmpty()) {
-                    secrets.add(line);
-                    api.logging().logToOutput("Extracted raw secret from notes: " + line);
+            api.logging().logToOutput("Raw notes content: [" + notes + "]");
+            
+            // Split by space instead of newline and add each part as a secret
+            String[] parts = notes.split("\\s+");
+            for (String part : parts) {
+                if (!part.trim().isEmpty()) {
+                    secrets.add(part.trim());
+                    api.logging().logToOutput("Extracted raw secret from notes: " + part.trim());
                 }
             }
         }
