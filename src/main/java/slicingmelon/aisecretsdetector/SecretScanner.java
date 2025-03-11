@@ -314,10 +314,11 @@ public class SecretScanner {
         return patterns;
     }
 
-
-    
     public SecretScanResult scanResponse(HttpResponse response) {
         List<Secret> foundSecrets = new ArrayList<>();
+        
+        // Track unique secrets by value to avoid duplicates within the same response
+        Set<String> uniqueSecretValues = new HashSet<>();
         
         try {
             String responseBody = response.bodyToString();
@@ -350,6 +351,14 @@ public class SecretScanner {
                             bodyEndPos = matcher.end(0);
                         }
                         
+                        // Skip if we've already found this secret value in this response
+                        if (uniqueSecretValues.contains(secretValue)) {
+                            api.logging().logToOutput("Skipping duplicate secret: " + secretValue);
+                            continue;
+                        }
+                        
+                        uniqueSecretValues.add(secretValue);
+                        
                         // Convert body positions to full response positions by adding bodyOffset
                         int fullStartPos = bodyOffset + bodyStartPos;
                         int fullEndPos = bodyOffset + bodyEndPos;
@@ -361,10 +370,10 @@ public class SecretScanner {
                         Secret secret = new Secret(pattern.getName(), secretValue, highlightStart, highlightEnd);
                         foundSecrets.add(secret);
                         
-                        api.logging().logToOutput(String.format(
-                            "Found %s: '%s' at body position %d-%d (highlight: %d-%d)",
-                            pattern.getName(), secretValue, bodyStartPos, bodyEndPos, highlightStart, highlightEnd
-                        ));
+                        // api.logging().logToOutput(String.format(
+                        //     "Found %s: '%s' at body position %d-%d (highlight: %d-%d)",
+                        //     pattern.getName(), secretValue, bodyStartPos, bodyEndPos, highlightStart, highlightEnd
+                        // ));
                     }
                 } catch (Exception e) {
                     api.logging().logToError("Error with pattern " + pattern.getName() + ": " + e.getMessage());
