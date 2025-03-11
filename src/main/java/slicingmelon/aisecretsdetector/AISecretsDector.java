@@ -61,8 +61,23 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
                     return ResponseReceivedAction.continueWith(responseReceived);
                 }
                 
-                // Submit the response directly to reduce memory allocations
-                executorService.submit(() -> scanResponseForSecrets(responseReceived));
+                // Convert to HttpRequestResponse for the scanner
+                HttpRequestResponse requestResponse = HttpRequestResponse.httpRequestResponse(
+                    responseReceived.initiatingRequest(),
+                    responseReceived
+                );
+                
+                // Submit to our worker thread pool
+                executorService.submit(() -> {
+                    // Use the passiveAudit method to scan and report issues
+                    AuditResult result = passiveAudit(requestResponse);
+                    
+                    // Report any issues found to the scanner
+                    for (AuditIssue issue : result.auditIssues()) {
+                        api.logging().logToOutput("Reporting issue via Scanner API: " + issue.name());
+                        api.scanner().reportIssue(issue); 
+                    }
+                });
                 
                 return ResponseReceivedAction.continueWith(responseReceived);
             }
@@ -110,8 +125,101 @@ public class AISecretsDector implements BurpExtension, ScanCheck {
     
     @Override
     public AuditResult passiveAudit(HttpRequestResponse baseRequestResponse) {
-        // Not used but required - return empty result
-        return AuditResult.auditResult(new ArrayList<>());
+        // Implement the scanning logic here to integrate with Burp's scanner
+        try {
+            // Save response to temp file first (minimize memory usage)
+            HttpResponse tempResponse = baseRequestResponse.response().copyToTempFile();
+            
+            // Create scanner and scan directly from the temp file response
+            SecretScanner scanner = new SecretScanner(api);
+            SecretScanner.SecretScanResult result = scanner.scanResponse(tempResponse);
+            
+            // If no secrets found, return empty result
+            if (!result.hasSecrets()) {
+                return AuditResult.auditResult(new ArrayList<>());
+            }
+            
+            String url = baseRequestResponse.request().url().toString();
+            api.logging().logToOutput("Secrets found in response from: " + url);
+            
+            // Create markers to highlight where the secrets are in the response
+            List<Marker> responseMarkers = new ArrayList<>();
+            
+            // Build simple notes with just the secrets - one per line
+            StringBuilder secretNotes = new StringBuilder();
+            
+            // Set to track unique secrets to avoid duplicates
+            Set<String> uniqueSecrets = new HashSet<>();
+            
+            for (SecretScanner.Secret secret : result.getDetectedSecrets()) {
+                // Create a marker for this secret using exact positions for UI highlighting
+                responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
+                
+                // Get the secret value directly from the Secret object
+                String secretValue = secret.getValue();
+                
+                // Add to notes - just the raw secret value per line (if not null and unique)
+                if (secretValue != null && !secretValue.isEmpty() && !uniqueSecrets.contains(secretValue)) {
+                    uniqueSecrets.add(secretValue);
+                    secretNotes.append(secretValue).append("\n");
+                    api.logging().logToOutput("Adding raw secret to notes: " + secretValue);
+                }
+                
+                api.logging().logToOutput(String.format(
+                    "Secret found: %s at position %d-%d", 
+                    secret.getType(), 
+                    secret.getStartIndex(), 
+                    secret.getEndIndex()
+                ));
+            }
+            
+            // Mark the request/response with the found secrets and add notes
+            HttpRequestResponse markedRequestResponse = baseRequestResponse
+                .withResponseMarkers(responseMarkers)
+                .withAnnotations(Annotations.annotations()
+                    .withNotes(secretNotes.toString()));
+            
+            // Debug check if annotations were properly added
+            if (markedRequestResponse.annotations() != null && 
+                markedRequestResponse.annotations().notes() != null) {
+                api.logging().logToOutput("Annotations added successfully with " + 
+                                         uniqueSecrets.size() + " unique raw secrets");
+            }
+            
+            // Build generic description
+            String detail = String.format(
+                "<p>%d unique secrets were detected in the response. Click the highlights to view them.</p>",
+                uniqueSecrets.size()
+            );
+            
+            // Create remediation advice
+            String remediation = "<p>Sensitive information such as API keys, tokens, and other secrets should not be included in HTTP responses. " +
+                    "Review the application code to ensure secrets are not leaked to clients.</p>";
+            
+            // Create an audit issue
+            AuditIssue auditIssue = AuditIssue.auditIssue(
+                    "Exposed Secrets Detected",
+                    detail,
+                    remediation,
+                    baseRequestResponse.request().url(),
+                    AuditIssueSeverity.HIGH,
+                    AuditIssueConfidence.FIRM,
+                    "Leaked secrets can lead to unauthorized access and system compromise.",
+                    "Properly secure all secrets and sensitive information to prevent exposure.",
+                    AuditIssueSeverity.HIGH,
+                    markedRequestResponse
+            );
+            
+            // Return the audit result with the issue
+            List<AuditIssue> issues = new ArrayList<>();
+            issues.add(auditIssue);
+            return AuditResult.auditResult(issues);
+            
+        } catch (Exception e) {
+            api.logging().logToError("Error in passive audit: " + e.getMessage());
+            e.printStackTrace();
+            return AuditResult.auditResult(new ArrayList<>());
+        }
     }
     
     @Override
