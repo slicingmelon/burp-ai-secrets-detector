@@ -17,6 +17,7 @@ import burp.api.montoya.scanner.audit.issues.AuditIssue;
 import burp.api.montoya.scanner.audit.issues.AuditIssueConfidence;
 import burp.api.montoya.scanner.audit.issues.AuditIssueSeverity;
 import burp.api.montoya.sitemap.SiteMapFilter;
+import burp.api.montoya.core.ToolType;
 
 import javax.swing.*;
 import java.awt.*;
@@ -59,7 +60,20 @@ public class AISecretsDector implements BurpExtension {
             
             @Override
             public ResponseReceivedAction handleHttpResponseReceived(HttpResponseReceived responseReceived) {
-                // Check if we should process this response based on configuration
+                // Check if response is from an enabled tool
+                boolean isFromEnabledTool = false;
+                for (ToolType tool : config.getConfigSettings().getEnabledTools()) {
+                    if (responseReceived.toolSource().isFromTool(tool)) {
+                        isFromEnabledTool = true;
+                        break;
+                    }
+                }
+                
+                if (!isFromEnabledTool) {
+                    return ResponseReceivedAction.continueWith(responseReceived);
+                }
+                
+                // Check if we should process this response based on scope configuration
                 if (config.getConfigSettings().isInScopeOnly() && !responseReceived.initiatingRequest().isInScope()) {
                     return ResponseReceivedAction.continueWith(responseReceived);
                 }
