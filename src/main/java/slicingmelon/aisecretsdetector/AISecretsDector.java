@@ -234,7 +234,7 @@ public class AISecretsDector implements BurpExtension {
                                   null) // No fragment
                          .toString();
                 
-                api.logging().logToOutput("Normalized URL from " + url + " to " + baseUrl);
+                //api.logging().logToOutput("Normalized URL from " + url + " to " + baseUrl);
             } catch (URISyntaxException e) {
                 // If URI parsing fails, fall back to string splitting
                 api.logging().logToOutput("Failed to parse URL with URI parser, falling back to string splitting");
