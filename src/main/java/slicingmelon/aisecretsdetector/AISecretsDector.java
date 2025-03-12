@@ -315,8 +315,12 @@ public class AISecretsDector implements BurpExtension {
                 int endPos = marker.range().endIndexExclusive();
                 
                 // Adjust marker positions to account for the padding and convert to body-relative positions
-                int adjustedStartPos = Math.max(0, (startPos + 20) - bodyOffset);
-                int adjustedEndPos = Math.min(bodyBytes.length(), (endPos - 20) - bodyOffset);
+                // int adjustedStartPos = Math.max(0, (startPos + 20) - bodyOffset);
+                // int adjustedEndPos = Math.min(bodyBytes.length(), (endPos - 20) - bodyOffset);
+
+                // Convert to body-relative positions without padding adjustments
+                int adjustedStartPos = Math.max(0, startPos - bodyOffset);
+                int adjustedEndPos = Math.min(bodyBytes.length(), endPos - bodyOffset);
                 
                 if (adjustedStartPos >= adjustedEndPos) {
                     logMsg("Invalid marker adjustment, cannot extract secret properly");
