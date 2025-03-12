@@ -103,8 +103,6 @@ public class SecretScanner {
         }
     }
     
-    
-
     public SecretScanner(MontoyaApi api) {
         //this.api = api;
         this.secretPatterns = initializeSecretPatterns();
@@ -117,7 +115,7 @@ public class SecretScanner {
         // URL with credentials
         patterns.add(new SecretPattern(
                 "URL with Credentials",
-                Pattern.compile("[A-Za-z]+://\\S{3,50}:(\\S{3,50})@[\\dA-Za-z#%&+./:=?_~-]+"),
+                Pattern.compile("(?i)\\b[a-zA-Z]+://[^/\\s:@]{3,20}:[^@]{3,100}@[a-zA-Z0-9.-]+\\b"),
                 false
         ));
 
