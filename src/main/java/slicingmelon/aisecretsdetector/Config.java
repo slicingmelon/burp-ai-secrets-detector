@@ -14,16 +14,21 @@ public class Config {
     private MontoyaApi api;
     private ConfigSettings configSettings;
     private Runnable onConfigChangedCallback;
+    private JTextArea logArea;
+
+    private static Config instance;
     
     public static class ConfigSettings {
         private int workers;
         private boolean inScopeOnly;
         private Set<ToolType> enabledTools;
+        private boolean loggingEnabled;
         
-        public ConfigSettings(int workers, boolean inScopeOnly, Set<ToolType> enabledTools) {
+        public ConfigSettings(int workers, boolean inScopeOnly, Set<ToolType> enabledTools, boolean loggingEnabled) {
             this.workers = workers;
             this.inScopeOnly = inScopeOnly;
             this.enabledTools = enabledTools;
+            this.loggingEnabled = loggingEnabled;
         }
         
         public int getWorkers() {
@@ -61,14 +66,29 @@ public class Config {
                 enabledTools.remove(toolType);
             }
         }
+
+        public boolean isLoggingEnabled() {
+            return loggingEnabled;
+        }
+        
+        public void setLoggingEnabled(boolean loggingEnabled) {
+            this.loggingEnabled = loggingEnabled;
+        }
     }
     
+    public static Config getInstance() {
+        return instance;
+    }
+
     public Config(MontoyaApi api, Runnable onConfigChangedCallback) {
         this.api = api;
         this.onConfigChangedCallback = onConfigChangedCallback;
         
         // Load saved settings
         this.configSettings = loadConfigSettings(api.persistence().extensionData());
+        
+        // Store instance for singleton access
+        instance = this;
     }
     
     public ConfigSettings getConfigSettings() {
@@ -82,6 +102,9 @@ public class Config {
         
         Boolean inScopeOnlyValue = persistedData.getBoolean("in_scope_only");
         boolean inScopeOnly = (inScopeOnlyValue != null) ? inScopeOnlyValue : true;
+
+        Boolean loggingEnabledValue = persistedData.getBoolean("logging_enabled");
+        boolean loggingEnabled = (loggingEnabledValue != null) ? loggingEnabledValue : false;
         
         // Initialize with default tool settings
         Set<ToolType> enabledTools = new HashSet<>();
@@ -103,13 +126,14 @@ public class Config {
             }
         }
         
-        return new ConfigSettings(workers, inScopeOnly, enabledTools);
+        return new ConfigSettings(workers, inScopeOnly, enabledTools, loggingEnabled);
     }
     
     public void saveConfigSettings() {
         PersistedObject persistedData = api.persistence().extensionData();
         persistedData.setInteger("workers", configSettings.getWorkers());
         persistedData.setBoolean("in_scope_only", configSettings.isInScopeOnly());
+        persistedData.setBoolean("logging_enabled", configSettings.isLoggingEnabled());
         
         StringBuilder toolsBuilder = new StringBuilder();
         for (ToolType tool : configSettings.getEnabledTools()) {
@@ -125,7 +149,6 @@ public class Config {
         }
     }
        
-    
     public JComponent createConfigPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         
@@ -200,19 +223,66 @@ public class Config {
         c.gridwidth = 2;
         settingsPanel.add(toolsPanel, c);
         
-        JLabel autoSaveLabel = new JLabel("Settings are saved automatically when changed");
+        // Add logging enable checkbox
+        JCheckBox loggingCheckbox = new JCheckBox("Enable Logging", configSettings.isLoggingEnabled());
+        loggingCheckbox.addActionListener(_ -> {
+            configSettings.setLoggingEnabled(loggingCheckbox.isSelected());
+            saveConfigSettings();
+            api.logging().logToOutput("Configuration updated - Logging: " + configSettings.isLoggingEnabled());
+            
+            if (configSettings.isLoggingEnabled()) {
+                appendToLog("Logging enabled");
+            }
+        });
+        
         c.gridx = 0;
         c.gridy = 3;
+        c.gridwidth = 2;
+        settingsPanel.add(loggingCheckbox, c);
+        
+        JLabel autoSaveLabel = new JLabel("Settings are saved automatically when changed");
+        c.gridx = 0;
+        c.gridy = 4;
         c.gridwidth = 2;
         settingsPanel.add(autoSaveLabel, c);
         
         panel.add(settingsPanel, BorderLayout.NORTH);
+                
+        // log text area
+        logArea = new JTextArea();
+        logArea.setEditable(false);
+        logArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
+        JScrollPane logScrollPane = new JScrollPane(logArea);
         
-        // Add results display area (in the future mby)
-        JTabbedPane tabbedPane = new JTabbedPane();
-        tabbedPane.addTab("Detection Results", new JScrollPane(new JTable()));
-        panel.add(tabbedPane, BorderLayout.CENTER);
+        JButton clearButton = new JButton("Clear Log");
+        clearButton.addActionListener(_ -> clearLogs());
+        
+        JPanel logPanel = new JPanel(new BorderLayout());
+        logPanel.setBorder(BorderFactory.createTitledBorder("Log"));
+        logPanel.add(logScrollPane, BorderLayout.CENTER);
+        
+        JPanel logControlPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        logControlPanel.add(clearButton);
+        logPanel.add(logControlPanel, BorderLayout.NORTH);
+        
+        panel.add(logPanel, BorderLayout.CENTER);
         
         return panel;
+    }
+
+    public void appendToLog(String message) {
+        if (logArea != null && configSettings.isLoggingEnabled()) {
+            SwingUtilities.invokeLater(() -> {
+                logArea.append(message + "\n");
+
+                logArea.setCaretPosition(logArea.getDocument().getLength());
+            });
+        }
+    }
+
+    public void clearLogs() {
+        if (logArea != null) {
+            SwingUtilities.invokeLater(() -> logArea.setText(""));
+        }
     }
 }
