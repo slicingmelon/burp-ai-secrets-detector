@@ -10,6 +10,7 @@ import burp.api.montoya.scanner.audit.issues.AuditIssue;
 import burp.api.montoya.scanner.audit.issues.AuditIssueConfidence;
 import burp.api.montoya.scanner.audit.issues.AuditIssueSeverity;
 import burp.api.montoya.sitemap.SiteMapFilter;
+import burp.api.montoya.sitemap.SiteMapNode;
 import burp.api.montoya.core.ToolType;
 import burp.api.montoya.http.message.MimeType;
 
@@ -25,7 +26,7 @@ import java.util.HashMap;
 import java.util.Set;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
+//import java.nio.charset.StandardCharsets;
 import burp.api.montoya.core.ByteArray;
 
 public class AISecretsDector implements BurpExtension {
@@ -222,52 +223,43 @@ public class AISecretsDector implements BurpExtension {
     */
     private Set<String> extractExistingSecretsForUrl(String url) {
         Set<String> existingSecrets = new HashSet<>();
-        
+    
         try {
-            // fix bug .. extract the base URL without query parameters using URI parser
-            String baseUrl = url;
-            try {
-                URI uri = new URI(url);
-   
-                baseUrl = new URI(uri.getScheme(), 
-                                  uri.getUserInfo(), 
-                                  uri.getHost(), 
-                                  uri.getPort(),
-                                  uri.getPath(), 
-                                  null, // No query
-                                  null) // No fragment
-                         .toString();
-                
-                //logMsg("Normalized URL from " + url + " to " + baseUrl);
-            } catch (URISyntaxException e) {
-                // If URI parsing fails, fall back to string splitting
-                logMsg("Failed to parse URL with URI parser, falling back to string splitting");
-                baseUrl = url.contains("?") ? url.split("\\?")[0] : url;
-            }
+            // Extract the base URL without query parameters using URI parser
+            String baseUrl = normalizeUrl(url);
             
-            SiteMapFilter urlFilter = SiteMapFilter.prefixFilter(baseUrl);
-            
-            List<AuditIssue> filteredIssues = api.siteMap().issues(urlFilter);
-            
-            logMsg("Found " + filteredIssues.size() + " filtered issues for base URL: " + baseUrl);
-            
-            // Process only our "Exposed Secrets Detected" issues
-            for (AuditIssue issue : filteredIssues) {
-                if (issue.name().equals("Exposed Secrets Detected")) {
-                    if (issue.baseUrl().equals(baseUrl)) {
-                        logMsg("Processing existing secret issue from: " + issue.baseUrl());
-                        
-                        // Process evidence efficiently
-                        for (HttpRequestResponse evidence : issue.requestResponses()) {
-                            List<Marker> markers = evidence.responseMarkers();
-                            
-                            if (markers != null && !markers.isEmpty()) {
-                                logMsg("Processing " + markers.size() + " markers from evidence");
-                                
-                                Set<String> secretsFromMarkers = extractSecretsFromMarkers(evidence);
-                                existingSecrets.addAll(secretsFromMarkers);
-                            }
+            SiteMapFilter preciseFilter = new SiteMapFilter() {
+                @Override
+                public boolean matches(SiteMapNode node) {
+                    // Only match our exact URL
+                    if (!node.url().equals(baseUrl)) {
+                        return false;
+                    }
+                    
+                    // Only match nodes that have "Exposed Secrets Detected" issues
+                    for (AuditIssue issue : node.issues()) {
+                        if (issue.name().equals("Exposed Secrets Detected")) {
+                            return true;
                         }
+                    }
+                    return false;
+                }
+            };
+            
+            // Get only issues that exactly match our filter criteria
+            List<AuditIssue> filteredIssues = api.siteMap().issues(preciseFilter);
+            
+            logMsg("Found " + filteredIssues.size() + " precise filtered issues for URL: " + baseUrl);
+            
+            for (AuditIssue issue : filteredIssues) {
+                for (HttpRequestResponse evidence : issue.requestResponses()) {
+                    List<Marker> markers = evidence.responseMarkers();
+                    
+                    if (markers != null && !markers.isEmpty()) {
+                        logMsg("Processing " + markers.size() + " markers from evidence");
+                        
+                        Set<String> secretsFromMarkers = extractSecretsFromMarkers(evidence);
+                        existingSecrets.addAll(secretsFromMarkers);
                     }
                 }
             }
@@ -277,6 +269,23 @@ public class AISecretsDector implements BurpExtension {
         }
         
         return existingSecrets;
+    }
+
+    private String normalizeUrl(String url) {
+        try {
+            URI uri = new URI(url);
+            return new URI(uri.getScheme(), 
+                          uri.getUserInfo(), 
+                          uri.getHost(), 
+                          uri.getPort(),
+                          uri.getPath(), 
+                          null, // No query
+                          null) // No fragment
+                     .toString();
+        } catch (URISyntaxException e) {
+            logMsg("Failed to parse URL with URI parser, falling back to string splitting");
+            return url.contains("?") ? url.split("\\?")[0] : url;
+        }
     }
     
     /*
