@@ -20,7 +20,6 @@ public class SecretScanner {
 
     private final List<SecretPattern> secretPatterns;
     private static final String RANDOM_STRING_REGEX = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-)\\s*[\\t \"'`]?([\\w+./=~-]{15,80})(?:[\\t\\n \"'`]|$)";
-    //private static final String RANDOM_STRING_REGEX = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-|:\\s+\")\\s*[\\t \"'`]?([\\w+./=~-]{15,80})(?:[\\t\\n \"'`]|$)";
 
     // Secret detection related classes
     public static class Secret {
@@ -119,19 +118,26 @@ public class SecretScanner {
                 false
         ));
 
+        // Azure Storage Account Key
+        patterns.add(new SecretPattern(
+            "Azure Storage Account Key",
+            Pattern.compile("AccountKey=[\\d+/=A-Za-z]{88}"),
+            false
+        ));
+
+        // Azure AD Client Secret
+        patterns.add(new SecretPattern(
+            "Azure AD Client Secret",
+            Pattern.compile("(?:^|[\\'\"\\x60\\s>=:(,)])([a-zA-Z0-9_~.]{3}\\dQ~[a-zA-Z0-9_~.-]{31,34})(?:$|[\\'\"\\x60\\s<),])"),
+            false
+        ));
+
         patterns.add(new SecretPattern(
             "AWS Access Key",
             Pattern.compile("\\b((?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16,20})\\b"),
             false
         ));
-        
-        // JWT/JWE
-        patterns.add(new SecretPattern(
-                "JWT/JWE Token",
-                Pattern.compile("\\beyJ[\\dA-Za-z=_-]+(?:\\.[\\dA-Za-z=_-]{3,}){1,4}"),
-                false
-        ));
-        
+                
         // GitHub PAT
         patterns.add(new SecretPattern(
                 "GitHub Personal Access Token",
@@ -145,40 +151,19 @@ public class SecretScanner {
                 Pattern.compile("glpat-[\\dA-Za-z_=-]{20,22}"),
                 false
         ));
-        
-        // Stripe API Key
+       
+        // Cloudflare API Key
         patterns.add(new SecretPattern(
-                "Stripe API Key",
-                Pattern.compile("[rs]k_live_[\\dA-Za-z]{24,247}"),
-                false
-        ));
-        
-        // Square OAuth Secret
-        patterns.add(new SecretPattern(
-                "Square OAuth Secret",
-                Pattern.compile("sq0i[a-z]{2}-[\\dA-Za-z_-]{22,43}"),
-                false
-        ));
-        
-        // Square Access Token
-        patterns.add(new SecretPattern(
-                "Square Access Token",
-                Pattern.compile("sq0c[a-z]{2}-[\\dA-Za-z_-]{40,50}"),
-                false
-        ));
-        
-        // Square Access Token
-        patterns.add(new SecretPattern(
-            "Square Access Token",
-            Pattern.compile("\\bEAAA[\\dA-Za-z+=-]{60}\\b"),
+        "Cloudflare API Key",
+            Pattern.compile("(?i)[\\w.-]{0,50}?(?:cloudflare)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-z0-9_-]{40})(?:[\\x60'\"\\s;]|\\\\[nr]|$)"),
             false
-    ));
-        
-        // Azure Storage Account Key
+        ));
+
+        // Cloudflare Global API Key
         patterns.add(new SecretPattern(
-                "Azure Storage Account Key",
-                Pattern.compile("AccountKey=[\\d+/=A-Za-z]{88}"),
-                false
+            "Cloudflare Global API Key",
+            Pattern.compile("(?i)[\\w.-]{0,50}?(?:cloudflare)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-f0-9]{37})(?:[\\x60'\"\\s;]|\\\\[nr]|$)"),
+            false
         ));
         
         // GCP API Key
@@ -186,6 +171,34 @@ public class SecretScanner {
                 "GCP API Key",
                 Pattern.compile("AIzaSy[\\dA-Za-z_-]{33}"),
                 false
+        ));
+
+        // JWT/JWE
+        patterns.add(new SecretPattern(
+            "JWT/JWE Token",
+            Pattern.compile("\\beyJ[\\dA-Za-z=_-]+(?:\\.[\\dA-Za-z=_-]{3,}){1,4}"),
+            false
+        ));
+
+        // Mailgun Signing Key
+        patterns.add(new SecretPattern(
+            "Mailgun Signing Key",
+            Pattern.compile("(?i)[\\w.-]{0,50}?(?:mailgun)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-h0-9]{32}-[a-h0-9]{8}-[a-h0-9]{8})(?:[\\x60'\"\\s;]|\\\\[nr]|$)"),
+            false
+        ));
+
+        // Mailgun Private API Token
+        patterns.add(new SecretPattern(
+            "Mailgun Private API Token",
+            Pattern.compile("(?i)[\\w.-]{0,50}?(?:mailgun)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}(key-[a-f0-9]{32})(?:[\\x60'\"\\s;]|\\\\[nr]|$)"),
+            false
+        ));
+
+        // OpenAI API Key
+        patterns.add(new SecretPattern(
+            "OpenAI API Key",
+            Pattern.compile("\\b(sk-[a-zA-Z0-9]{20}T3BlbkFJ[a-zA-Z0-9]{20})(?:[\\x60'\"\\s;]|\\\\[nr]|$)"),
+            false
         ));
         
         // NPM Token (modern)
@@ -208,12 +221,26 @@ public class SecretScanner {
                 Pattern.compile("xox[aboprs]-(?:\\d+-)+[\\da-z]+"),
                 false
         ));
+
+        // Slack Config Access Token
+        patterns.add(new SecretPattern(
+            "Slack Config Access Token",
+            Pattern.compile("(?i)xoxe.xox[bp]-\\d-[A-Z0-9]{163,166}"),
+            false
+        ));
+
+        // Slack Legacy Workspace Token
+        patterns.add(new SecretPattern(
+            "Slack Legacy Workspace Token",
+            Pattern.compile("xox[ar]-(?:\\d-)?[0-9a-zA-Z]{8,48}"),
+            false
+        ));
         
         // Slack Webhook URL
         patterns.add(new SecretPattern(
-                "Slack Webhook URL",
-                Pattern.compile("https://hooks\\.slack\\.com/services/T[\\dA-Za-z_]+/B[\\dA-Za-z_]+/[\\dA-Za-z_]+"),
-                false
+            "Slack Webhook URL",
+            Pattern.compile("(?:https?://)?hooks.slack.com/(?:services|workflows)/[A-Za-z0-9+/]{43,46}"),
+            false
         ));
         
         // SendGrid API Key
@@ -221,6 +248,34 @@ public class SecretScanner {
                 "SendGrid API Key",
                 Pattern.compile("SG\\.[\\dA-Za-z_-]{22}\\.[\\dA-Za-z_-]{43}"),
                 false
+        ));
+
+        // Stripe API Key
+        patterns.add(new SecretPattern(
+            "Stripe API Key",
+            Pattern.compile("[rs]k_live_[\\dA-Za-z]{24,247}"),
+            false
+        ));
+        
+        // Square OAuth Secret
+        patterns.add(new SecretPattern(
+                "Square OAuth Secret",
+                Pattern.compile("sq0i[a-z]{2}-[\\dA-Za-z_-]{22,43}"),
+                false
+        ));
+        
+        // Square Access Token
+        patterns.add(new SecretPattern(
+                "Square Access Token",
+                Pattern.compile("sq0c[a-z]{2}-[\\dA-Za-z_-]{40,50}"),
+                false
+        ));
+        
+        // Square Access Token
+        patterns.add(new SecretPattern(
+            "Square Access Token",
+            Pattern.compile("\\bEAAA[\\dA-Za-z+=-]{60}\\b"),
+            false
         ));
         
         // Twilio API Key
