@@ -240,14 +240,7 @@ public class SecretScanner {
                 Pattern.compile("s-s4t2(?:af|ud)-[\\da-f]{64}"),
                 false
         ));
-        
-        // PuTTY Private Key
-        patterns.add(new SecretPattern(
-                "PuTTY Private Key",
-                Pattern.compile("PuTTY-User-Key-File-2"),
-                false
-        ));
-        
+                
         // Age Secret Key
         patterns.add(new SecretPattern(
                 "Age Secret Key",
@@ -255,53 +248,11 @@ public class SecretScanner {
                 false
         ));
         
-        // DSA Private Key
+        // Generic Private Key (RSA, DSA, etc.)
         patterns.add(new SecretPattern(
-                "DSA Private Key",
-                Pattern.compile("-{5}BEGIN DSA PRIVATE KEY-{5}(?:$|[^-]{63,}-{5}END)"),
-                false
-        ));
-        
-        // EC Private Key
-        patterns.add(new SecretPattern(
-                "EC Private Key",
-                Pattern.compile("-{5}BEGIN EC PRIVATE KEY-{5}(?:$|[^-]{63,}-{5}END)"),
-                false
-        ));
-        
-        // OpenSSH Private Key
-        patterns.add(new SecretPattern(
-                "OpenSSH Private Key",
-                Pattern.compile("-{5}BEGIN OPENSSH PRIVATE KEY-{5}(?:$|[^-]{63,}-{5}END)"),
-                false
-        ));
-        
-        // PGP Private Key
-        patterns.add(new SecretPattern(
-                "PGP Private Key",
-                Pattern.compile("-{5}BEGIN PGP PRIVATE KEY BLOCK-{5}(?:$|[^-]{63,}-{5}END)"),
-                false
-        ));
-        
-        // Generic Private Key
-        patterns.add(new SecretPattern(
-                "Generic Private Key",
-                Pattern.compile("-{5}BEGIN PRIVATE KEY-{5}(?:$|[^-]{63,}-{5}END)"),
-                false
-        ));
-        
-        // RSA Private Key
-        patterns.add(new SecretPattern(
-                "RSA Private Key",
-                Pattern.compile("-{5}BEGIN RSA PRIVATE KEY-{5}(?:$|[^-]{63,}-{5}END)"),
-                false
-        ));
-        
-        // SSH2 Encrypted Private Key
-        patterns.add(new SecretPattern(
-                "SSH2 Encrypted Private Key",
-                Pattern.compile("-{5}BEGIN SSH2 ENCRYPTED PRIVATE KEY-{5}(?:$|[^-]{63,}-{5}END)"),
-                false
+            "Private Key",
+            Pattern.compile("(?i)-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\\s\\S-]{64,}?KEY(?: BLOCK)?-----"),
+            false
         ));
         
         // Generic Secret (Random String)
