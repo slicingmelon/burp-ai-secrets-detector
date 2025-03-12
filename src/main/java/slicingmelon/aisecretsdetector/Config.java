@@ -255,7 +255,7 @@ public class Config {
         JScrollPane logScrollPane = new JScrollPane(logArea);
         
         JButton clearButton = new JButton("Clear Log");
-        clearButton.addActionListener(e -> clearLogs());
+        clearButton.addActionListener(_ -> clearLogs());
         
         JPanel logPanel = new JPanel(new BorderLayout());
         logPanel.setBorder(BorderFactory.createTitledBorder("Log"));

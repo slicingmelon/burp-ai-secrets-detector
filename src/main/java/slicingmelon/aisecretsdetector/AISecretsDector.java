@@ -342,13 +342,13 @@ public class AISecretsDector implements BurpExtension {
             case IMAGE_SVG_XML:
             case IMAGE_TIFF:
             case IMAGE_UNKNOWN:
-
             case FONT_WOFF:
             case FONT_WOFF2:
             case SOUND:
             case VIDEO:
             case APPLICATION_FLASH:
             case RTF:
+            case APPLICATION_UNKNOWN: // risky but burp does not detect enough useless mime types (e.g font/ttf etc)
                 return true;
             // Process all other MIME types
             default:
