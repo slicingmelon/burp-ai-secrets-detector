@@ -99,7 +99,7 @@ public class SecretScannerUtils {
         addPattern("Intra42 Secret", 
             "s-s4t2(?:af|ud)-[\\da-f]{64}");
         
-        addPattern("Private Key", 
+        addPattern("Generic Private Key", 
             "(?i)-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\\s\\S-]{64,}?KEY(?: BLOCK)?-----");
         
         // Generic Secret pattern
