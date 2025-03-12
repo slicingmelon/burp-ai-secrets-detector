@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.Set;
 import java.net.URI;
 import java.net.URISyntaxException;
-//import java.nio.charset.StandardCharsets;
 import burp.api.montoya.core.ByteArray;
 
 public class AISecretsDector implements BurpExtension {
@@ -114,7 +113,7 @@ public class AISecretsDector implements BurpExtension {
     }
 
     /**
-    * Process HTTP response and compare with existing issues
+    * Process HTTP responses
     */
     private void processHttpResponse(HttpResponseReceived responseReceived) {
         try {
@@ -288,60 +287,9 @@ public class AISecretsDector implements BurpExtension {
         }
     }
     
-    /*
-    * Extract actual secrets from response markers by removing the padding
+    /**
+    * Extract actual secrets from response markers
     */
-    // private Set<String> extractSecretsFromMarkers(HttpRequestResponse requestResponse) {
-    //     Set<String> extractedSecrets = new HashSet<>();
-        
-    //     if (requestResponse == null || requestResponse.response() == null) {
-    //         logMsg("No response to extract markers from");
-    //         return extractedSecrets;
-    //     }
-        
-    //     String responseBody = requestResponse.response().bodyToString();
-    //     int bodyOffset = requestResponse.response().bodyOffset();
-    //     List<Marker> markers = requestResponse.responseMarkers();
-        
-    //     if (markers == null || markers.isEmpty()) {
-    //         logMsg("No markers found in response");
-    //         return extractedSecrets;
-    //     }
-        
-    //     for (Marker marker : markers) {
-    //         try {
-    //             int startPos = marker.range().startIndexInclusive();
-    //             int endPos = marker.range().endIndexExclusive();
-                
-    //             // Adjust marker positions to account for the padding (20 chars on each side)
-    //             int adjustedStartPos = Math.max(bodyOffset, startPos + 20);
-    //             int adjustedEndPos = Math.min(bodyOffset + responseBody.length(), endPos - 20);
-                
-    //             // Only check if we have a valid range (start < end)
-    //             if (adjustedStartPos >= adjustedEndPos) {
-    //                 logMsg("Invalid marker adjustment, cannot extract secret properly");
-    //                 continue;
-    //             }
-                
-    //             // Extract the actual secret without padding, using the already parsed body
-    //             // Convert positions from response-relative to body-relative
-    //             String secret = responseBody.substring(
-    //                 adjustedStartPos - bodyOffset, 
-    //                 adjustedEndPos - bodyOffset
-    //             );
-                
-    //             if (secret != null && !secret.isEmpty()) {
-    //                 extractedSecrets.add(secret);
-    //                 logMsg("Extracted secret from marker: " + secret);
-    //             }
-    //         } catch (Exception e) {
-    //             logMsg("Error extracting secret from marker: " + e.getMessage());
-    //         }
-    //     }
-
-    //     return extractedSecrets;
-    // }
-
     private Set<String> extractSecretsFromMarkers(HttpRequestResponse requestResponse) {
         Set<String> extractedSecrets = new HashSet<>();
     
@@ -375,7 +323,7 @@ public class AISecretsDector implements BurpExtension {
                     continue;
                 }
                 
-                // Extract ONLY the bytes needed using subArray - more efficient!
+                // Extract ONLY the bytes needed using subArray
                 ByteArray secretBytes = bodyBytes.subArray(adjustedStartPos, adjustedEndPos);
                 String secret = secretBytes.toString();
                 
