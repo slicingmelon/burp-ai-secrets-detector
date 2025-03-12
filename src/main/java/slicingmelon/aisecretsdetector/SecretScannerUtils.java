@@ -20,6 +20,9 @@ public class SecretScannerUtils {
         
         addPattern("Age Secret Key", 
             "AGE-SECRET-KEY-1[\\dA-Z]{58}");
+
+        addPattern("Algolia API Key", 
+        "(?i)[\\w.-]{0,50}?(?:algolia)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-z0-9]{32})(?:[\\x60'\"\\s;]|\\\\[nr]|$)");
         
         addPattern("Azure Storage Account Key", 
             "AccountKey=[\\d+/=A-Za-z]{88}");
