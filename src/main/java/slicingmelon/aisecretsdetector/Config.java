@@ -22,7 +22,7 @@ public class Config {
         private Set<ToolType> enabledTools;
         private boolean loggingEnabled;
         
-        public ConfigSettings(int workers, boolean inScopeOnly, Set<ToolType> enabledTools) {
+        public ConfigSettings(int workers, boolean inScopeOnly, Set<ToolType> enabledTools, boolean loggingEnabled) {
             this.workers = workers;
             this.inScopeOnly = inScopeOnly;
             this.enabledTools = enabledTools;
@@ -214,17 +214,59 @@ public class Config {
         c.gridwidth = 2;
         settingsPanel.add(toolsPanel, c);
         
-        JLabel autoSaveLabel = new JLabel("Settings are saved automatically when changed");
+        // Add logging enable checkbox
+        JCheckBox loggingCheckbox = new JCheckBox("Enable Logging", configSettings.isLoggingEnabled());
+        loggingCheckbox.addActionListener(_ -> {
+            configSettings.setLoggingEnabled(loggingCheckbox.isSelected());
+            saveConfigSettings();
+            api.logging().logToOutput("Configuration updated - Logging: " + configSettings.isLoggingEnabled());
+            
+            if (configSettings.isLoggingEnabled()) {
+                appendToLog("Logging enabled");
+            }
+        });
+        
         c.gridx = 0;
         c.gridy = 3;
+        c.gridwidth = 2;
+        settingsPanel.add(loggingCheckbox, c);
+        
+        JLabel autoSaveLabel = new JLabel("Settings are saved automatically when changed");
+        c.gridx = 0;
+        c.gridy = 4;
         c.gridwidth = 2;
         settingsPanel.add(autoSaveLabel, c);
         
         panel.add(settingsPanel, BorderLayout.NORTH);
         
-        // Add results display area (in the future mby)
+        // Create tabbed pane with detection results and log area
         JTabbedPane tabbedPane = new JTabbedPane();
-        tabbedPane.addTab("Detection Results", new JScrollPane(new JTable()));
+        
+        // Create table model for results
+        // We'll just use an empty table for now
+        JTable resultsTable = new JTable();
+        
+        // Create log text area
+        logArea = new JTextArea();
+        logArea.setEditable(false);
+        logArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        JScrollPane logScrollPane = new JScrollPane(logArea);
+        
+        // Create buttons for log control
+        JButton clearButton = new JButton("Clear Log");
+        clearButton.addActionListener(e -> clearLogs());
+        
+        JPanel logPanel = new JPanel(new BorderLayout());
+        logPanel.add(logScrollPane, BorderLayout.CENTER);
+        
+        JPanel logControlPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        logControlPanel.add(clearButton);
+        logPanel.add(logControlPanel, BorderLayout.NORTH);
+        
+        // Add components to tabbed pane - first tab for results, second for log
+        tabbedPane.addTab("Detection Results", new JScrollPane(resultsTable));
+        tabbedPane.addTab("Log", logPanel);
+        
         panel.add(tabbedPane, BorderLayout.CENTER);
         
         return panel;
