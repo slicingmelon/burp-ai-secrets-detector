@@ -101,6 +101,8 @@ public class SecretScanner {
         }
     }
     
+    private final Config config;
+
     public SecretScanner(MontoyaApi api) {
         this.api = api;
         this.secretPatterns = initializeSecretPatterns();
@@ -304,7 +306,7 @@ public class SecretScanner {
                         
                         // Skip if we've already found this secret value in this response
                         if (uniqueSecretValues.contains(secretValue)) {
-                            api.logging().logToOutput("Skipping duplicate secret: " + secretValue);
+                            config.appendToLog("Skipping duplicate secret: " + secretValue);
                             continue;
                         }
                         

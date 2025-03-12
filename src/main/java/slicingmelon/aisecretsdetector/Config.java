@@ -15,6 +15,8 @@ public class Config {
     private ConfigSettings configSettings;
     private Runnable onConfigChangedCallback;
     private JTextArea logArea;
+
+    private static Config instance;
     
     public static class ConfigSettings {
         private int workers;
@@ -74,12 +76,19 @@ public class Config {
         }
     }
     
+    public static Config getInstance() {
+        return instance;
+    }
+
     public Config(MontoyaApi api, Runnable onConfigChangedCallback) {
         this.api = api;
         this.onConfigChangedCallback = onConfigChangedCallback;
         
         // Load saved settings
         this.configSettings = loadConfigSettings(api.persistence().extensionData());
+        
+        // Store instance for singleton access
+        instance = this;
     }
     
     public ConfigSettings getConfigSettings() {
@@ -238,36 +247,25 @@ public class Config {
         settingsPanel.add(autoSaveLabel, c);
         
         panel.add(settingsPanel, BorderLayout.NORTH);
-        
-        // Create tabbed pane with detection results and log area
-        JTabbedPane tabbedPane = new JTabbedPane();
-        
-        // Create table model for results
-        // We'll just use an empty table for now
-        JTable resultsTable = new JTable();
-        
-        // Create log text area
+                
+        // log text area
         logArea = new JTextArea();
         logArea.setEditable(false);
-        logArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        logArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
         JScrollPane logScrollPane = new JScrollPane(logArea);
         
-        // Create buttons for log control
         JButton clearButton = new JButton("Clear Log");
         clearButton.addActionListener(e -> clearLogs());
         
         JPanel logPanel = new JPanel(new BorderLayout());
+        logPanel.setBorder(BorderFactory.createTitledBorder("Log"));
         logPanel.add(logScrollPane, BorderLayout.CENTER);
         
         JPanel logControlPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         logControlPanel.add(clearButton);
         logPanel.add(logControlPanel, BorderLayout.NORTH);
         
-        // Add components to tabbed pane - first tab for results, second for log
-        tabbedPane.addTab("Detection Results", new JScrollPane(resultsTable));
-        tabbedPane.addTab("Log", logPanel);
-        
-        panel.add(tabbedPane, BorderLayout.CENTER);
+        panel.add(logPanel, BorderLayout.CENTER);
         
         return panel;
     }
@@ -276,7 +274,7 @@ public class Config {
         if (logArea != null && configSettings.isLoggingEnabled()) {
             SwingUtilities.invokeLater(() -> {
                 logArea.append(message + "\n");
-                // Auto-scroll to bottom
+
                 logArea.setCaretPosition(logArea.getDocument().getLength());
             });
         }
