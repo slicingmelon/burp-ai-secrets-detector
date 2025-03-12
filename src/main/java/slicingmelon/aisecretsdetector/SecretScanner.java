@@ -54,12 +54,10 @@ public class SecretScanner {
     public static class SecretPattern {
         private final String name;
         private final Pattern pattern;
-        private final boolean requiresRandomCheck;
         
-        public SecretPattern(String name, Pattern pattern, boolean requiresRandomCheck) {
+        public SecretPattern(String name, Pattern pattern) {
             this.name = name;
             this.pattern = pattern;
-            this.requiresRandomCheck = requiresRandomCheck;
         }
         
         public String getName() {
@@ -69,10 +67,7 @@ public class SecretScanner {
         public Pattern getPattern() {
             return pattern;
         }
-        
-        public boolean requiresRandomCheck() {
-            return requiresRandomCheck;
-        }
+    
     }
     
     public static class SecretScanResult {
@@ -134,7 +129,7 @@ public class SecretScanner {
                             bodyEndPos = matcher.end(1);
                             
                             // Check if this is actually a random string
-                            if (pattern.requiresRandomCheck() && !isRandom(secretValue.getBytes(StandardCharsets.UTF_8))) {
+                            if (!isRandom(secretValue.getBytes(StandardCharsets.UTF_8))) {
                                 continue;  // Skip if not random enough
                             }
                         } else {
