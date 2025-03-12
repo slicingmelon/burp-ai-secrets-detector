@@ -351,4 +351,17 @@ public class AISecretsDector implements BurpExtension {
                 return false;
         }
     }
+
+    private void logPoolStats() {
+        if (executorService instanceof ThreadPoolExecutor) {
+            ThreadPoolExecutor pool = (ThreadPoolExecutor) executorService;
+            api.logging().logToOutput(String.format(
+                "Thread pool stats - Active: %d, Completed: %d, Task Count: %d, Queue Size: %d",
+                pool.getActiveCount(),
+                pool.getCompletedTaskCount(),
+                pool.getTaskCount(),
+                pool.getQueue().size()
+            ));
+        }
+    }
 }
