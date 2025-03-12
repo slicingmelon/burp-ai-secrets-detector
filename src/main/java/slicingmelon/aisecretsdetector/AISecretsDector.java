@@ -349,6 +349,7 @@ public class AISecretsDector implements BurpExtension {
             case APPLICATION_FLASH:
             case RTF:
             case APPLICATION_UNKNOWN: // risky but burp does not detect enough useless mime types (e.g font/ttf etc)
+            case UNRECOGNIZED: // risky but burp does not detect enough useless mime types (e.g font/ttf etc)
                 return true;
             // Process all other MIME types
             default:
