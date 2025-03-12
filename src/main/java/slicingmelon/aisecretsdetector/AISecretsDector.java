@@ -304,33 +304,35 @@ public class AISecretsDector implements BurpExtension {
                 int endPos = marker.range().endIndexExclusive();
                 
                 // Adjust marker positions to account for the padding (20 chars on each side)
-                int adjustedStartPos = startPos + 20;
-                int adjustedEndPos = endPos - 20;
+                int adjustedStartPos = Math.max(bodyOffset, startPos + 20);
+                int adjustedEndPos = Math.min(bodyOffset + responseBody.length(), endPos - 20);
                 
-                // If adjusted positions are invalid, log and continue without extraction
-                if (adjustedStartPos >= adjustedEndPos || 
-                    adjustedStartPos < bodyOffset || 
-                    adjustedEndPos > bodyOffset + responseBody.length()) {
-                    
+                // Only check if we have a valid range (start < end)
+                if (adjustedStartPos >= adjustedEndPos) {
                     logMsg("Invalid marker adjustment, cannot extract secret properly");
                     continue;
                 }
                 
-                // Extract the actual secret without padding
-                String secret = requestResponse.response().toString().substring(
-                    adjustedStartPos, adjustedEndPos);
+                // Extract the actual secret without padding, using the already parsed body
+                // Convert positions from response-relative to body-relative
+                String secret = responseBody.substring(
+                    adjustedStartPos - bodyOffset, 
+                    adjustedEndPos - bodyOffset
+                );
                 
                 if (secret != null && !secret.isEmpty()) {
                     extractedSecrets.add(secret);
                     logMsg("Extracted secret from marker: " + secret);
                 }
             } catch (Exception e) {
-                api.logging().logToError("Error extracting secret from marker: " + e.getMessage());
+                logMsg("Error extracting secret from marker: " + e.getMessage());
             }
         }
-        
+
         return extractedSecrets;
     }
+        
+       
 
     // Skip binary content types that are unlikely to contain secrets
     public boolean shouldSkipMimeType(MimeType mimeType) {
