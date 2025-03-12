@@ -1,14 +1,11 @@
 package slicingmelon.aisecretsdetector;
 
-import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.regex.Pattern;
 
 /**
- * Utility class for SecretScanner containing precompiled regex patterns
- * and common constants
+ * Utility class for SecretScanner
  */
 public class SecretScannerUtils {
     // Random string pattern
@@ -34,7 +31,7 @@ public class SecretScannerUtils {
             "\\b((?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16,20})\\b", false);
         
         addPattern("Fastly API Key", 
-            "(?i)[\\w.-]{0,50}?(?:fastly)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-z0-9=_\\-]{32})(?:[\\x60'\"\\s;]|\\\\[nr]|$)'", false);
+            "(?i)[\\w.-]{0,50}?(?:fastly)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-z0-9=_\\-]{32})(?:[\\x60'\"\\s;]|\\\\[nr]|$)", false);
         
         addPattern("GitHub Personal Access Token", 
             "(?:gh[oprsu]|github_pat)_[\\dA-Za-z_]{36}", false);
