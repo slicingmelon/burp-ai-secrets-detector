@@ -89,6 +89,7 @@ public class AISecretsDector implements BurpExtension {
             api.logging().logToOutput("AI Secrets Detector extension unloading...");
             logMsg("AI Secrets Detector extension unloading...");
             shutdownWorkers();
+            config.clearLogs();
         });
         
         api.logging().logToOutput("AI Secrets Detector extension loaded successfully");
@@ -368,6 +369,7 @@ public class AISecretsDector implements BurpExtension {
         }
     }
 
+    // helper function to log messages 
     private void logMsg(String message) {
         // burp's logger
         //api.logging().logToOutput(message);
