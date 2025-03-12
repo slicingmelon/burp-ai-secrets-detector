@@ -118,6 +118,13 @@ public class SecretScanner {
                 false
         ));
 
+        // Age Secret Key
+        patterns.add(new SecretPattern(
+            "Age Secret Key",
+            Pattern.compile("AGE-SECRET-KEY-1[\\dA-Z]{58}"),
+            false
+        ));
+
         // Azure Storage Account Key
         patterns.add(new SecretPattern(
             "Azure Storage Account Key",
@@ -132,9 +139,17 @@ public class SecretScanner {
             false
         ));
 
+        // AWS Access Key
         patterns.add(new SecretPattern(
             "AWS Access Key",
             Pattern.compile("\\b((?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16,20})\\b"),
+            false
+        ));
+
+        // Fastly API Key
+        patterns.add(new SecretPattern(
+            "Fastly API Key",
+            Pattern.compile( 	"(?i)[\\w.-]{0,50}?(?:fastly)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-z0-9=_\\-]{32})(?:[\\x60'\"\\s;]|\\\\[nr]|$)'"),
             false
         ));
                 
@@ -257,24 +272,17 @@ public class SecretScanner {
             false
         ));
         
-        // Square OAuth Secret
-        patterns.add(new SecretPattern(
-                "Square OAuth Secret",
-                Pattern.compile("sq0i[a-z]{2}-[\\dA-Za-z_-]{22,43}"),
-                false
-        ));
-        
-        // Square Access Token
-        patterns.add(new SecretPattern(
-                "Square Access Token",
-                Pattern.compile("sq0c[a-z]{2}-[\\dA-Za-z_-]{40,50}"),
-                false
-        ));
-        
         // Square Access Token
         patterns.add(new SecretPattern(
             "Square Access Token",
-            Pattern.compile("\\bEAAA[\\dA-Za-z+=-]{60}\\b"),
+            Pattern.compile("\\b((?:EAAA|sq0atp-)[\\w-]{22,60})(?:[\\x60'\"\\s;]|\\\\[nr]|$)"),
+            false
+        ));
+
+        // Squarespace Access Token
+        patterns.add(new SecretPattern(
+            "Squarespace Access Token",
+            Pattern.compile("(?i)[\\w.-]{0,50}?(?:squarespace)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[\\x60'\"\\s;]|\\\\[nr]|$)"),
             false
         ));
         
@@ -299,12 +307,7 @@ public class SecretScanner {
                 false
         ));
                 
-        // Age Secret Key
-        patterns.add(new SecretPattern(
-                "Age Secret Key",
-                Pattern.compile("AGE-SECRET-KEY-1[\\dA-Z]{58}"),
-                false
-        ));
+
         
         // Generic Private Key (RSA, DSA, etc.)
         patterns.add(new SecretPattern(
