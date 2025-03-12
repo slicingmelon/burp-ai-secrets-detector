@@ -11,16 +11,13 @@ import java.util.regex.Pattern;
  * and common constants
  */
 public class SecretScannerUtils {
-    
-    // Regex pattern constants
+    // Random string pattern
     public static final String RANDOM_STRING_REGEX = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-)\\s*[\\t \"'`]?([\\w+./=~-]{15,80})(?:[\\t\\n \"'`]|$)";
     
-    // Store SecretPattern objects directly instead of just Pattern objects
     private static final List<SecretScanner.SecretPattern> SECRET_PATTERNS = new ArrayList<>();
     
-    // Static initializer block to ensure patterns are compiled at class load time
+    // Load and compile patterns during load time
     static {
-        // Add all patterns with their names and configurations
         addPattern("URL with Credentials", 
             "(?i)\\b[a-zA-Z]+://[^/\\s:@]{3,20}:[^@]{3,100}@[a-zA-Z0-9.-]+\\b", false);
         
@@ -108,7 +105,7 @@ public class SecretScannerUtils {
         addPattern("Private Key", 
             "(?i)-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\\s\\S-]{64,}?KEY(?: BLOCK)?-----", false);
         
-        // Generic Secret pattern - this is the only one that needs random check
+        // Generic Secret pattern
         addPattern("Generic Secret", RANDOM_STRING_REGEX, true);
     }
     

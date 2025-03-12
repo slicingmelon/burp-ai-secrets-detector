@@ -103,7 +103,7 @@ public class SecretScanner {
     
     public SecretScanner(MontoyaApi api) {
         //this.api = api;
-        this.secretPatterns = initializeSecretPatterns();
+        this.secretPatterns = SecretScannerUtils.getAllPatterns();
         this.config = Config.getInstance();
     }
     
