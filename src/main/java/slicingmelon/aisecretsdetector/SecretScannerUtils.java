@@ -113,7 +113,7 @@ public class SecretScannerUtils {
     }
     
     /**
-     * Helper method to compile and store a pattern with its metadata
+     * Helper method to compile and store a pattern with its metadataa
      */
     private static void addPattern(String name, String regex, boolean requiresRandomCheck) {
         SECRET_PATTERNS.add(new SecretScanner.SecretPattern(
