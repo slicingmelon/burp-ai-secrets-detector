@@ -16,6 +16,7 @@ import burp.api.montoya.http.message.MimeType;
 import javax.swing.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -86,10 +87,12 @@ public class AISecretsDector implements BurpExtension {
         
         api.extension().registerUnloadingHandler(() -> {
             api.logging().logToOutput("AI Secrets Detector extension unloading...");
+            logMsg("AI Secrets Detector extension unloading...");
             shutdownWorkers();
         });
         
         api.logging().logToOutput("AI Secrets Detector extension loaded successfully");
+        logMsg("AI Secrets Detector extension loaded successfully");
     }
     
     private void initializeWorkers() {
@@ -121,7 +124,7 @@ public class AISecretsDector implements BurpExtension {
             // Process found secrets
             if (result.hasSecrets()) {
                 String url = responseReceived.initiatingRequest().url().toString();
-                api.logging().logToOutput("HTTP Handler: Secrets found in response from: " + url);
+                logMsg("HTTP Handler: Secrets found in response from: " + url);
                 
                 // Create markers to highlight where the secrets are in the response
                 List<Marker> responseMarkers = new ArrayList<>();
@@ -142,19 +145,19 @@ public class AISecretsDector implements BurpExtension {
                         }
                         secretTypeMap.get(secretType).add(secretValue);
                         
-                        api.logging().logToOutput("HTTP Handler: Found " + secretType + ": " + secretValue);
+                        logMsg("HTTP Handler: Found " + secretType + ": " + secretValue);
                     }
                 }
                 
                 Set<String> existingSecrets = extractExistingSecretsForUrl(url);
-                api.logging().logToOutput("HTTP Handler: Found " + existingSecrets.size() + " existing secrets for URL: " + url);
+                logMsg("HTTP Handler: Found " + existingSecrets.size() + " existing secrets for URL: " + url);
                 
                 // Check if we have new secrets for this URL
                 boolean hasNewSecrets = false;
                 for (String newSecret : newSecrets) {
                     if (!existingSecrets.contains(newSecret)) {
                         hasNewSecrets = true;
-                        api.logging().logToOutput("HTTP Handler: Found new secret: " + newSecret);
+                        logMsg("HTTP Handler: Found new secret: " + newSecret);
                     }
                 }
                 
@@ -199,10 +202,10 @@ public class AISecretsDector implements BurpExtension {
                     );
                     
                     // Add the issue to Burp's issues list and log the action
-                    api.logging().logToOutput("HTTP Handler: Adding NEW audit issue for URL: " + requestResponse.request().url());
+                    logMsg("HTTP Handler: Adding NEW audit issue for URL: " + requestResponse.request().url());
                     api.siteMap().add(auditIssue);
                 } else {
-                    api.logging().logToOutput("HTTP Handler: No new secrets found for URL: " + url + ", skipping issue creation");
+                    logMsg("HTTP Handler: No new secrets found for URL: " + url + ", skipping issue creation");
                 }
             }
             
@@ -233,10 +236,10 @@ public class AISecretsDector implements BurpExtension {
                                   null) // No fragment
                          .toString();
                 
-                //api.logging().logToOutput("Normalized URL from " + url + " to " + baseUrl);
+                //logMsg("Normalized URL from " + url + " to " + baseUrl);
             } catch (URISyntaxException e) {
                 // If URI parsing fails, fall back to string splitting
-                api.logging().logToOutput("Failed to parse URL with URI parser, falling back to string splitting");
+                logMsg("Failed to parse URL with URI parser, falling back to string splitting");
                 baseUrl = url.contains("?") ? url.split("\\?")[0] : url;
             }
             
@@ -244,20 +247,20 @@ public class AISecretsDector implements BurpExtension {
             
             List<AuditIssue> filteredIssues = api.siteMap().issues(urlFilter);
             
-            api.logging().logToOutput("Found " + filteredIssues.size() + " filtered issues for base URL: " + baseUrl);
+            logMsg("Found " + filteredIssues.size() + " filtered issues for base URL: " + baseUrl);
             
             // Process only our "Exposed Secrets Detected" issues
             for (AuditIssue issue : filteredIssues) {
                 if (issue.name().equals("Exposed Secrets Detected")) {
                     if (issue.baseUrl().equals(baseUrl)) {
-                        api.logging().logToOutput("Processing existing secret issue from: " + issue.baseUrl());
+                        logMsg("Processing existing secret issue from: " + issue.baseUrl());
                         
                         // Process evidence efficiently
                         for (HttpRequestResponse evidence : issue.requestResponses()) {
                             List<Marker> markers = evidence.responseMarkers();
                             
                             if (markers != null && !markers.isEmpty()) {
-                                api.logging().logToOutput("Processing " + markers.size() + " markers from evidence");
+                                logMsg("Processing " + markers.size() + " markers from evidence");
                                 
                                 Set<String> secretsFromMarkers = extractSecretsFromMarkers(evidence);
                                 existingSecrets.addAll(secretsFromMarkers);
@@ -281,7 +284,7 @@ public class AISecretsDector implements BurpExtension {
         Set<String> extractedSecrets = new HashSet<>();
         
         if (requestResponse == null || requestResponse.response() == null) {
-            api.logging().logToOutput("No response to extract markers from");
+            logMsg("No response to extract markers from");
             return extractedSecrets;
         }
         
@@ -290,7 +293,7 @@ public class AISecretsDector implements BurpExtension {
         List<Marker> markers = requestResponse.responseMarkers();
         
         if (markers == null || markers.isEmpty()) {
-            api.logging().logToOutput("No markers found in response");
+            logMsg("No markers found in response");
             return extractedSecrets;
         }
         
@@ -308,7 +311,7 @@ public class AISecretsDector implements BurpExtension {
                     adjustedStartPos < bodyOffset || 
                     adjustedEndPos > bodyOffset + responseBody.length()) {
                     
-                    api.logging().logToOutput("Invalid marker adjustment, cannot extract secret properly");
+                    logMsg("Invalid marker adjustment, cannot extract secret properly");
                     continue;
                 }
                 
@@ -318,7 +321,7 @@ public class AISecretsDector implements BurpExtension {
                 
                 if (secret != null && !secret.isEmpty()) {
                     extractedSecrets.add(secret);
-                    api.logging().logToOutput("Extracted secret from marker: " + secret);
+                    logMsg("Extracted secret from marker: " + secret);
                 }
             } catch (Exception e) {
                 api.logging().logToError("Error extracting secret from marker: " + e.getMessage());
@@ -355,13 +358,23 @@ public class AISecretsDector implements BurpExtension {
     private void logPoolStats() {
         if (executorService instanceof ThreadPoolExecutor) {
             ThreadPoolExecutor pool = (ThreadPoolExecutor) executorService;
-            api.logging().logToOutput(String.format(
+            logMsg(String.format(
                 "Thread pool stats - Active: %d, Completed: %d, Task Count: %d, Queue Size: %d",
                 pool.getActiveCount(),
                 pool.getCompletedTaskCount(),
                 pool.getTaskCount(),
                 pool.getQueue().size()
             ));
+        }
+    }
+
+    private void logMsg(String message) {
+        // burp's logger
+        //api.logging().logToOutput(message);
+        
+        // Also log to UI if enabled
+        if (config != null && config.getConfigSettings().isLoggingEnabled()) {
+            config.appendToLog(message);
         }
     }
 }
