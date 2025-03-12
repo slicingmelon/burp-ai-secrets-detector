@@ -15,7 +15,9 @@ import java.nio.charset.StandardCharsets;
 
 public class SecretScanner {
     
-    private final MontoyaApi api;
+    //private final MontoyaApi api;
+    private final Config config;
+
     private final List<SecretPattern> secretPatterns;
     private static final String RANDOM_STRING_REGEX = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-)\\s*[\\t \"'`]?([\\w+./=~-]{15,80})(?:[\\t\\n \"'`]|$)";
     //private static final String RANDOM_STRING_REGEX = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-|:\\s+\")\\s*[\\t \"'`]?([\\w+./=~-]{15,80})(?:[\\t\\n \"'`]|$)";
@@ -101,11 +103,12 @@ public class SecretScanner {
         }
     }
     
-    private final Config config;
+    
 
     public SecretScanner(MontoyaApi api) {
-        this.api = api;
+        //this.api = api;
         this.secretPatterns = initializeSecretPatterns();
+        this.config = Config.getInstance();
     }
     
     private List<SecretPattern> initializeSecretPatterns() {
@@ -323,17 +326,17 @@ public class SecretScanner {
                         Secret secret = new Secret(pattern.getName(), secretValue, highlightStart, highlightEnd);
                         foundSecrets.add(secret);
                         
-                        // api.logging().logToOutput(String.format(
-                        //     "Found %s: '%s' at body position %d-%d (highlight: %d-%d)",
-                        //     pattern.getName(), secretValue, bodyStartPos, bodyEndPos, highlightStart, highlightEnd
-                        // ));
+                        config.appendToLog(String.format(
+                            "Found %s: '%s' at body position %d-%d (highlight: %d-%d)",
+                            pattern.getName(), secretValue, bodyStartPos, bodyEndPos, highlightStart, highlightEnd
+                        ));
                     }
                 } catch (Exception e) {
-                    api.logging().logToError("Error with pattern " + pattern.getName() + ": " + e.getMessage());
+                    config.appendToLog("Error with pattern " + pattern.getName() + ": " + e.getMessage());
                 }
             }
         } catch (Exception e) {
-            api.logging().logToError("Error scanning response: " + e.getMessage());
+            config.appendToLog("Error scanning response: " + e.getMessage());
         }
         
         return new SecretScanResult(response, foundSecrets);
