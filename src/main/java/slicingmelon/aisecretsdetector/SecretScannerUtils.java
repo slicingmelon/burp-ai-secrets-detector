@@ -9,12 +9,40 @@ import java.util.regex.Pattern;
  */
 public class SecretScannerUtils {
     // Random string pattern
-    public static final String RANDOM_STRING_REGEX = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-)\\s*[\\t \"'`]?([\\w+./=~-]{15,80})(?:[\\t\\n \"'`]|$)";
-    
+    //public static final String RANDOM_STRING_REGEX = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-)\\s*[\\t \"'`]?([\\w+./=~-]{15,80})(?:[\\t\\n \"'`]|$)";
+    public static final String RANDOM_STRING_REGEX_TEMPLATE = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-)\\s*[\\t \"'`]?([\\w+./=~-]{%d,80})(?:[\\t\\n \"'`]|$)";
+
     private static final List<SecretScanner.SecretPattern> SECRET_PATTERNS = new ArrayList<>();
-    
-    // Load and compile patterns during load time
+    private static int minSecretLength = 15;
+
+    /**
+     * Set the minimum length for random secrets and regenerate patterns
+     * @param length The new minimum length
+     */
+    public static void setMinSecretLength(int length) {
+        if (length != minSecretLength) {
+            minSecretLength = length;
+            // Regenerate the patterns with the new minimum length
+            SECRET_PATTERNS.clear();
+            initializePatterns();
+        }
+    }
+
+    /**
+     * Get the current minimum secret length
+     * @return The minimum secret length
+     */
+    public static int getMinSecretLength() {
+        return minSecretLength;
+    }
+
+    // Load and compile patterns
     static {
+        initializePatterns();
+    }
+
+    // Load and compile patterns during load time
+    private static void initializePatterns() {
         addPattern("URL with Credentials", 
             "(?i)\\b[a-zA-Z]+://[^/\\s:@]{3,20}:[^@]{3,100}@[a-zA-Z0-9.-]+\\b");
         
@@ -106,7 +134,9 @@ public class SecretScannerUtils {
             "(?i)-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\\s\\S-]{64,}?KEY(?: BLOCK)?-----");
         
         // Generic Secret pattern
-        addPattern("Generic Secret", RANDOM_STRING_REGEX);
+        //addPattern("Generic Secret", RANDOM_STRING_REGEX);
+        String randomStringRegex = String.format(RANDOM_STRING_REGEX_TEMPLATE, minSecretLength);
+        addPattern("Generic Secret", randomStringRegex);
     }
     
     /**

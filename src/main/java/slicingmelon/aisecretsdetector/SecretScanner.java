@@ -152,8 +152,10 @@ public class SecretScanner {
                         int fullEndPos = bodyOffset + bodyEndPos;
                         
                         // Calculate highlight positions with 20 character buffer for better visibility
-                        int highlightStart = Math.max(bodyOffset, fullStartPos - 20);
-                        int highlightEnd = Math.min(bodyOffset + responseBody.length(), fullEndPos + 20);
+                        // int highlightStart = Math.max(bodyOffset, fullStartPos - 20);
+                        // int highlightEnd = Math.min(bodyOffset + responseBody.length(), fullEndPos + 20);
+                        int highlightStart = fullStartPos;
+                        int highlightEnd = fullEndPos;
                         
                         Secret secret = new Secret(pattern.getName(), secretValue, highlightStart, highlightEnd);
                         foundSecrets.add(secret);
@@ -180,7 +182,7 @@ public class SecretScanner {
      */
     private boolean isRandom(byte[] data) {
         // Check if the data is valid
-        if (data == null || data.length < 15) {
+        if (data == null || data.length < SecretScannerUtils.getMinSecretLength()) {
             return false;
         }
         
@@ -203,7 +205,7 @@ public class SecretScanner {
         
         return true;
     }
-    
+
     /**
      * Calculates the probability that a byte sequence is random
      * Ported from RipSecrets
