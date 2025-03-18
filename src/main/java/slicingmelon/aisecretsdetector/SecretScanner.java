@@ -206,12 +206,25 @@ public class SecretScanner {
         return true;
     }
 
+    // Added regex patterns from the updated Rust code
+    private static final Pattern HEX_STRING_REGEX = Pattern.compile("^[0-9a-fA-F]{16,}$");
+    private static final Pattern CAP_AND_NUMBERS_REGEX = Pattern.compile("^[0-9A-Z]{16,}$");
+
     /**
      * Calculates the probability that a byte sequence is random
      * Ported from RipSecrets
      */
     private double pRandom(byte[] data) {
-        double base = isHex(data) ? 16.0 : 64.0;
+        String dataStr = new String(data, StandardCharsets.UTF_8);
+        
+        double base;
+        if (HEX_STRING_REGEX.matcher(dataStr).matches()) {
+            base = 16.0;
+        } else if (CAP_AND_NUMBERS_REGEX.matcher(dataStr).matches()) {
+            base = 36.0;
+        } else {
+            base = 64.0;
+        }
         
         double p = pRandomDistinctValues(data, base) * pRandomCharClass(data, base);
         
@@ -243,7 +256,15 @@ public class SecretScanner {
             return pRandomCharClassAux(data, (byte)'0', (byte)'9', 16.0);
         } else {
             double minP = Double.POSITIVE_INFINITY;
-            byte[][] charClasses = {{(byte)'0', (byte)'9'}, {(byte)'A', (byte)'Z'}, {(byte)'a', (byte)'z'}};
+            
+            byte[][] charClasses;
+            if (base == 36.0) {
+                // For base 36, we only check digits and uppercase
+                charClasses = new byte[][] {{(byte)'0', (byte)'9'}, {(byte)'A', (byte)'Z'}};
+            } else {
+                // For base 64, we check digits, uppercase, and lowercase
+                charClasses = new byte[][] {{(byte)'0', (byte)'9'}, {(byte)'A', (byte)'Z'}, {(byte)'a', (byte)'z'}};
+            }
             
             for (byte[] charClass : charClasses) {
                 double p = pRandomCharClassAux(data, charClass[0], charClass[1], base);
