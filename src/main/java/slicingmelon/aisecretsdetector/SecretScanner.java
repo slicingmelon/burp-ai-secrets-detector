@@ -14,8 +14,6 @@ import java.util.regex.Pattern;
 import java.nio.charset.StandardCharsets;
 
 public class SecretScanner {
-    
-    //private final MontoyaApi api;
     private final Config config;
 
     private final List<SecretPattern> secretPatterns;
@@ -140,6 +138,7 @@ public class SecretScanner {
                         }
                         
                         // Skip if we've already found this secret value in this response
+                        // Could kill burp easily
                         if (uniqueSecretValues.contains(secretValue)) {
                             config.appendToLog("Skipping duplicate secret: " + secretValue);
                             continue;
@@ -177,12 +176,12 @@ public class SecretScanner {
     }
     
     /**
-     * Determines if a byte sequence is likely to be a random string (secret)
-     * Ported from RipSecrets p_random.rs
-     */
+    * Determines if a byte sequence is likely to be a random string (secret)
+    * Ported from RipSecrets p_random.rs
+    */
     private boolean isRandom(byte[] data) {
         // Check if the data is valid
-        if (data == null || data.length < SecretScannerUtils.getMinSecretLength()) {
+        if (data == null || data.length < SecretScannerUtils.getGenericSecretMinLength()) {
             return false;
         }
         
@@ -207,11 +206,18 @@ public class SecretScanner {
     }
 
     /**
-     * Calculates the probability that a byte sequence is random
-     * Ported from RipSecrets
-     */
+    * Calculates the probability that a byte sequence is random
+    * Ported from RipSecrets
+    */
     private double pRandom(byte[] data) {
-        double base = isHex(data) ? 16.0 : 64.0;
+        double base;
+        if (isHex(data)) {
+            base = 16.0;
+        } else if (isCapAndNumbers(data)) {
+            base = 36.0;
+        } else {
+            base = 64.0;
+        }
         
         double p = pRandomDistinctValues(data, base) * pRandomCharClass(data, base);
         
@@ -224,26 +230,56 @@ public class SecretScanner {
     }
     
     /**
-     * Checks if a byte sequence appears to be hexadecimal
+     * Checks if a byte sequence consists only of hex characters (0-9, a-f, A-F)
+     * and is at least 16 bytes long
      */
     private boolean isHex(byte[] data) {
+        if (data.length < 16) {
+            return false;
+        }
+        
         for (byte b : data) {
             if (!((b >= '0' && b <= '9') || (b >= 'a' && b <= 'f') || (b >= 'A' && b <= 'F'))) {
                 return false;
             }
         }
-        return data.length >= 16;
+        return true;
+    }
+
+    /**
+    * Checks if a byte sequence consists only of capital letters and numbers (0-9, A-Z)
+    * and is at least 16 bytes long
+    */
+    private boolean isCapAndNumbers(byte[] data) {
+        if (data.length < 16) {
+            return false;
+        }
+        
+        for (byte b : data) {
+            if (!((b >= '0' && b <= '9') || (b >= 'A' && b <= 'Z'))) {
+                return false;
+            }
+        }
+        return true;
     }
     
     /**
-     * Analyzes character classes to determine randomness
-     */
+    * Analyzes character classes to determine randomness
+    */
     private double pRandomCharClass(byte[] data, double base) {
         if (base == 16.0) {
             return pRandomCharClassAux(data, (byte)'0', (byte)'9', 16.0);
         } else {
             double minP = Double.POSITIVE_INFINITY;
-            byte[][] charClasses = {{(byte)'0', (byte)'9'}, {(byte)'A', (byte)'Z'}, {(byte)'a', (byte)'z'}};
+            
+            byte[][] charClasses;
+            if (base == 36.0) {
+                // For base 36, we only check digits and uppercase
+                charClasses = new byte[][] {{(byte)'0', (byte)'9'}, {(byte)'A', (byte)'Z'}};
+            } else {
+                // For base 64, we check digits, uppercase, and lowercase
+                charClasses = new byte[][] {{(byte)'0', (byte)'9'}, {(byte)'A', (byte)'Z'}, {(byte)'a', (byte)'z'}};
+            }
             
             for (byte[] charClass : charClasses) {
                 double p = pRandomCharClassAux(data, charClass[0], charClass[1], base);
@@ -257,8 +293,8 @@ public class SecretScanner {
     }
     
     /**
-     * Calculates randomness probability for a specific character class
-     */
+    * Calculates randomness probability for a specific character class
+    */
     private double pRandomCharClassAux(byte[] data, byte min, byte max, double base) {
         int count = 0;
         for (byte b : data) {
@@ -272,8 +308,8 @@ public class SecretScanner {
     }
     
     /**
-     * Calculates binomial probability
-     */
+    * Calculates binomial probability
+    */
     private double pBinomial(int n, int x, double p) {
         boolean leftTail = x < n * p;
         int min = leftTail ? 0 : x;
@@ -290,8 +326,8 @@ public class SecretScanner {
     }
     
     /**
-     * Calculates factorial
-     */
+    * Calculates factorial
+    */
     private double factorial(int n) {
         double result = 1.0;
         for (int i = 2; i <= n; i++) {
@@ -301,8 +337,8 @@ public class SecretScanner {
     }
     
     /**
-     * Calculates randomness based on bigram frequencies
-     */
+    * Calculates randomness based on bigram frequencies
+    */
     private double pRandomBigrams(byte[] data) {
         // Common bigrams from ripsecrets code (a subset for Java version)
         String[] commonBigrams = {
@@ -329,8 +365,8 @@ public class SecretScanner {
     }
     
     /**
-     * Calculates randomness probability based on distinct values
-     */
+    * Calculates randomness probability based on distinct values
+    */
     private double pRandomDistinctValues(byte[] data, double base) {
         double totalPossible = Math.pow(base, data.length);
         int numDistinctValues = countDistinctValues(data);
@@ -344,8 +380,8 @@ public class SecretScanner {
     }
     
     /**
-     * Counts distinct values in a byte array
-     */
+    * Counts distinct values in a byte array
+    */
     private int countDistinctValues(byte[] data) {
         Set<Byte> values = new HashSet<>();
         for (byte b : data) {
@@ -355,8 +391,8 @@ public class SecretScanner {
     }
     
     /**
-     * Calculates number of possible outcomes
-     */
+    * Calculates number of possible outcomes
+    */
     private double numPossibleOutcomes(int numValues, int numDistinctValues, int base) {
         double res = base;
         for (int i = 1; i < numDistinctValues; i++) {
@@ -367,8 +403,8 @@ public class SecretScanner {
     }
     
     /**
-     * Calculates number of distinct configurations
-     */
+    * Calculates number of distinct configurations
+    */
     private double numDistinctConfigurations(int numValues, int numDistinctValues) {
         if (numDistinctValues == 1 || numDistinctValues == numValues) {
             return 1.0;
@@ -379,9 +415,9 @@ public class SecretScanner {
     private final Map<String, Double> configCache = new HashMap<>();
     
     /**
-     * Recursive helper for distinct configurations calculation
-     * Memoized version of the function from ripsecrets
-     */
+    * Recursive helper for distinct configurations calculation
+    * Memoized version of the function from ripsecrets
+    */
     private double numDistinctConfigurationsAux(int numPositions, int position, int remainingValues) {
         String key = numPositions + ":" + position + ":" + remainingValues;
         if (configCache.containsKey(key)) {

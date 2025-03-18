@@ -3,7 +3,7 @@ Burp extension that automatically detects leaked secrets in HTTP responses. The 
 
 ## Installation
 
-1. Download the jar file from [burp-ai-secrets-detector-1.0.0.jar](https://github.com/slicingmelon/burp-ai-secrets-detector/blob/main/build/libs/burp-ai-secrets-detector-1.0.0.jar)
+1. Download the jar file from [burp-ai-secrets-detector-1.0.0.jar](https://raw.githubusercontent.com/slicingmelon/burp-ai-secrets-detector/refs/heads/main/build/libs/burp-ai-secrets-detector-1.0.0.jar)
 2. In burp, add the .jar file: Burp → Extensions → Installed → Add → Select .jar file
 
 ## How It Works

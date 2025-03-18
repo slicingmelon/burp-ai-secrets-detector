@@ -5,35 +5,34 @@ import java.util.ArrayList;
 import java.util.regex.Pattern;
 
 /**
- * Utility class for SecretScanner
- */
+* Utility class for SecretScanner
+*/
 public class SecretScannerUtils {
     // Random string pattern
-    //public static final String RANDOM_STRING_REGEX = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-)\\s*[\\t \"'`]?([\\w+./=~-]{15,80})(?:[\\t\\n \"'`]|$)";
     public static final String RANDOM_STRING_REGEX_TEMPLATE = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-)\\s*[\\t \"'`]?([\\w+./=~-]{%d,80})(?:[\\t\\n \"'`]|$)";
 
     private static final List<SecretScanner.SecretPattern> SECRET_PATTERNS = new ArrayList<>();
-    private static int minSecretLength = 15;
+    private static int genericSecretMinLength = 15;
 
     /**
-     * Set the minimum length for random secrets and regenerate patterns
-     * @param length The new minimum length
-     */
-    public static void setMinSecretLength(int length) {
-        if (length != minSecretLength) {
-            minSecretLength = length;
-            // Regenerate the patterns with the new minimum length
+    * Set the minimum length for generic secrets (random algorithm matcher) and regenerate patterns
+    * @param length The new minimum length
+    */
+    public static void setGenericSecretMinLength(int length) {
+        if (length != genericSecretMinLength) {
+            genericSecretMinLength = length;
+            // Regenerate the patterns
             SECRET_PATTERNS.clear();
             initializePatterns();
         }
     }
 
     /**
-     * Get the current minimum secret length
-     * @return The minimum secret length
-     */
-    public static int getMinSecretLength() {
-        return minSecretLength;
+    * Get the current minimum generic secret length
+    * @return The minimum generic secret length
+    */
+    public static int getGenericSecretMinLength() {
+        return genericSecretMinLength;
     }
 
     // Load and compile patterns
@@ -134,23 +133,22 @@ public class SecretScannerUtils {
             "(?i)-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\\s\\S-]{64,}?KEY(?: BLOCK)?-----");
         
         // Generic Secret pattern
-        //addPattern("Generic Secret", RANDOM_STRING_REGEX);
-        String randomStringRegex = String.format(RANDOM_STRING_REGEX_TEMPLATE, minSecretLength);
+        String randomStringRegex = String.format(RANDOM_STRING_REGEX_TEMPLATE, genericSecretMinLength);
         addPattern("Generic Secret", randomStringRegex);
     }
     
     /**
-     * Helper method to compile and store a pattern with its metadataa
-     */
+    * Helper method to compile and store a pattern with its metadataa
+    */
     private static void addPattern(String name, String regex) {
         SECRET_PATTERNS.add(new SecretScanner.SecretPattern(
             name, Pattern.compile(regex)));
     }
     
     /**
-     * Get all precompiled secret patterns
-     * @return List of SecretPattern objects
-     */
+    * Get all precompiled secret patterns
+    * @return List of SecretPattern objects
+    */
     public static List<SecretScanner.SecretPattern> getAllPatterns() {
         return SECRET_PATTERNS;
     }
