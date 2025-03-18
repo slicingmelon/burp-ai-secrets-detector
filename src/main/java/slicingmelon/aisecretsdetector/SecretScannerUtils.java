@@ -9,31 +9,30 @@ import java.util.regex.Pattern;
  */
 public class SecretScannerUtils {
     // Random string pattern
-    //public static final String RANDOM_STRING_REGEX = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-)\\s*[\\t \"'`]?([\\w+./=~-]{15,80})(?:[\\t\\n \"'`]|$)";
     public static final String RANDOM_STRING_REGEX_TEMPLATE = "(?i:key|token|secret|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-)\\s*[\\t \"'`]?([\\w+./=~-]{%d,80})(?:[\\t\\n \"'`]|$)";
 
     private static final List<SecretScanner.SecretPattern> SECRET_PATTERNS = new ArrayList<>();
-    private static int minSecretLength = 15;
+    private static int genericSecretMinLength = 15;
 
     /**
      * Set the minimum length for random secrets and regenerate patterns
      * @param length The new minimum length
      */
-    public static void setMinSecretLength(int length) {
-        if (length != minSecretLength) {
-            minSecretLength = length;
-            // Regenerate the patterns with the new minimum length
+    public static void setGenericSecretMinLength(int length) {
+        if (length != genericSecretMinLength) {
+            genericSecretMinLength = length;
+            // Regenerate the patterns
             SECRET_PATTERNS.clear();
             initializePatterns();
         }
     }
 
     /**
-     * Get the current minimum secret length
-     * @return The minimum secret length
+     * Get the current minimum generic secret length
+     * @return The minimum generic secret length
      */
-    public static int getMinSecretLength() {
-        return minSecretLength;
+    public static int getGenericSecretMinLength() {
+        return genericSecretMinLength;
     }
 
     // Load and compile patterns
@@ -58,8 +57,8 @@ public class SecretScannerUtils {
         addPattern("Azure AD Client Secret", 
             "(?:^|[\\'\"\\x60\\s>=:(,)])([a-zA-Z0-9_~.]{3}\\dQ~[a-zA-Z0-9_~.-]{31,34})(?:$|[\\'\"\\x60\\s<),])");
         
-        addPattern("AWS Access Key", 
-            "\\b((?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16,20})\\b");
+        // addPattern("AWS Access Key", 
+        //     "\\b((?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16,20})\\b");
         
         addPattern("Fastly API Key", 
             "(?i)[\\w.-]{0,50}?(?:fastly)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-z0-9=_\\-]{32})(?:[\\x60'\"\\s;]|\\\\[nr]|$)");
@@ -134,8 +133,7 @@ public class SecretScannerUtils {
             "(?i)-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\\s\\S-]{64,}?KEY(?: BLOCK)?-----");
         
         // Generic Secret pattern
-        //addPattern("Generic Secret", RANDOM_STRING_REGEX);
-        String randomStringRegex = String.format(RANDOM_STRING_REGEX_TEMPLATE, minSecretLength);
+        String randomStringRegex = String.format(RANDOM_STRING_REGEX_TEMPLATE, genericSecretMinLength);
         addPattern("Generic Secret", randomStringRegex);
     }
     

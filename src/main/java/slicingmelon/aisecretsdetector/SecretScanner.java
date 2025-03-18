@@ -14,8 +14,6 @@ import java.util.regex.Pattern;
 import java.nio.charset.StandardCharsets;
 
 public class SecretScanner {
-    
-    //private final MontoyaApi api;
     private final Config config;
 
     private final List<SecretPattern> secretPatterns;
@@ -182,7 +180,7 @@ public class SecretScanner {
      */
     private boolean isRandom(byte[] data) {
         // Check if the data is valid
-        if (data == null || data.length < SecretScannerUtils.getMinSecretLength()) {
+        if (data == null || data.length < SecretScannerUtils.getGenericSecretMinLength()) {
             return false;
         }
         
