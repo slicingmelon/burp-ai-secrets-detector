@@ -42,7 +42,7 @@ For detecting secrets that don't follow standardized patterns, the extension imp
 
 3. **Filters false positives** by requiring detected strings to:
    - Have a minimum/maximum length
-   - Pass a randomness probability threshold, e.g., digits, letters, uppercase/lowercase letters, and special characters.
+   - Pass a randomness probability threshold, e.g., digits, letters, uppercase/lowercase letters, and special characters
 
 This dual-detection approach provides high accuracy in finding both common and random secrets or API keys that might be hardcoded in HTTP responses.
 
