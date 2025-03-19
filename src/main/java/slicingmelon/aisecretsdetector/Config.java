@@ -98,7 +98,7 @@ public class Config {
     public ConfigSettings loadConfigSettings(PersistedObject persistedData) {
         // Fix using null check approach
         Integer workersValue = persistedData.getInteger("workers");
-        int workers = (workersValue != null) ? workersValue : 5;
+        int workers = (workersValue != null) ? workersValue : 10;
         
         Boolean inScopeOnlyValue = persistedData.getBoolean("in_scope_only");
         boolean inScopeOnly = (inScopeOnlyValue != null) ? inScopeOnlyValue : true;
