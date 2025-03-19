@@ -1,5 +1,5 @@
 # Burp AI Secrets Detector
-Burp extension that automatically detects leaked secrets in HTTP responses. The extension uses a dual-detection approach combining fixed patterns and a sophisticated randomness analysis algorithm to find exposed secrets with minimal false positives.
+Burp extension that automatically detects leaked secrets in HTTP responses. The extension uses a dual-detection approach combining fixed patterns and a randomness analysis algorithm to find exposed secrets with minimal false positives.
 
 ## Installation
 
@@ -66,6 +66,13 @@ The extension includes several optimizations for performance and resource effici
 - **Memoization**: Complex probability calculations in the randomness detection algorithm use memoization to avoid redundant computation
 
 These optimizations ensure the extension remains lightweight and responsive even when processing large volumes of traffic.
+
+## Results
+
+Results comparison vs Trufflehog:
+
+![Results](./images/burp-secrets-detector-vs-trufflehog.jpg)
+
 
 ## TO DO
 

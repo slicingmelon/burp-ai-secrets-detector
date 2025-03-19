@@ -134,17 +134,25 @@ public class SecretScanner {
 
                             // Check if this is a reCAPTCHA Site Key by directly using the pattern
                             // We want to skip reCAPTCHA Site Key, as it's useless
+                            boolean isReCaptchaSiteKey = false;
                             for (SecretPattern p : secretPatterns) {
                                 if (p.getName().equals("reCAPTCHA Site Key") && p.getPattern().matcher(secretValue).matches()) {
-                                    continue;
+                                    isReCaptchaSiteKey = true;
+                                    config.appendToLog("Skipping reCAPTCHA Site Key detected by Generic Secret pattern: " + secretValue);
+                                    break;
                                 }
+                            }
+                            
+                            // Skip this match if it's a reCAPTCHA Site Key
+                            if (isReCaptchaSiteKey) {
+                                continue;
                             }
 
                             // Check if this is actually a random string
                             if (!isRandom(secretValue.getBytes(StandardCharsets.UTF_8))) {
                                 continue;  // Skip if not random enough
                             }
-                            
+
                         } else {
                             // For other patterns, use the whole match
                             secretValue = matcher.group(0);

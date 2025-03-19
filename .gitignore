@@ -12,3 +12,4 @@
 !build/libs/*.jar
 !test-server/srv.py
 !test-server/static/secrets.js
+!images/*.png

@@ -187,7 +187,7 @@ public class AISecretsDector implements BurpExtension {
                     String detail = detailBuilder.toString();
                     
                     String remediation = "<p>Sensitive information such as API keys, tokens, and other secrets should not be included in HTTP responses. " +
-                            "Review the application code to ensure secrets are not leaked to clients.</p>";
+                            "Review the application code to ensure that sensitive credentials are not hardcoded or exposed in the source code.</p>";
                     
                     // Create an audit issue
                     AuditIssue auditIssue = AuditIssue.auditIssue(
