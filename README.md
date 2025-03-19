@@ -1,6 +1,8 @@
 # Burp AI Secrets Detector
 Burp extension that automatically detects leaked secrets in HTTP responses. The extension uses a dual-detection approach combining fixed patterns and a randomness analysis algorithm to find exposed secrets with minimal false positives.
 
+Author: Petru Surugiu <[pedro_infosec](https://x.com/pedro_infosec)>
+
 ## Installation
 
 1. Download the jar file from [burp-ai-secrets-detector-1.0.0.jar](https://raw.githubusercontent.com/slicingmelon/burp-ai-secrets-detector/refs/heads/main/build/libs/burp-ai-secrets-detector-1.0.0.jar)
@@ -38,9 +40,8 @@ For detecting secrets that don't follow standardized patterns, the extension imp
    - **Entropy calculation**: Evaluates the randomness of the detected string
 
 3. **Filters false positives** by requiring detected strings to:
-   - Have a minimum length (15 characters)
-   - Contain at least one digit
-   - Pass a randomness probability threshold
+   - Have a minimum/maximum lenght
+   - Pass a randomness probability threshold, e.g digits, letters, uppercase/lowercase, special characters.
 
 This dual-detection approach provider high accuracy in finding both common and random secrets or API keys that might be hardcoded in HTTP responses.
 
@@ -73,6 +74,7 @@ Results comparison vs Trufflehog:
 
 ![Results](./images/burp-secrets-detector-vs-trufflehog.jpg)
 
+**NOTE**: This extension was not inspired by Trufflehog Burp Integration extension.
 
 ## TO DO
 
