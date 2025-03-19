@@ -1,3 +1,10 @@
+/**
+ * AI Secrets Detector
+ * 
+ * Author: Petru Surugiu <@pedro_infosec>
+ * https://github.com/slicingmelon/
+ * This extension is a Burp Suite extension that uses a dual-detection approach combining fixed patterns and a randomness analysis algorithm to find exposed secrets with minimal false positives.
+ */
 package slicingmelon.aisecretsdetector;
 
 import burp.api.montoya.BurpExtension;
