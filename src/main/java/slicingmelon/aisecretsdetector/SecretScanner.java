@@ -131,11 +131,20 @@ public class SecretScanner {
                             secretValue = matcher.group(1);
                             bodyStartPos = matcher.start(1);
                             bodyEndPos = matcher.end(1);
-                            
+
+                            // Check if this is a reCAPTCHA Site Key by directly using the pattern
+                            // We want to skip reCAPTCHA Site Key, as it's useless
+                            for (SecretPattern p : secretPatterns) {
+                                if (p.getName().equals("reCAPTCHA Site Key") && p.getPattern().matcher(secretValue).matches()) {
+                                    continue;
+                                }
+                            }
+
                             // Check if this is actually a random string
                             if (!isRandom(secretValue.getBytes(StandardCharsets.UTF_8))) {
                                 continue;  // Skip if not random enough
                             }
+                            
                         } else {
                             // For other patterns, use the whole match
                             secretValue = matcher.group(0);
