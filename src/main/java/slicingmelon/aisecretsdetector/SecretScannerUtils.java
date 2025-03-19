@@ -48,6 +48,7 @@ public class SecretScannerUtils {
     }
 
     // Load and compile patterns during load time
+    // Credits to gitleaks for most of the fixed patterns regexes
     private static void initializePatterns() {
         addPattern("URL with Credentials", 
             "(?i)\\b[a-zA-Z]+://[^/\\s:@]{3,20}:[^@]{3,100}@[a-zA-Z0-9.-]+\\b");
