@@ -105,11 +105,11 @@ public class SecretScannerUtils {
 
         // reCAPTCHA Site Key
         addPattern("reCAPTCHA Site Key", 
-            "6[LM][a-zA-Z0-9_-]{38}");
+            "\\b6[LM][a-zA-Z0-9_-]{38}\\b");
         
         // reCAPTCHA Secret Key
         addPattern("reCAPTCHA Secret Key", 
-            "6[LM][a-zA-Z0-9_-]{39}");
+            "\\b6[LM][a-zA-Z0-9_-]{39}\\b");
         
         addPattern("Slack Token", 
             "xox[aboprs]-(?:\\d+-)+[\\da-z]+");
