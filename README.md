@@ -10,11 +10,11 @@ Author: Petru Surugiu <[pedro_infosec](https://x.com/pedro_infosec)>
 
 ## How It Works
 
-The extension scans HTTP responses for leaked secrets using two complementary detection mechanisms:
+This BurpSuite extension actively and passively scans HTTP responses for leaked secrets using two complementary detection mechanisms.
 
 ### 1. Fixed Pattern Detection
 
-The extension detects most known secrets based on a predefined list of fixed patterns:
+It detects most known secrets based on a predefined list of fixed patterns:
 
 - AWS Access Keys (AKIA...)
 - Azure Secrets
