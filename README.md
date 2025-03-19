@@ -6,7 +6,7 @@ Author: Petru Surugiu <[pedro_infosec](https://x.com/pedro_infosec)>
 ## Installation
 
 1. Download the jar file from [burp-ai-secrets-detector-1.0.0.jar](https://raw.githubusercontent.com/slicingmelon/burp-ai-secrets-detector/refs/heads/main/build/libs/burp-ai-secrets-detector-1.0.0.jar)
-2. In burp, add the .jar file: Burp → Extensions → Installed → Add → Select .jar file
+2. In burp, add the .jar file: Burp → Extensions → Installed → Add → Select the .jar file
 
 ## How It Works
 
@@ -14,15 +14,16 @@ The extension scans HTTP responses for leaked secrets using two complementary de
 
 ### 1. Fixed Pattern Detection
 
-The extension contains a comprehensive set of regular expressions designed to match known secret formats, including:
+The extension detects most known secrets based on a predefined list of fixed patterns:
 
 - AWS Access Keys (AKIA...)
+- Azure Secrets
 - GitHub Personal Access Tokens (ghp_...)
 - GitLab Tokens (glpat-...)
+- GCP API Keys
+- JWT/JWE Tokens
 - Stripe API Keys
 - Square OAuth Tokens
-- JWT/JWE Tokens
-- GCP API Keys
 - Various private key formats (RSA, DSA, EC, SSH, etc.)
 - And more
 
@@ -40,10 +41,10 @@ For detecting secrets that don't follow standardized patterns, the extension imp
    - **Entropy calculation**: Evaluates the randomness of the detected string
 
 3. **Filters false positives** by requiring detected strings to:
-   - Have a minimum/maximum lenght
-   - Pass a randomness probability threshold, e.g digits, letters, uppercase/lowercase, special characters.
+   - Have a minimum/maximum length
+   - Pass a randomness probability threshold, e.g., digits, letters, uppercase/lowercase letters, and special characters.
 
-This dual-detection approach provider high accuracy in finding both common and random secrets or API keys that might be hardcoded in HTTP responses.
+This dual-detection approach provides high accuracy in finding both common and random secrets or API keys that might be hardcoded in HTTP responses.
 
 ## Content Type Filtering
 
@@ -74,13 +75,13 @@ Results comparison vs Trufflehog:
 
 ![Results](./images/burp-secrets-detector-vs-trufflehog.jpg)
 
-**NOTE**: This extension was not inspired by Trufflehog Burp Integration extension.
+**NOTE**: This extension was not inspired by the Trufflehog Burp Integration extension.
 
 ## TO DO
 
 - The extension needs thorough testing to minimize false positives before enabling AI integration, as each false positive would unnecessarily consume tokens.
-- While it's not currently possible to use custom AI models through the Montoya API, and Burp's built-in AI is a paid service with token limitations, the next version will have the option to leverage Burp's AI for additional verification of detected secrets once the base detection rate is refined.
+- Currently, it is not possible to use custom AI models through the Montoya API. Additionally, Burp's built-in AI is a paid service with token limitations. In the next version, the extension will have the option to leverage Burp's AI for additional verification of detected secrets once the base detection rate is refined.
   
 ## Credits
 
-This extension is inspired by and ports the randomness detection algorithm from [RipSecrets](https://github.com/sirwart/ripsecrets), a tool designed to find secrets accidentally committed to repositories.
+Credits to [RipSecrets](https://github.com/sirwart/ripsecrets) for the randomness detection algorithm, a tool designed to find secrets accidentally committed to repositories.
