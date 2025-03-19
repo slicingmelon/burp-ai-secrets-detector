@@ -113,6 +113,12 @@ public class SecretScanner {
             
             for (SecretPattern pattern : secretPatterns) {
                 try {
+
+                    // Skip reCAPTCHA Site Key pattern - we only want reCAPTCHA Secret Keys
+                    if (pattern.getName().equals("reCAPTCHA Site Key")) {
+                        continue;
+                    }
+
                     Matcher matcher = pattern.getPattern().matcher(responseBody);
                     
                     while (matcher.find()) {

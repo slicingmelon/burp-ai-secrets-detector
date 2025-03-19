@@ -95,6 +95,14 @@ public class SecretScannerUtils {
         
         addPattern("NPM Token (legacy)", 
             "//.+/:_authToken=[\\dA-Za-z_-]+");
+
+        // reCAPTCHA Site Key
+        addPattern("reCAPTCHA Site Key", 
+            "6[LM][a-zA-Z0-9_-]{38}");
+        
+        // reCAPTCHA Secret Key
+        addPattern("reCAPTCHA Secret Key", 
+            "6[LM][a-zA-Z0-9_-]{39}");
         
         addPattern("Slack Token", 
             "xox[aboprs]-(?:\\d+-)+[\\da-z]+");
