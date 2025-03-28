@@ -88,8 +88,9 @@ public class SecretScannerUtils {
         addPattern("GCP API Key", 
             "AIzaSy[\\dA-Za-z_-]{33}");
         
-        addPattern("JWT/JWE Token", 
-            "\\beyJ[\\dA-Za-z=_-]+(?:\\.[\\dA-Za-z=_-]{3,}){1,4}");
+        // Disabled for now.. too many "findings"
+        // addPattern("JWT/JWE Token", 
+        //     "\\beyJ[\\dA-Za-z=_-]+(?:\\.[\\dA-Za-z=_-]{3,}){1,4}");
         
         addPattern("Mailgun Signing Key", 
             "(?i)[\\w.-]{0,50}?(?:mailgun)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-h0-9]{32}-[a-h0-9]{8}-[a-h0-9]{8})(?:[\\x60'\"\\s;]|\\\\[nr]|$)");
