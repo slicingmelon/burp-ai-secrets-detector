@@ -125,7 +125,6 @@ public class Config {
         // Load saved settings
         this.configSettings = loadConfigSettings(api.persistence().extensionData());
         
-        // Store instance for singleton access
         instance = this;
     }
     
@@ -234,21 +233,30 @@ public class Config {
                 1
         );
         JSpinner workersSpinner = new JSpinner(workersModel);
+        
+        // Fix the spinner width using a more direct approach
+        JComponent editor = workersSpinner.getEditor();
+        Dimension prefSize = new Dimension(60, editor.getPreferredSize().height);
+        editor.setPreferredSize(prefSize);
+        
+        // Set the spinner's maximum size to ensure it doesn't grow beyond our desired size
+        workersSpinner.setMaximumSize(new Dimension(60, workersSpinner.getPreferredSize().height));
+        
+        // Additionally, add the spinner to a panel with FlowLayout to prevent stretching
+        JPanel spinnerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        spinnerPanel.setOpaque(false); // Make panel transparent
+        spinnerPanel.add(workersSpinner);
+        
         workersSpinner.addChangeListener(_ -> {
             configSettings.setWorkers((Integer) workersSpinner.getValue());
             saveConfigSettings();
             api.logging().logToOutput("Configuration updated - Workers: " + configSettings.getWorkers());
         });
         
-        // Set a reasonable fixed width for the spinner
-        JComponent editor = workersSpinner.getEditor();
-        Dimension prefSize = new Dimension(60, editor.getPreferredSize().height);
-        editor.setPreferredSize(prefSize);
-        
         leftConstraints.gridx = 1;
         leftConstraints.gridy = 0;
-        leftConstraints.weightx = 0.0; // Don't stretch the spinner
-        leftPanel.add(workersSpinner, leftConstraints);
+        leftConstraints.weightx = 0.0; // Don't stretch
+        leftPanel.add(spinnerPanel, leftConstraints);
         
         // In-scope only setting
         JCheckBox inScopeCheckbox = new JCheckBox("In-Scope Requests Only", configSettings.isInScopeOnly());
@@ -379,7 +387,7 @@ public class Config {
         }
         
         // Logging panel
-        JPanel loggingPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel loggingPanel = new JPanel(new GridLayout(2, 1)); // Use 2 rows, 1 column layout
         
         // Add logging enable checkbox
         JCheckBox loggingCheckbox = new JCheckBox("Enable Logging", configSettings.isLoggingEnabled());
@@ -395,8 +403,11 @@ public class Config {
         
         loggingPanel.add(loggingCheckbox);
         
+        // Create a panel for the auto-save message with left alignment
+        JPanel autoSavePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JLabel autoSaveLabel = new JLabel("Settings are saved automatically when changed");
-        loggingPanel.add(autoSaveLabel);
+        autoSavePanel.add(autoSaveLabel);
+        loggingPanel.add(autoSavePanel);
         
         // Add all panels to the main panel
         JPanel topPanel = new JPanel(new BorderLayout());
