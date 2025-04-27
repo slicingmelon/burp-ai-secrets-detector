@@ -240,9 +240,14 @@ public class Config {
             api.logging().logToOutput("Configuration updated - Workers: " + configSettings.getWorkers());
         });
         
+        // Set a reasonable fixed width for the spinner
+        JComponent editor = workersSpinner.getEditor();
+        Dimension prefSize = new Dimension(60, editor.getPreferredSize().height);
+        editor.setPreferredSize(prefSize);
+        
         leftConstraints.gridx = 1;
         leftConstraints.gridy = 0;
-        leftConstraints.weightx = 1.0; // Allow the spinner to resize
+        leftConstraints.weightx = 0.0; // Don't stretch the spinner
         leftPanel.add(workersSpinner, leftConstraints);
         
         // In-scope only setting
@@ -303,9 +308,14 @@ public class Config {
                                      configSettings.getGenericSecretMinLength());
         });
         
+        // Set a reasonable fixed width for the spinner
+        JComponent minEditor = minLengthSpinner.getEditor();
+        Dimension minPrefSize = new Dimension(60, minEditor.getPreferredSize().height);
+        minEditor.setPreferredSize(minPrefSize);
+        
         rightConstraints.gridx = 1;
         rightConstraints.gridy = 1;
-        rightConstraints.weightx = 1.0; // Allow the spinner to resize
+        rightConstraints.weightx = 0.0; // Don't stretch the spinner
         rightPanel.add(minLengthSpinner, rightConstraints);
         
         // Max Length setting
@@ -329,9 +339,14 @@ public class Config {
                                      configSettings.getGenericSecretMaxLength());
         });
         
+        // Set a reasonable fixed width for the spinner
+        JComponent maxEditor = maxLengthSpinner.getEditor();
+        Dimension maxPrefSize = new Dimension(60, maxEditor.getPreferredSize().height);
+        maxEditor.setPreferredSize(maxPrefSize);
+        
         rightConstraints.gridx = 1;
         rightConstraints.gridy = 2;
-        rightConstraints.weightx = 1.0; // Allow the spinner to resize
+        rightConstraints.weightx = 0.0; // Don't stretch the spinner
         rightPanel.add(maxLengthSpinner, rightConstraints);
         
         // Add left and right panels to the settings panel
