@@ -126,6 +126,12 @@ public class SecretScanner {
                         continue;
                     }
 
+                    // Skip randomness algorithm detection if disabled in settings
+                    if (pattern.getName().equals("Generic Secret") && !SecretScannerUtils.isRandomnessAlgorithmEnabled()) {
+                        config.appendToLog("Skipping Generic Secret pattern - randomness algorithm disabled");
+                        continue;
+                    }
+
                     Matcher matcher = pattern.getPattern().matcher(responseBody);
                     
                     while (matcher.find()) {

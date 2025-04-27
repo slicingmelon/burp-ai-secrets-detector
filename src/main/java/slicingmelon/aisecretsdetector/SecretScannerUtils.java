@@ -16,10 +16,12 @@ import java.util.regex.Pattern;
 */
 public class SecretScannerUtils {
     // Random string pattern
-    public static final String RANDOM_STRING_REGEX_TEMPLATE = "(?i:auth|key|token|secret|passwd|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-)\\s*[\\t \"'`]?([\\w+./=~-]{%d,80})(?:[\\t\\n \"'`]|$)";
+    public static final String RANDOM_STRING_REGEX_TEMPLATE = "(?i:auth|key|token|secret|passwd|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-)\\s*[\\t \"'`]?([\\w+./=~-]{%d,%d})(?:[\\t\\n \"'`]|$)";
 
     private static final List<SecretScanner.SecretPattern> SECRET_PATTERNS = new ArrayList<>();
     private static int genericSecretMinLength = 15;
+    private static int genericSecretMaxLength = 80;
+    private static boolean randomnessAlgorithmEnabled = true;
 
     /**
     * Set the minimum length for generic secrets (random algorithm matcher) and regenerate patterns
@@ -35,11 +37,48 @@ public class SecretScannerUtils {
     }
 
     /**
+    * Set the maximum length for generic secrets (random algorithm matcher) and regenerate patterns
+    * @param length The new maximum length
+    */
+    public static void setGenericSecretMaxLength(int length) {
+        if (length != genericSecretMaxLength) {
+            genericSecretMaxLength = length;
+            // Regenerate the patterns
+            SECRET_PATTERNS.clear();
+            initializePatterns();
+        }
+    }
+
+    /**
+    * Enable or disable the randomness algorithm detection
+    * @param enabled Whether the algorithm should be enabled
+    */
+    public static void setRandomnessAlgorithmEnabled(boolean enabled) {
+        randomnessAlgorithmEnabled = enabled;
+    }
+
+    /**
+    * Check if the randomness algorithm detection is enabled
+    * @return True if enabled, false otherwise
+    */
+    public static boolean isRandomnessAlgorithmEnabled() {
+        return randomnessAlgorithmEnabled;
+    }
+
+    /**
     * Get the current minimum generic secret length
     * @return The minimum generic secret length
     */
     public static int getGenericSecretMinLength() {
         return genericSecretMinLength;
+    }
+
+    /**
+    * Get the current maximum generic secret length
+    * @return The maximum generic secret length
+    */
+    public static int getGenericSecretMaxLength() {
+        return genericSecretMaxLength;
     }
 
     // Load and compile patterns
@@ -152,7 +191,7 @@ public class SecretScannerUtils {
             "(?i)-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\\s\\S-]{64,}?KEY(?: BLOCK)?-----");
         
         // Generic Secret pattern
-        String randomStringRegex = String.format(RANDOM_STRING_REGEX_TEMPLATE, genericSecretMinLength);
+        String randomStringRegex = String.format(RANDOM_STRING_REGEX_TEMPLATE, genericSecretMinLength, genericSecretMaxLength);
         addPattern("Generic Secret", randomStringRegex);
     }
     
