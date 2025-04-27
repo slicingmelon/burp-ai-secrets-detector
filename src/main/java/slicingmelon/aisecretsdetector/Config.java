@@ -218,11 +218,13 @@ public class Config {
         GridBagConstraints leftConstraints = new GridBagConstraints();
         leftConstraints.fill = GridBagConstraints.HORIZONTAL;
         leftConstraints.insets = new Insets(5, 5, 5, 5);
+        leftConstraints.anchor = GridBagConstraints.WEST; // Anchor to the west (left)
         
         // Worker setting
         JLabel workersLabel = new JLabel("Number of Workers:");
         leftConstraints.gridx = 0;
         leftConstraints.gridy = 0;
+        leftConstraints.weightx = 0.0; // Don't resize the label
         leftPanel.add(workersLabel, leftConstraints);
         
         SpinnerNumberModel workersModel = new SpinnerNumberModel(
@@ -240,6 +242,7 @@ public class Config {
         
         leftConstraints.gridx = 1;
         leftConstraints.gridy = 0;
+        leftConstraints.weightx = 1.0; // Allow the spinner to resize
         leftPanel.add(workersSpinner, leftConstraints);
         
         // In-scope only setting
@@ -253,6 +256,7 @@ public class Config {
         leftConstraints.gridx = 0;
         leftConstraints.gridy = 1;
         leftConstraints.gridwidth = 2;
+        leftConstraints.weightx = 1.0;
         leftPanel.add(inScopeCheckbox, leftConstraints);
         
         // Right panel - for randomness algorithm settings
@@ -260,6 +264,7 @@ public class Config {
         GridBagConstraints rightConstraints = new GridBagConstraints();
         rightConstraints.fill = GridBagConstraints.HORIZONTAL;
         rightConstraints.insets = new Insets(5, 5, 5, 5);
+        rightConstraints.anchor = GridBagConstraints.WEST; // Anchor to the west (left)
         
         // Randomness Algorithm Enable
         JCheckBox randomnessCheckbox = new JCheckBox("Enable Randomness Algorithm Detection", 
@@ -281,6 +286,7 @@ public class Config {
         rightConstraints.gridx = 0;
         rightConstraints.gridy = 1;
         rightConstraints.gridwidth = 1;
+        rightConstraints.weightx = 0.0; // Don't resize the label
         rightPanel.add(minLengthLabel, rightConstraints);
         
         SpinnerNumberModel minLengthModel = new SpinnerNumberModel(
@@ -299,12 +305,14 @@ public class Config {
         
         rightConstraints.gridx = 1;
         rightConstraints.gridy = 1;
+        rightConstraints.weightx = 1.0; // Allow the spinner to resize
         rightPanel.add(minLengthSpinner, rightConstraints);
         
         // Max Length setting
         JLabel maxLengthLabel = new JLabel("Generic Secret Max Length (Randomness Algorithm):");
         rightConstraints.gridx = 0;
         rightConstraints.gridy = 2;
+        rightConstraints.weightx = 0.0; // Don't resize the label
         rightPanel.add(maxLengthLabel, rightConstraints);
         
         SpinnerNumberModel maxLengthModel = new SpinnerNumberModel(
@@ -323,16 +331,17 @@ public class Config {
         
         rightConstraints.gridx = 1;
         rightConstraints.gridy = 2;
+        rightConstraints.weightx = 1.0; // Allow the spinner to resize
         rightPanel.add(maxLengthSpinner, rightConstraints);
         
         // Add left and right panels to the settings panel
         settingsPanel.add(leftPanel);
         settingsPanel.add(rightPanel);
         
-        // Tool source settings
+        // Tool source settings - changing layout to improve alignment
         JPanel toolsPanel = new JPanel();
         toolsPanel.setBorder(BorderFactory.createTitledBorder("Process Messages from Tools:"));
-        toolsPanel.setLayout(new GridLayout(0, 2));
+        toolsPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 0)); // Use FlowLayout with LEFT alignment and horizontal gap
         
         Map<ToolType, JCheckBox> toolCheckboxes = new HashMap<>();
         
@@ -341,6 +350,7 @@ public class Config {
             ToolType.EXTENSIONS, ToolType.REPEATER, ToolType.INTRUDER
         };
         
+        // Create a single row for all tool checkboxes
         for (ToolType tool : relevantTools) {
             JCheckBox checkbox = new JCheckBox(tool.name(), configSettings.isToolEnabled(tool));
             checkbox.addActionListener(_ -> {
