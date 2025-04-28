@@ -102,7 +102,7 @@ public class Config {
         }
         
         public void setGenericSecretMinLength(int genericSecretMinLength) {
-            this.genericSecretMinLength = Math.max(4, genericSecretMinLength);
+            this.genericSecretMinLength = Math.max(8, genericSecretMinLength);
         }
         
         public int getGenericSecretMaxLength() {
@@ -148,7 +148,7 @@ public class Config {
         
         Integer genericSecretMinLengthValue = persistedData.getInteger("generic_secret_min_length");
         int genericSecretMinLength = (genericSecretMinLengthValue != null) ? 
-                                    Math.max(4, genericSecretMinLengthValue) : 15;
+                                    Math.max(8, genericSecretMinLengthValue) : 15;
         
         Integer genericSecretMaxLengthValue = persistedData.getInteger("generic_secret_max_length");
         int genericSecretMaxLength = (genericSecretMaxLengthValue != null) ? 
@@ -304,7 +304,7 @@ public class Config {
         
         SpinnerNumberModel minLengthModel = new SpinnerNumberModel(
                 configSettings.getGenericSecretMinLength(),
-                4,   // Minimum allowed value
+                8,   // Minimum allowed value
                 128, // Maximum allowed value for min length
                 1
         );
@@ -335,7 +335,7 @@ public class Config {
         
         SpinnerNumberModel maxLengthModel = new SpinnerNumberModel(
                 configSettings.getGenericSecretMaxLength(),
-                4,   // Minimum allowed value for max length
+                8,   // Minimum allowed value for max length
                 128, // Maximum allowed value
                 1
         );
