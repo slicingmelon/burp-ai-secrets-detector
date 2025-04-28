@@ -13,8 +13,15 @@ dependencies {
     compileOnly 'net.portswigger.burp.extensions:montoya-api:2025.4'
 }
 
+// jar {
+//     from {
+//         configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+//     }
+// }
+
 jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from {
-        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+        configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
     }
 }
