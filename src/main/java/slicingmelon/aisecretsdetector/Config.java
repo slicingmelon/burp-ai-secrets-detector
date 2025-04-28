@@ -30,12 +30,19 @@ public class Config {
         private boolean inScopeOnly;
         private Set<ToolType> enabledTools;
         private boolean loggingEnabled;
+        private boolean randomnessAlgorithmEnabled;
+        private int genericSecretMinLength;
+        private int genericSecretMaxLength;
         
-        public ConfigSettings(int workers, boolean inScopeOnly, Set<ToolType> enabledTools, boolean loggingEnabled) {
+        public ConfigSettings(int workers, boolean inScopeOnly, Set<ToolType> enabledTools, boolean loggingEnabled,
+                             boolean randomnessAlgorithmEnabled, int genericSecretMinLength, int genericSecretMaxLength) {
             this.workers = workers;
             this.inScopeOnly = inScopeOnly;
             this.enabledTools = enabledTools;
             this.loggingEnabled = loggingEnabled;
+            this.randomnessAlgorithmEnabled = randomnessAlgorithmEnabled;
+            this.genericSecretMinLength = genericSecretMinLength;
+            this.genericSecretMaxLength = genericSecretMaxLength;
         }
         
         public int getWorkers() {
@@ -81,6 +88,30 @@ public class Config {
         public void setLoggingEnabled(boolean loggingEnabled) {
             this.loggingEnabled = loggingEnabled;
         }
+        
+        public boolean isRandomnessAlgorithmEnabled() {
+            return randomnessAlgorithmEnabled;
+        }
+        
+        public void setRandomnessAlgorithmEnabled(boolean randomnessAlgorithmEnabled) {
+            this.randomnessAlgorithmEnabled = randomnessAlgorithmEnabled;
+        }
+        
+        public int getGenericSecretMinLength() {
+            return genericSecretMinLength;
+        }
+        
+        public void setGenericSecretMinLength(int genericSecretMinLength) {
+            this.genericSecretMinLength = Math.max(8, genericSecretMinLength);
+        }
+        
+        public int getGenericSecretMaxLength() {
+            return genericSecretMaxLength;
+        }
+        
+        public void setGenericSecretMaxLength(int genericSecretMaxLength) {
+            this.genericSecretMaxLength = Math.min(128, genericSecretMaxLength);
+        }
     }
     
     public static Config getInstance() {
@@ -94,7 +125,6 @@ public class Config {
         // Load saved settings
         this.configSettings = loadConfigSettings(api.persistence().extensionData());
         
-        // Store instance for singleton access
         instance = this;
     }
     
@@ -112,6 +142,17 @@ public class Config {
 
         Boolean loggingEnabledValue = persistedData.getBoolean("logging_enabled");
         boolean loggingEnabled = (loggingEnabledValue != null) ? loggingEnabledValue : false;
+        
+        Boolean randomnessAlgorithmEnabledValue = persistedData.getBoolean("randomness_algorithm_enabled");
+        boolean randomnessAlgorithmEnabled = (randomnessAlgorithmEnabledValue != null) ? randomnessAlgorithmEnabledValue : true;
+        
+        Integer genericSecretMinLengthValue = persistedData.getInteger("generic_secret_min_length");
+        int genericSecretMinLength = (genericSecretMinLengthValue != null) ? 
+                                    Math.max(8, genericSecretMinLengthValue) : 15;
+        
+        Integer genericSecretMaxLengthValue = persistedData.getInteger("generic_secret_max_length");
+        int genericSecretMaxLength = (genericSecretMaxLengthValue != null) ? 
+                                    Math.min(128, genericSecretMaxLengthValue) : 80;
         
         // Initialize with default tool settings
         Set<ToolType> enabledTools = new HashSet<>();
@@ -133,7 +174,8 @@ public class Config {
             }
         }
         
-        return new ConfigSettings(workers, inScopeOnly, enabledTools, loggingEnabled);
+        return new ConfigSettings(workers, inScopeOnly, enabledTools, loggingEnabled, 
+                                 randomnessAlgorithmEnabled, genericSecretMinLength, genericSecretMaxLength);
     }
     
     public void saveConfigSettings() {
@@ -141,6 +183,9 @@ public class Config {
         persistedData.setInteger("workers", configSettings.getWorkers());
         persistedData.setBoolean("in_scope_only", configSettings.isInScopeOnly());
         persistedData.setBoolean("logging_enabled", configSettings.isLoggingEnabled());
+        persistedData.setBoolean("randomness_algorithm_enabled", configSettings.isRandomnessAlgorithmEnabled());
+        persistedData.setInteger("generic_secret_min_length", configSettings.getGenericSecretMinLength());
+        persistedData.setInteger("generic_secret_max_length", configSettings.getGenericSecretMaxLength());
         
         StringBuilder toolsBuilder = new StringBuilder();
         for (ToolType tool : configSettings.getEnabledTools()) {
@@ -151,6 +196,11 @@ public class Config {
         }
         persistedData.setString("enabled_tools", toolsBuilder.toString());
         
+        // Update SecretScannerUtils settings
+        SecretScannerUtils.setGenericSecretMinLength(configSettings.getGenericSecretMinLength());
+        SecretScannerUtils.setGenericSecretMaxLength(configSettings.getGenericSecretMaxLength());
+        SecretScannerUtils.setRandomnessAlgorithmEnabled(configSettings.isRandomnessAlgorithmEnabled());
+        
         if (onConfigChangedCallback != null) {
             onConfigChangedCallback.run();
         }
@@ -159,17 +209,22 @@ public class Config {
     public JComponent createConfigPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         
-        // Settings panel
-        JPanel settingsPanel = new JPanel(new GridBagLayout());
-        GridBagConstraints c = new GridBagConstraints();
-        c.fill = GridBagConstraints.HORIZONTAL;
-        c.insets = new Insets(5, 5, 5, 5);
+        // Settings panel - now uses a split layout
+        JPanel settingsPanel = new JPanel(new GridLayout(1, 2, 10, 0));
+        
+        // Left panel - for worker settings and in-scope only
+        JPanel leftPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints leftConstraints = new GridBagConstraints();
+        leftConstraints.fill = GridBagConstraints.HORIZONTAL;
+        leftConstraints.insets = new Insets(5, 5, 5, 5);
+        leftConstraints.anchor = GridBagConstraints.WEST; // Anchor to the west (left)
         
         // Worker setting
         JLabel workersLabel = new JLabel("Number of Workers:");
-        c.gridx = 0;
-        c.gridy = 0;
-        settingsPanel.add(workersLabel, c);
+        leftConstraints.gridx = 0;
+        leftConstraints.gridy = 0;
+        leftConstraints.weightx = 0.0; // Don't resize the label
+        leftPanel.add(workersLabel, leftConstraints);
         
         SpinnerNumberModel workersModel = new SpinnerNumberModel(
                 configSettings.getWorkers(),
@@ -178,15 +233,30 @@ public class Config {
                 1
         );
         JSpinner workersSpinner = new JSpinner(workersModel);
+        
+        // Fix the spinner width using a more direct approach
+        JComponent editor = workersSpinner.getEditor();
+        Dimension prefSize = new Dimension(60, editor.getPreferredSize().height);
+        editor.setPreferredSize(prefSize);
+        
+        // Set the spinner's maximum size to ensure it doesn't grow beyond our desired size
+        workersSpinner.setMaximumSize(new Dimension(60, workersSpinner.getPreferredSize().height));
+        
+        // Additionally, add the spinner to a panel with FlowLayout to prevent stretching
+        JPanel spinnerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        spinnerPanel.setOpaque(false); // Make panel transparent
+        spinnerPanel.add(workersSpinner);
+        
         workersSpinner.addChangeListener(_ -> {
             configSettings.setWorkers((Integer) workersSpinner.getValue());
             saveConfigSettings();
             api.logging().logToOutput("Configuration updated - Workers: " + configSettings.getWorkers());
         });
         
-        c.gridx = 1;
-        c.gridy = 0;
-        settingsPanel.add(workersSpinner, c);
+        leftConstraints.gridx = 1;
+        leftConstraints.gridy = 0;
+        leftConstraints.weightx = 0.0; // Don't stretch
+        leftPanel.add(spinnerPanel, leftConstraints);
         
         // In-scope only setting
         JCheckBox inScopeCheckbox = new JCheckBox("In-Scope Requests Only", configSettings.isInScopeOnly());
@@ -196,15 +266,105 @@ public class Config {
             api.logging().logToOutput("Configuration updated - In-Scope Only: " + configSettings.isInScopeOnly());
         });
         
-        c.gridx = 0;
-        c.gridy = 1;
-        c.gridwidth = 2;
-        settingsPanel.add(inScopeCheckbox, c);
+        leftConstraints.gridx = 0;
+        leftConstraints.gridy = 1;
+        leftConstraints.gridwidth = 2;
+        leftConstraints.weightx = 1.0;
+        leftPanel.add(inScopeCheckbox, leftConstraints);
         
-        // Tool source settings
+        // Right panel - for randomness algorithm settings
+        JPanel rightPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints rightConstraints = new GridBagConstraints();
+        rightConstraints.fill = GridBagConstraints.HORIZONTAL;
+        rightConstraints.insets = new Insets(5, 5, 5, 5);
+        rightConstraints.anchor = GridBagConstraints.WEST; // Anchor to the west (left)
+        
+        // Randomness Algorithm Enable
+        JCheckBox randomnessCheckbox = new JCheckBox("Enable Randomness Algorithm Detection", 
+                                                   configSettings.isRandomnessAlgorithmEnabled());
+        randomnessCheckbox.addActionListener(_ -> {
+            configSettings.setRandomnessAlgorithmEnabled(randomnessCheckbox.isSelected());
+            saveConfigSettings();
+            api.logging().logToOutput("Configuration updated - Randomness Algorithm: " + 
+                                     configSettings.isRandomnessAlgorithmEnabled());
+        });
+        
+        rightConstraints.gridx = 0;
+        rightConstraints.gridy = 0;
+        rightConstraints.gridwidth = 2;
+        rightPanel.add(randomnessCheckbox, rightConstraints);
+        
+        // Min Length setting
+        JLabel minLengthLabel = new JLabel("Generic Secret Min Length (Randomness Algorithm):");
+        rightConstraints.gridx = 0;
+        rightConstraints.gridy = 1;
+        rightConstraints.gridwidth = 1;
+        rightConstraints.weightx = 0.0; // Don't resize the label
+        rightPanel.add(minLengthLabel, rightConstraints);
+        
+        SpinnerNumberModel minLengthModel = new SpinnerNumberModel(
+                configSettings.getGenericSecretMinLength(),
+                8,   // Minimum allowed value
+                128, // Maximum allowed value for min length
+                1
+        );
+        JSpinner minLengthSpinner = new JSpinner(minLengthModel);
+        minLengthSpinner.addChangeListener(_ -> {
+            configSettings.setGenericSecretMinLength((Integer) minLengthSpinner.getValue());
+            saveConfigSettings();
+            api.logging().logToOutput("Configuration updated - Min Secret Length: " + 
+                                     configSettings.getGenericSecretMinLength());
+        });
+        
+        // Set a reasonable fixed width for the spinner
+        JComponent minEditor = minLengthSpinner.getEditor();
+        Dimension minPrefSize = new Dimension(60, minEditor.getPreferredSize().height);
+        minEditor.setPreferredSize(minPrefSize);
+        
+        rightConstraints.gridx = 1;
+        rightConstraints.gridy = 1;
+        rightConstraints.weightx = 0.0; // Don't stretch the spinner
+        rightPanel.add(minLengthSpinner, rightConstraints);
+        
+        // Max Length setting
+        JLabel maxLengthLabel = new JLabel("Generic Secret Max Length (Randomness Algorithm):");
+        rightConstraints.gridx = 0;
+        rightConstraints.gridy = 2;
+        rightConstraints.weightx = 0.0; // Don't resize the label
+        rightPanel.add(maxLengthLabel, rightConstraints);
+        
+        SpinnerNumberModel maxLengthModel = new SpinnerNumberModel(
+                configSettings.getGenericSecretMaxLength(),
+                8,   // Minimum allowed value for max length
+                128, // Maximum allowed value
+                1
+        );
+        JSpinner maxLengthSpinner = new JSpinner(maxLengthModel);
+        maxLengthSpinner.addChangeListener(_ -> {
+            configSettings.setGenericSecretMaxLength((Integer) maxLengthSpinner.getValue());
+            saveConfigSettings();
+            api.logging().logToOutput("Configuration updated - Max Secret Length: " + 
+                                     configSettings.getGenericSecretMaxLength());
+        });
+        
+        // Set a reasonable fixed width for the spinner
+        JComponent maxEditor = maxLengthSpinner.getEditor();
+        Dimension maxPrefSize = new Dimension(60, maxEditor.getPreferredSize().height);
+        maxEditor.setPreferredSize(maxPrefSize);
+        
+        rightConstraints.gridx = 1;
+        rightConstraints.gridy = 2;
+        rightConstraints.weightx = 0.0; // Don't stretch the spinner
+        rightPanel.add(maxLengthSpinner, rightConstraints);
+        
+        // Add left and right panels to the settings panel
+        settingsPanel.add(leftPanel);
+        settingsPanel.add(rightPanel);
+        
+        // Tool source settings - changing layout to improve alignment
         JPanel toolsPanel = new JPanel();
         toolsPanel.setBorder(BorderFactory.createTitledBorder("Process Messages from Tools:"));
-        toolsPanel.setLayout(new GridLayout(0, 2));
+        toolsPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 0)); // Use FlowLayout with LEFT alignment and horizontal gap
         
         Map<ToolType, JCheckBox> toolCheckboxes = new HashMap<>();
         
@@ -213,6 +373,7 @@ public class Config {
             ToolType.EXTENSIONS, ToolType.REPEATER, ToolType.INTRUDER
         };
         
+        // Create a single row for all tool checkboxes
         for (ToolType tool : relevantTools) {
             JCheckBox checkbox = new JCheckBox(tool.name(), configSettings.isToolEnabled(tool));
             checkbox.addActionListener(_ -> {
@@ -225,10 +386,8 @@ public class Config {
             toolCheckboxes.put(tool, checkbox);
         }
         
-        c.gridx = 0;
-        c.gridy = 2;
-        c.gridwidth = 2;
-        settingsPanel.add(toolsPanel, c);
+        // Logging panel
+        JPanel loggingPanel = new JPanel(new GridLayout(2, 1)); // Use 2 rows, 1 column layout
         
         // Add logging enable checkbox
         JCheckBox loggingCheckbox = new JCheckBox("Enable Logging", configSettings.isLoggingEnabled());
@@ -242,18 +401,21 @@ public class Config {
             }
         });
         
-        c.gridx = 0;
-        c.gridy = 3;
-        c.gridwidth = 2;
-        settingsPanel.add(loggingCheckbox, c);
+        loggingPanel.add(loggingCheckbox);
         
+        // Create a panel for the auto-save message with left alignment
+        JPanel autoSavePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JLabel autoSaveLabel = new JLabel("Settings are saved automatically when changed");
-        c.gridx = 0;
-        c.gridy = 4;
-        c.gridwidth = 2;
-        settingsPanel.add(autoSaveLabel, c);
+        autoSavePanel.add(autoSaveLabel);
+        loggingPanel.add(autoSavePanel);
         
-        panel.add(settingsPanel, BorderLayout.NORTH);
+        // Add all panels to the main panel
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.add(settingsPanel, BorderLayout.NORTH);
+        topPanel.add(toolsPanel, BorderLayout.CENTER);
+        topPanel.add(loggingPanel, BorderLayout.SOUTH);
+        
+        panel.add(topPanel, BorderLayout.NORTH);
                 
         // log text area
         logArea = new JTextArea();
