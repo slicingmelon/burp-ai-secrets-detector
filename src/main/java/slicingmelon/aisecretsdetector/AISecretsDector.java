@@ -157,6 +157,7 @@ public class AISecretsDector implements BurpExtension {
                 Map<String, Set<String>> secretTypeMap = new HashMap<>();
                 
                 for (SecretScanner.Secret secret : result.getDetectedSecrets()) {
+                    // Create marker with exact positions of the secret
                     responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
                     
                     String secretValue = secret.getValue(); 
@@ -230,7 +231,7 @@ public class AISecretsDector implements BurpExtension {
                     HttpRequestResponse markedRequestResponse = requestResponse
                         .withResponseMarkers(responseMarkers);
                     
-                    // Build enhanced issue template with simple format
+                    // Build enhanced issue template with simple format and include direct context about positions
                     String detail = buildEnhancedIssueDetail(secretsToReportByType, secretsToReport.size());
                     
                     String remediation = "<p>Sensitive information such as API keys, tokens, and other secrets should not be included in HTTP responses. " +
@@ -483,7 +484,7 @@ public class AISecretsDector implements BurpExtension {
     }
 
     /**
-    * Build enhanced issue detail with simple format
+    * Build enhanced issue detail with simple format and include direct context about positions
     */
     private String buildEnhancedIssueDetail(Map<String, Set<String>> secretsByType, int totalSecrets) {
         StringBuilder detail = new StringBuilder();
@@ -497,6 +498,7 @@ public class AISecretsDector implements BurpExtension {
         for (Map.Entry<String, Set<String>> entry : secretsByType.entrySet()) {
             String secretType = entry.getKey();
             for (String secret : entry.getValue()) {
+                // Add a clear indicator of what to look for in the response
                 detail.append(String.format("<li><b>%s:</b> <code>%s</code></li>", 
                         secretType, secret));
             }
@@ -513,7 +515,8 @@ public class AISecretsDector implements BurpExtension {
         }
         detail.append("</ul>");
         
-        detail.append("<p>Click the highlights in the response to view the actual secrets.</p>");
+        // Add a clear instruction about how to find the secrets
+        detail.append("<p>Click on the highlights in the <b>response</b> panel to view the exact secrets. Look for the exact strings shown above.</p>");
         
         return detail.toString();
     }

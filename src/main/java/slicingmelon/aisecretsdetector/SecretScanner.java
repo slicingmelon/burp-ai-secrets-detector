@@ -9,6 +9,7 @@ package slicingmelon.aisecretsdetector;
 
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.responses.HttpResponse;
+import burp.api.montoya.core.ByteArray;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -179,18 +180,37 @@ public class SecretScanner {
                         
                         uniqueSecretValues.add(secretValue);
                         
-                        // Convert body positions to full response positions by adding bodyOffset
-                        int fullStartPos = bodyOffset + bodyStartPos;
-                        int fullEndPos = bodyOffset + bodyEndPos;
+                        // Instead of using regex positions, use ByteArray.indexOf for more reliable positioning
+                        ByteArray responseByteArray = response.toByteArray();
+                        ByteArray secretByteArray = ByteArray.byteArray(secretValue);
                         
-                        // Create a secret with the exact positions - no buffer, no tricks
-                        Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
-                        foundSecrets.add(secret);
+                        // Find the secret in the response using ByteArray methods
+                        int realStartPos = responseByteArray.indexOf(secretByteArray, false);
                         
-                        config.appendToLog(String.format(
-                            "Found %s: '%s' at positions %d-%d",
-                            pattern.getName(), secretValue, fullStartPos, fullEndPos
-                        ));
+                        if (realStartPos != -1) {
+                            int realEndPos = realStartPos + secretByteArray.length();
+                            
+                            // Create a secret with the positions from ByteArray search
+                            Secret secret = new Secret(pattern.getName(), secretValue, realStartPos, realEndPos);
+                            foundSecrets.add(secret);
+                            
+                            config.appendToLog(String.format(
+                                "Found %s: '%s' at ByteArray positions %d-%d",
+                                pattern.getName(), secretValue, realStartPos, realEndPos
+                            ));
+                        } else {
+                            // Fallback to regex positions if ByteArray search fails
+                            int fullStartPos = bodyOffset + bodyStartPos;
+                            int fullEndPos = bodyOffset + bodyEndPos;
+                            
+                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
+                            foundSecrets.add(secret);
+                            
+                            config.appendToLog(String.format(
+                                "Found %s: '%s' using fallback positions %d-%d",
+                                pattern.getName(), secretValue, fullStartPos, fullEndPos
+                            ));
+                        }
                     }
                 } catch (Exception e) {
                     config.appendToLog("Error with pattern " + pattern.getName() + ": " + e.getMessage());
