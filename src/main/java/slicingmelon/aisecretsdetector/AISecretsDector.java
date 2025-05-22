@@ -133,6 +133,7 @@ public class AISecretsDector implements BurpExtension {
             // Process found secrets
             if (result.hasSecrets()) {
                 String url = responseReceived.initiatingRequest().url().toString();
+                String baseUrl = extractBaseUrl(url);
                 logMsg("HTTP Handler: Secrets found in response from: " + url);
                 
                 // Create markers to highlight where the secrets are in the response
@@ -158,40 +159,44 @@ public class AISecretsDector implements BurpExtension {
                     }
                 }
                 
-                Set<String> existingSecrets = extractExistingSecretsForUrl(url);
-                logMsg("HTTP Handler: Found " + existingSecrets.size() + " existing secrets for URL: " + url);
+                // Check for duplicates using the threshold approach
+                Map<String, Integer> secretCounts = countExistingSecrets(baseUrl, newSecrets);
+                int duplicateThreshold = config.getConfigSettings().getDuplicateThreshold();
                 
-                // Check if we have new secrets for this URL
-                boolean hasNewSecrets = false;
-                for (String newSecret : newSecrets) {
-                    if (!existingSecrets.contains(newSecret)) {
-                        hasNewSecrets = true;
-                        logMsg("HTTP Handler: Found new secret: " + newSecret);
+                // Filter out secrets that appear too frequently
+                Set<String> secretsToReport = new HashSet<>();
+                Map<String, Set<String>> secretsToReportByType = new HashMap<>();
+                
+                for (String secret : newSecrets) {
+                    int existingCount = secretCounts.getOrDefault(secret, 0);
+                    if (existingCount < duplicateThreshold) {
+                        secretsToReport.add(secret);
+                        
+                        // Find which type this secret belongs to
+                        for (Map.Entry<String, Set<String>> entry : secretTypeMap.entrySet()) {
+                            if (entry.getValue().contains(secret)) {
+                                secretsToReportByType.computeIfAbsent(entry.getKey(), k -> new HashSet<>()).add(secret);
+                            }
+                        }
+                        
+                        logMsg("HTTP Handler: Will report secret: " + secret + " (seen " + existingCount + " times, threshold: " + duplicateThreshold + ")");
+                    } else {
+                        logMsg("HTTP Handler: Skipping secret due to threshold: " + secret + " (seen " + existingCount + " times, threshold: " + duplicateThreshold + ")");
                     }
                 }
                 
-                if (hasNewSecrets) {
-                    // Create back the HttpRequestResponse object for markers and issue reporting (needed by AuditIssue)
+                if (!secretsToReport.isEmpty()) {
+                    // Create back the HttpRequestResponse object for markers and issue reporting
                     HttpRequestResponse requestResponse = HttpRequestResponse.httpRequestResponse(
                         responseReceived.initiatingRequest(),
-                        tempResponse  // Use the temp file version of response
+                        tempResponse
                     );
                     
                     HttpRequestResponse markedRequestResponse = requestResponse
                         .withResponseMarkers(responseMarkers);
                     
-                    // Build detailed description with secret types
-                    StringBuilder detailBuilder = new StringBuilder();
-                    detailBuilder.append(String.format("<p>%d secrets were detected in the response:</p><ul>", newSecrets.size()));
-                    
-                    // Add each type of secret found
-                    for (Map.Entry<String, Set<String>> entry : secretTypeMap.entrySet()) {
-                        detailBuilder.append(String.format("<li><b>%s</b>: %d found</li>", 
-                                entry.getKey(), entry.getValue().size()));
-                    }
-                    
-                    detailBuilder.append("</ul><p>Click the highlights in the response to view the actual secrets.</p>");
-                    String detail = detailBuilder.toString();
+                    // Build enhanced issue template with table
+                    String detail = buildEnhancedIssueDetail(secretsToReportByType, secretsToReport.size());
                     
                     String remediation = "<p>Sensitive information such as API keys, tokens, and other secrets should not be included in HTTP responses. " +
                             "Review the application code to ensure that sensitive credentials are not hardcoded or exposed in the source code.</p>";
@@ -212,9 +217,10 @@ public class AISecretsDector implements BurpExtension {
                     
                     // Add the issue to Burp's issues list and log the action
                     logMsg("HTTP Handler: Adding NEW audit issue for URL: " + requestResponse.request().url());
+                    logMsg("HTTP Handler: Reporting " + secretsToReport.size() + " new secrets (base URL: " + baseUrl + ")");
                     api.siteMap().add(auditIssue);
                 } else {
-                    logMsg("HTTP Handler: No new secrets found for URL: " + url + ", skipping issue creation");
+                    logMsg("HTTP Handler: No new secrets to report for base URL: " + baseUrl + " (all exceeded threshold)");
                 }
             }
             
@@ -225,24 +231,51 @@ public class AISecretsDector implements BurpExtension {
     }
 
     /**
-    * Extract existing secrets for a URL from Burp's site map
+    * Extract base URL (scheme + host + port) for deduplication
     */
-    private Set<String> extractExistingSecretsForUrl(String url) {
-        Set<String> existingSecrets = new HashSet<>();
-    
+    private String extractBaseUrl(String url) {
         try {
-            // Extract the base URL without query parameters using URI parser
-            String baseUrl = normalizeUrl(url);
-            
-            SiteMapFilter preciseFilter = new SiteMapFilter() {
+            URI uri = new URI(url);
+            return new URI(uri.getScheme(), 
+                          uri.getUserInfo(), 
+                          uri.getHost(), 
+                          uri.getPort(),
+                          null, // No path
+                          null, // No query
+                          null) // No fragment
+                     .toString();
+        } catch (URISyntaxException e) {
+            logMsg("Failed to parse URL for base URL extraction: " + e.getMessage());
+            // Fallback to simple extraction
+            if (url.contains("://")) {
+                String[] parts = url.split("://", 2);
+                if (parts.length == 2) {
+                    String remaining = parts[1];
+                    String hostPart = remaining.split("/")[0];
+                    return parts[0] + "://" + hostPart;
+                }
+            }
+            return url;
+        }
+    }
+
+    /**
+    * Count how many times each secret appears in existing issues for the base URL
+    */
+    private Map<String, Integer> countExistingSecrets(String baseUrl, Set<String> secretsToCheck) {
+        Map<String, Integer> secretCounts = new HashMap<>();
+        
+        try {
+            SiteMapFilter baseUrlFilter = new SiteMapFilter() {
                 @Override
                 public boolean matches(SiteMapNode node) {
-                    // Only match our exact URL
-                    if (!node.url().equals(baseUrl)) {
+                    String nodeBaseUrl = extractBaseUrl(node.url());
+                    
+                    // Match base URLs and only our issue type
+                    if (!nodeBaseUrl.equals(baseUrl)) {
                         return false;
                     }
                     
-                    // Only match nodes that have "Exposed Secrets Detected" issues
                     for (AuditIssue issue : node.issues()) {
                         if (issue.name().equals("Exposed Secrets Detected")) {
                             return true;
@@ -252,47 +285,77 @@ public class AISecretsDector implements BurpExtension {
                 }
             };
             
-            // Get only issues that exactly match our filter criteria
-            List<AuditIssue> filteredIssues = api.siteMap().issues(preciseFilter);
+            List<AuditIssue> existingIssues = api.siteMap().issues(baseUrlFilter);
+            logMsg("Found " + existingIssues.size() + " existing issues for base URL: " + baseUrl);
             
-            logMsg("Found " + filteredIssues.size() + " precise filtered issues for URL: " + baseUrl);
-            
-            for (AuditIssue issue : filteredIssues) {
+            // Extract all secrets from existing issues
+            Set<String> allExistingSecrets = new HashSet<>();
+            for (AuditIssue issue : existingIssues) {
                 for (HttpRequestResponse evidence : issue.requestResponses()) {
-                    List<Marker> markers = evidence.responseMarkers();
-                    
-                    if (markers != null && !markers.isEmpty()) {
-                        logMsg("Processing " + markers.size() + " markers from evidence");
-                        
-                        Set<String> secretsFromMarkers = extractSecretsFromMarkers(evidence);
-                        existingSecrets.addAll(secretsFromMarkers);
-                    }
+                    Set<String> secretsFromMarkers = extractSecretsFromMarkers(evidence);
+                    allExistingSecrets.addAll(secretsFromMarkers);
                 }
             }
+            
+            // Count occurrences of each secret we're checking
+            for (String secretToCheck : secretsToCheck) {
+                int count = 0;
+                for (String existingSecret : allExistingSecrets) {
+                    if (existingSecret.equals(secretToCheck)) {
+                        count++;
+                    }
+                }
+                secretCounts.put(secretToCheck, count);
+            }
+            
         } catch (Exception e) {
-            api.logging().logToError("Error extracting existing secrets: " + e.getMessage());
+            api.logging().logToError("Error counting existing secrets: " + e.getMessage());
             e.printStackTrace();
         }
         
-        return existingSecrets;
+        return secretCounts;
     }
 
-    private String normalizeUrl(String url) {
-        try {
-            URI uri = new URI(url);
-            return new URI(uri.getScheme(), 
-                          uri.getUserInfo(), 
-                          uri.getHost(), 
-                          uri.getPort(),
-                          uri.getPath(), 
-                          null, // No query
-                          null) // No fragment
-                     .toString();
-        } catch (URISyntaxException e) {
-            logMsg("Failed to parse URL with URI parser, falling back to string splitting");
-            return url.contains("?") ? url.split("\\?")[0] : url;
+    /**
+    * Build enhanced issue detail with table format
+    */
+    private String buildEnhancedIssueDetail(Map<String, Set<String>> secretsByType, int totalSecrets) {
+        StringBuilder detail = new StringBuilder();
+        
+        detail.append(String.format("<p>%d secrets were detected in the response:</p>", totalSecrets));
+        
+        // Create table with secret details
+        detail.append("<table border=\"1\" cellpadding=\"5\" cellspacing=\"0\" style=\"border-collapse: collapse;\">");
+        detail.append("<tr style=\"background-color: #f0f0f0;\"><th>Secret Type</th><th>Plaintext Secret</th></tr>");
+        
+        // Add each secret as a table row
+        for (Map.Entry<String, Set<String>> entry : secretsByType.entrySet()) {
+            String secretType = entry.getKey();
+            for (String secret : entry.getValue()) {
+                detail.append("<tr>");
+                detail.append(String.format("<td>%s</td>", secretType));
+                detail.append(String.format("<td style=\"font-family: monospace; word-break: break-all;\">%s</td>", secret));
+                detail.append("</tr>");
+            }
         }
+        
+        detail.append("</table>");
+        
+        // Add summary section
+        detail.append("<p><b>Summary:</b></p>");
+        detail.append("<ul>");
+        for (Map.Entry<String, Set<String>> entry : secretsByType.entrySet()) {
+            detail.append(String.format("<li>%s: %d total found</li>", 
+                    entry.getKey(), entry.getValue().size()));
+        }
+        detail.append("</ul>");
+        
+        detail.append("<p>Click the highlights in the response to view the actual secrets.</p>");
+        
+        return detail.toString();
     }
+
+    
     
     /**
     * Extract actual secrets from response markers
