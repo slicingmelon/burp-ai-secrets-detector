@@ -115,6 +115,7 @@ public class SecretScanner {
         
         try {
             String responseBody = response.bodyToString();
+            byte[] responseBodyBytes = response.body().getBytes();
             
             int bodyOffset = response.bodyOffset();
             
@@ -186,11 +187,52 @@ public class SecretScanner {
                         int fullStartPos = bodyOffset + bodyStartPos;
                         int fullEndPos = bodyOffset + bodyEndPos;
                         
-                        // Calculate highlight positions with 20 character buffer for better visibility
-                        // int highlightStart = Math.max(bodyOffset, fullStartPos - 20);
-                        // int highlightEnd = Math.min(bodyOffset + responseBody.length(), fullEndPos + 20);
+                        // IMPROVED MARKER APPROACH:
+                        // Create more accurate markers by searching for the exact bytes in the response
+                        // This helps with character encoding issues
                         int highlightStart = fullStartPos;
                         int highlightEnd = fullEndPos;
+                        
+                        try {
+                            // Get the exact bytes of the secret
+                            byte[] secretBytes = secretValue.getBytes(StandardCharsets.UTF_8);
+                            
+                            // Search for these bytes in the raw response bytes
+                            int foundIndex = -1;
+                            
+                            // Skip the headers (start at bodyOffset)
+                            for (int i = bodyOffset; i <= responseBodyBytes.length - secretBytes.length; i++) {
+                                boolean found = true;
+                                for (int j = 0; j < secretBytes.length; j++) {
+                                    if (responseBodyBytes[i + j] != secretBytes[j]) {
+                                        found = false;
+                                        break;
+                                    }
+                                }
+                                if (found) {
+                                    foundIndex = i;
+                                    break;
+                                }
+                            }
+                            
+                            // If we found the bytes directly, use that position
+                            if (foundIndex >= 0) {
+                                highlightStart = foundIndex;
+                                highlightEnd = foundIndex + secretBytes.length;
+                                config.appendToLog("Found exact bytes for secret: " + secretValue + 
+                                        " at position " + highlightStart + "-" + highlightEnd);
+                            } else {
+                                // Use a slightly expanded area around the match to improve highlight chance
+                                // and include a bit of context
+                                highlightStart = Math.max(bodyOffset, fullStartPos - 5);
+                                highlightEnd = Math.min(bodyOffset + responseBody.length(), fullEndPos + 5);
+                                config.appendToLog("Using expanded area for highlighting since exact bytes not found");
+                            }
+                        } catch (Exception e) {
+                            // Fall back to the original positions if the byte search fails
+                            config.appendToLog("Error searching for exact bytes: " + e.getMessage());
+                            // Use default positions
+                        }
                         
                         Secret secret = new Secret(pattern.getName(), secretValue, highlightStart, highlightEnd);
                         foundSecrets.add(secret);
