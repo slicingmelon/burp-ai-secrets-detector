@@ -230,7 +230,7 @@ public class AISecretsDector implements BurpExtension {
                     HttpRequestResponse markedRequestResponse = requestResponse
                         .withResponseMarkers(responseMarkers);
                     
-                    // Build enhanced issue template with table
+                    // Build enhanced issue template with simple format
                     String detail = buildEnhancedIssueDetail(secretsToReportByType, secretsToReport.size());
                     
                     String remediation = "<p>Sensitive information such as API keys, tokens, and other secrets should not be included in HTTP responses. " +
@@ -537,8 +537,7 @@ public class AISecretsDector implements BurpExtension {
             return extractedSecrets;
         }
         
-        // Get the full response for inspection
-        ByteArray responseBytes = requestResponse.response().toByteArray();
+        // Get only the body as ByteArray
         ByteArray bodyBytes = requestResponse.response().body();
         
         for (Marker marker : markers) {
@@ -546,56 +545,26 @@ public class AISecretsDector implements BurpExtension {
                 int startPos = marker.range().startIndexInclusive();
                 int endPos = marker.range().endIndexExclusive();
                 
-                logMsg("Processing marker at positions: " + startPos + "-" + endPos + " (body offset: " + bodyOffset + ")");
+                logMsg("Processing marker at positions: " + startPos + "-" + endPos + 
+                       " (body offset: " + bodyOffset + ")");
                 
-                // Try various approaches to extract the secret correctly
-                
-                // Approach 1: Direct extraction using marker positions (original approach)
+                // Convert to body-relative positions with careful bounds checking
                 int adjustedStartPos = Math.max(0, startPos - bodyOffset);
                 int adjustedEndPos = Math.min(bodyBytes.length(), endPos - bodyOffset);
                 
-                if (adjustedStartPos >= adjustedEndPos || adjustedStartPos < 0) {
-                    logMsg("Invalid marker adjustment in approach 1, trying approach 2");
-                    
-                    // Approach 2: Use the raw positions directly on the full response
-                    if (startPos < responseBytes.length() && endPos <= responseBytes.length() && startPos < endPos) {
-                        ByteArray rawSecretBytes = responseBytes.subArray(startPos, endPos);
-                        String rawSecret = rawSecretBytes.toString();
-                        
-                        if (rawSecret != null && !rawSecret.isEmpty() && isLikelySecret(rawSecret)) {
-                            extractedSecrets.add(rawSecret);
-                            logMsg("Extracted secret using approach 2: " + maskSecret(rawSecret));
-                            continue;  // Move to next marker
-                        }
-                    }
-                    
-                    // Approach 3: If both failed, try searching for a pattern in the area
-                    for (int searchStart = Math.max(0, startPos - 10); 
-                         searchStart < Math.min(responseBytes.length(), endPos + 10); 
-                         searchStart++) {
-                        
-                        // Extract a chunk of data that might contain the secret
-                        int searchEnd = Math.min(responseBytes.length(), searchStart + 100);
-                        ByteArray searchArea = responseBytes.subArray(searchStart, searchEnd);
-                        String searchText = searchArea.toString();
-                        
-                        // Look for patterns that resemble secrets
-                        for (String possibleSecret : findPossibleSecrets(searchText)) {
-                            extractedSecrets.add(possibleSecret);
-                            logMsg("Extracted secret using approach 3: " + maskSecret(possibleSecret));
-                        }
-                    }
-                    
-                    continue;  // Move to next marker if approaches 2 and 3 were tried
+                if (adjustedStartPos >= adjustedEndPos || adjustedEndPos <= 0) {
+                    logMsg("Invalid marker adjustment, cannot extract secret properly");
+                    continue;
                 }
                 
-                // Extract using approach 1 if the adjustments are valid
+                // Extract the bytes from the response body
                 ByteArray secretBytes = bodyBytes.subArray(adjustedStartPos, adjustedEndPos);
                 String secret = secretBytes.toString();
                 
-                if (secret != null && !secret.isEmpty() && isLikelySecret(secret)) {
+                if (secret != null && !secret.isEmpty()) {
+                    // Only store non-empty secrets
                     extractedSecrets.add(secret);
-                    logMsg("Extracted secret using approach 1: " + maskSecret(secret));
+                    logMsg("Extracted secret from marker: " + maskSecret(secret));
                 }
             } catch (Exception e) {
                 logMsg("Error extracting secret from marker: " + e.getMessage());
@@ -605,66 +574,7 @@ public class AISecretsDector implements BurpExtension {
         return extractedSecrets;
     }
     
-    /**
-     * Check if a string is likely to be a secret based on characteristics
-     */
-    private boolean isLikelySecret(String text) {
-        // Remove common non-secret text
-        if (text.trim().isEmpty()) return false;
-        
-        // Skip obvious HTML tags
-        if (text.matches("^\\s*<[a-z]+[^>]*>.*</[a-z]+>\\s*$")) return false;
-        
-        // Skip very long text that's unlikely to be a secret
-        if (text.length() > 200) return false;
-        
-        // Check for common secret formats
-        boolean looksLikeSecret = 
-            // JWT-like
-            text.matches("eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+") ||
-            // Base64-like
-            text.matches("[A-Za-z0-9+/]{20,}={0,2}") ||
-            // Hex-like
-            text.matches("[A-Fa-f0-9]{16,}") ||
-            // API Key-like (alphanumeric with some symbols)
-            text.matches("[A-Za-z0-9_\\-+/=]{8,}");
-        
-        return looksLikeSecret;
-    }
     
-    /**
-     * Find potential secrets in a text string
-     */
-    private List<String> findPossibleSecrets(String text) {
-        List<String> secrets = new ArrayList<>();
-        
-        // Potential common patterns for secrets
-        String[] patterns = {
-            // JWT
-            "eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+",
-            // API keys often surrounded by quotes in JSON
-            "\"([A-Za-z0-9_\\-+/=]{16,})\"",
-            // Quoted strings that look like secrets
-            "'([A-Za-z0-9_\\-+/=]{16,})'",
-            // Common assignments in JS
-            "(?:key|token|secret|apiKey|api_key)(?:\\s*[:=]\\s*[\"']?)([A-Za-z0-9_\\-+/=]{16,})"
-        };
-        
-        for (String pattern : patterns) {
-            java.util.regex.Pattern regex = java.util.regex.Pattern.compile(pattern);
-            java.util.regex.Matcher matcher = regex.matcher(text);
-            
-            while (matcher.find()) {
-                // If the pattern has a capturing group, use that (for the quotes patterns)
-                String secret = matcher.groupCount() > 0 ? matcher.group(1) : matcher.group(0);
-                if (secret != null && !secret.isEmpty() && isLikelySecret(secret)) {
-                    secrets.add(secret);
-                }
-            }
-        }
-        
-        return secrets;
-    }
         
     // Skip binary content types that are unlikely to contain secrets
     public boolean shouldSkipMimeType(MimeType mimeType) {
