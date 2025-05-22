@@ -120,7 +120,6 @@ public class SecretScanner {
             
             for (SecretPattern pattern : secretPatterns) {
                 try {
-
                     // Skip reCAPTCHA Site Key pattern - we only want reCAPTCHA Secret Keys
                     if (pattern.getName().equals("reCAPTCHA Site Key")) {
                         continue;
@@ -165,7 +164,6 @@ public class SecretScanner {
                             if (!isRandom(secretValue.getBytes(StandardCharsets.UTF_8))) {
                                 continue;  // Skip if not random enough
                             }
-
                         } else {
                             // For other patterns, use the whole match
                             secretValue = matcher.group(0);
@@ -174,7 +172,6 @@ public class SecretScanner {
                         }
                         
                         // Skip if we've already found this secret value in this response
-                        // Could kill burp easily
                         if (uniqueSecretValues.contains(secretValue)) {
                             config.appendToLog("Skipping duplicate secret: " + secretValue);
                             continue;
@@ -186,13 +183,13 @@ public class SecretScanner {
                         int fullStartPos = bodyOffset + bodyStartPos;
                         int fullEndPos = bodyOffset + bodyEndPos;
                         
-                        // Create the secret object with exact positions (no buffer)
+                        // Create a secret with the exact positions - no buffer, no tricks
                         Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
                         foundSecrets.add(secret);
                         
                         config.appendToLog(String.format(
-                            "Found %s: '%s' at body position %d-%d (full response: %d-%d)",
-                            pattern.getName(), secretValue, bodyStartPos, bodyEndPos, fullStartPos, fullEndPos
+                            "Found %s: '%s' at positions %d-%d",
+                            pattern.getName(), secretValue, fullStartPos, fullEndPos
                         ));
                     }
                 } catch (Exception e) {

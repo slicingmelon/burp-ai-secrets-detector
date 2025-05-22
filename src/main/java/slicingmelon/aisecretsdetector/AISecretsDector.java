@@ -529,7 +529,6 @@ public class AISecretsDector implements BurpExtension {
             return extractedSecrets;
         }
         
-        int bodyOffset = requestResponse.response().bodyOffset();
         List<Marker> markers = requestResponse.responseMarkers();
         
         if (markers == null || markers.isEmpty()) {
@@ -537,34 +536,28 @@ public class AISecretsDector implements BurpExtension {
             return extractedSecrets;
         }
         
-        // Get only the body as ByteArray
-        ByteArray bodyBytes = requestResponse.response().body();
+        // Get full response as ByteArray
+        ByteArray responseBytes = requestResponse.response().toByteArray();
         
         for (Marker marker : markers) {
             try {
                 int startPos = marker.range().startIndexInclusive();
                 int endPos = marker.range().endIndexExclusive();
                 
-                logMsg("Processing marker at positions: " + startPos + "-" + endPos + 
-                       " (body offset: " + bodyOffset + ")");
-                
-                // Convert to body-relative positions with careful bounds checking
-                int adjustedStartPos = Math.max(0, startPos - bodyOffset);
-                int adjustedEndPos = Math.min(bodyBytes.length(), endPos - bodyOffset);
-                
-                if (adjustedStartPos >= adjustedEndPos || adjustedEndPos <= 0) {
-                    logMsg("Invalid marker adjustment, cannot extract secret properly");
-                    continue;
-                }
-                
-                // Extract the bytes from the response body
-                ByteArray secretBytes = bodyBytes.subArray(adjustedStartPos, adjustedEndPos);
-                String secret = secretBytes.toString();
-                
-                if (secret != null && !secret.isEmpty()) {
-                    // Only store non-empty secrets
-                    extractedSecrets.add(secret);
-                    logMsg("Extracted secret from marker: " + maskSecret(secret));
+                // Simple bounds checking
+                if (startPos >= 0 && endPos <= responseBytes.length() && startPos < endPos) {
+                    // Extract bytes directly from the full response
+                    ByteArray secretBytes = responseBytes.subArray(startPos, endPos);
+                    String secret = secretBytes.toString();
+                    
+                    if (secret != null && !secret.isEmpty()) {
+                        // Only store non-empty secrets
+                        extractedSecrets.add(secret);
+                        logMsg("Extracted secret from marker: " + maskSecret(secret));
+                    }
+                } else {
+                    logMsg("Invalid marker position: " + startPos + "-" + endPos + 
+                          " (response length: " + responseBytes.length() + ")");
                 }
             } catch (Exception e) {
                 logMsg("Error extracting secret from marker: " + e.getMessage());
