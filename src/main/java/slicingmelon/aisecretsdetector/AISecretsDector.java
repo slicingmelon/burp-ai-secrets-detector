@@ -41,12 +41,25 @@ public class AISecretsDector implements BurpExtension {
     private ExecutorService executorService;
     private Config config;
     
+    // Persistent secret counter map stored as JSON in Burp's extension data
+    private Map<String, Map<String, Integer>> secretCounters = new HashMap<>();
+    private static final String SECRET_COUNTERS_KEY = "secret_counters";
+    
+    // Static instance for accessing from Config
+    private static AISecretsDector instance;
+    
     @Override
     public void initialize(MontoyaApi api) {
         this.api = api;
         api.extension().setName("AI Secrets Detector");
         
+        // Set instance for Config access
+        instance = this;
+        
         config = new Config(api, this::updateWorkers);
+        
+        // Load persistent secret counters
+        loadSecretCounters();
         
         // Initialize worker thread pool
         initializeWorkers();
@@ -96,6 +109,7 @@ public class AISecretsDector implements BurpExtension {
         api.extension().registerUnloadingHandler(() -> {
             api.logging().logToOutput("AI Secrets Detector extension unloading...");
             logMsg("AI Secrets Detector extension unloading...");
+            saveSecretCounters();
             shutdownWorkers();
             config.clearLogs();
         });
@@ -135,6 +149,7 @@ public class AISecretsDector implements BurpExtension {
                 String url = responseReceived.initiatingRequest().url().toString();
                 String baseUrl = extractBaseUrl(url);
                 logMsg("HTTP Handler: Secrets found in response from: " + url);
+                logMsg("HTTP Handler: Base URL: " + baseUrl);
                 
                 // Create markers to highlight where the secrets are in the response
                 List<Marker> responseMarkers = new ArrayList<>();
@@ -159,17 +174,32 @@ public class AISecretsDector implements BurpExtension {
                     }
                 }
                 
-                // Check for duplicates using the threshold approach
-                Map<String, Integer> secretCounts = countExistingSecrets(baseUrl, newSecrets);
+                // Use our persisted counters combined with existing issues
+                Map<String, Integer> existingCounts = getExistingSecretCounts(baseUrl);
+                Map<String, Integer> persistedCounts = getPersistedSecretCounts(baseUrl);
+                
+                // Merge the counts giving precedence to the higher count
+                Map<String, Integer> secretCounts = new HashMap<>();
+                for (String secret : newSecrets) {
+                    int existingCount = existingCounts.getOrDefault(secret, 0);
+                    int persistedCount = persistedCounts.getOrDefault(secret, 0);
+                    int finalCount = Math.max(existingCount, persistedCount);
+                    secretCounts.put(secret, finalCount);
+                    
+                    logMsg(String.format("Secret count for %s - Existing: %d, Persisted: %d, Final: %d", 
+                            maskSecret(secret), existingCount, persistedCount, finalCount));
+                }
+                
                 int duplicateThreshold = config.getConfigSettings().getDuplicateThreshold();
+                logMsg("Current duplicate threshold: " + duplicateThreshold);
                 
                 // Filter out secrets that appear too frequently
                 Set<String> secretsToReport = new HashSet<>();
                 Map<String, Set<String>> secretsToReportByType = new HashMap<>();
                 
                 for (String secret : newSecrets) {
-                    int existingCount = secretCounts.getOrDefault(secret, 0);
-                    if (existingCount < duplicateThreshold) {
+                    int count = secretCounts.getOrDefault(secret, 0);
+                    if (count < duplicateThreshold) {
                         secretsToReport.add(secret);
                         
                         // Find which type this secret belongs to
@@ -179,9 +209,14 @@ public class AISecretsDector implements BurpExtension {
                             }
                         }
                         
-                        logMsg("HTTP Handler: Will report secret: " + secret + " (seen " + existingCount + " times, threshold: " + duplicateThreshold + ")");
+                        logMsg("HTTP Handler: Will report secret: " + maskSecret(secret) + 
+                                " (seen " + count + " times, threshold: " + duplicateThreshold + ")");
+                        
+                        // Increment the counter for this secret
+                        incrementSecretCounter(baseUrl, secret);
                     } else {
-                        logMsg("HTTP Handler: Skipping secret due to threshold: " + secret + " (seen " + existingCount + " times, threshold: " + duplicateThreshold + ")");
+                        logMsg("HTTP Handler: Skipping secret due to threshold: " + maskSecret(secret) + 
+                                " (seen " + count + " times, threshold: " + duplicateThreshold + ")");
                     }
                 }
                 
@@ -260,9 +295,145 @@ public class AISecretsDector implements BurpExtension {
     }
 
     /**
-    * Count how many times each secret appears in existing issues for the base URL
+    * Get persisted secret counts for a base URL
     */
-    private Map<String, Integer> countExistingSecrets(String baseUrl, Set<String> secretsToCheck) {
+    private Map<String, Integer> getPersistedSecretCounts(String baseUrl) {
+        return secretCounters.getOrDefault(baseUrl, new HashMap<>());
+    }
+    
+    /**
+    * Increment the counter for a specific secret at a base URL
+    */
+    private void incrementSecretCounter(String baseUrl, String secret) {
+        Map<String, Integer> counters = secretCounters.computeIfAbsent(baseUrl, k -> new HashMap<>());
+        int currentCount = counters.getOrDefault(secret, 0);
+        counters.put(secret, currentCount + 1);
+        
+        // Save counters to persist data
+        saveSecretCounters();
+    }
+    
+    /**
+    * Mask a secret value for logging (show first 4 and last 4 chars)
+    */
+    private String maskSecret(String secret) {
+        if (secret == null || secret.length() <= 8) {
+            return "[MASKED]";
+        }
+        return secret.substring(0, 4) + "..." + secret.substring(secret.length() - 4);
+    }
+    
+    /**
+    * Load persistent secret counters from extension storage
+    */
+    private void loadSecretCounters() {
+        try {
+            String countersJson = api.persistence().extensionData().getString(SECRET_COUNTERS_KEY);
+            if (countersJson != null && !countersJson.isEmpty()) {
+                // Simple parsing of the format used in saveSecretCounters
+                secretCounters.clear();
+                
+                // Remove outer braces
+                countersJson = countersJson.substring(1, countersJson.length() - 1);
+                
+                // Split by baseUrl entries
+                String[] baseUrlEntries = countersJson.split("\\},");
+                
+                for (String baseUrlEntry : baseUrlEntries) {
+                    // Parse baseUrl
+                    int baseUrlEnd = baseUrlEntry.indexOf("={");
+                    if (baseUrlEnd == -1) continue;
+                    
+                    String baseUrl = baseUrlEntry.substring(0, baseUrlEnd).trim();
+                    if (baseUrl.startsWith("\"")) {
+                        baseUrl = baseUrl.substring(1, baseUrl.length() - 1);
+                    }
+                    
+                    // Parse secret counts
+                    String secretsString = baseUrlEntry.substring(baseUrlEnd + 2);
+                    if (secretsString.endsWith("}")) {
+                        secretsString = secretsString.substring(0, secretsString.length() - 1);
+                    }
+                    
+                    Map<String, Integer> secretMap = new HashMap<>();
+                    String[] secretEntries = secretsString.split(",");
+                    
+                    for (String secretEntry : secretEntries) {
+                        String[] keyValue = secretEntry.split("=");
+                        if (keyValue.length != 2) continue;
+                        
+                        String secret = keyValue[0].trim();
+                        if (secret.startsWith("\"")) {
+                            secret = secret.substring(1, secret.length() - 1);
+                        }
+                        
+                        try {
+                            int count = Integer.parseInt(keyValue[1].trim());
+                            secretMap.put(secret, count);
+                        } catch (NumberFormatException e) {
+                            continue;
+                        }
+                    }
+                    
+                    secretCounters.put(baseUrl, secretMap);
+                }
+            }
+            
+            logMsg("Loaded " + secretCounters.size() + " base URLs with secret counts from persistent storage");
+            
+            // Log loaded counters for debugging
+            for (Map.Entry<String, Map<String, Integer>> entry : secretCounters.entrySet()) {
+                logMsg("Base URL: " + entry.getKey() + " has " + entry.getValue().size() + " secrets tracked");
+            }
+        } catch (Exception e) {
+            logMsg("Error loading secret counters: " + e.getMessage());
+            secretCounters.clear();
+        }
+    }
+    
+    /**
+    * Save persistent secret counters to extension storage
+    */
+    private void saveSecretCounters() {
+        try {
+            // Simple JSON-like serialization without using external libraries
+            StringBuilder json = new StringBuilder("{");
+            
+            boolean firstBaseUrl = true;
+            for (Map.Entry<String, Map<String, Integer>> baseUrlEntry : secretCounters.entrySet()) {
+                if (!firstBaseUrl) {
+                    json.append(",");
+                }
+                firstBaseUrl = false;
+                
+                json.append("\"").append(baseUrlEntry.getKey()).append("\"={");
+                
+                boolean firstSecret = true;
+                for (Map.Entry<String, Integer> secretEntry : baseUrlEntry.getValue().entrySet()) {
+                    if (!firstSecret) {
+                        json.append(",");
+                    }
+                    firstSecret = false;
+                    
+                    json.append("\"").append(secretEntry.getKey()).append("\"=").append(secretEntry.getValue());
+                }
+                
+                json.append("}");
+            }
+            
+            json.append("}");
+            
+            api.persistence().extensionData().setString(SECRET_COUNTERS_KEY, json.toString());
+            logMsg("Saved secret counters to persistent storage");
+        } catch (Exception e) {
+            logMsg("Error saving secret counters: " + e.getMessage());
+        }
+    }
+    
+    /**
+    * Count secrets in existing issues
+    */
+    private Map<String, Integer> getExistingSecretCounts(String baseUrl) {
         Map<String, Integer> secretCounts = new HashMap<>();
         
         try {
@@ -288,24 +459,19 @@ public class AISecretsDector implements BurpExtension {
             List<AuditIssue> existingIssues = api.siteMap().issues(baseUrlFilter);
             logMsg("Found " + existingIssues.size() + " existing issues for base URL: " + baseUrl);
             
-            // Extract all secrets from existing issues
-            Set<String> allExistingSecrets = new HashSet<>();
+            // Process each issue to count secret occurrences
             for (AuditIssue issue : existingIssues) {
                 for (HttpRequestResponse evidence : issue.requestResponses()) {
                     Set<String> secretsFromMarkers = extractSecretsFromMarkers(evidence);
-                    allExistingSecrets.addAll(secretsFromMarkers);
-                }
-            }
-            
-            // Count occurrences of each secret we're checking
-            for (String secretToCheck : secretsToCheck) {
-                int count = 0;
-                for (String existingSecret : allExistingSecrets) {
-                    if (existingSecret.equals(secretToCheck)) {
-                        count++;
+                    logMsg("Extracted " + secretsFromMarkers.size() + " secrets from markers in issue: " + issue.name());
+                    
+                    // Count each found secret
+                    for (String secret : secretsFromMarkers) {
+                        int count = secretCounts.getOrDefault(secret, 0);
+                        secretCounts.put(secret, count + 1);
+                        logMsg("Counted existing secret: " + maskSecret(secret) + " (count=" + (count + 1) + ")");
                     }
                 }
-                secretCounts.put(secretToCheck, count);
             }
             
         } catch (Exception e) {
@@ -317,29 +483,26 @@ public class AISecretsDector implements BurpExtension {
     }
 
     /**
-    * Build enhanced issue detail with table format
+    * Build enhanced issue detail with simple format
     */
     private String buildEnhancedIssueDetail(Map<String, Set<String>> secretsByType, int totalSecrets) {
         StringBuilder detail = new StringBuilder();
         
         detail.append(String.format("<p>%d secrets were detected in the response:</p>", totalSecrets));
         
-        // Create table with secret details
-        detail.append("<table border=\"1\" cellpadding=\"5\" cellspacing=\"0\" style=\"border-collapse: collapse;\">");
-        detail.append("<tr style=\"background-color: #f0f0f0;\"><th>Secret Type</th><th>Plaintext Secret</th></tr>");
+        // List each secret with its type (simple format since tables don't work well in Burp)
+        detail.append("<p><b>Detected Secrets:</b></p>");
+        detail.append("<ul>");
         
-        // Add each secret as a table row
         for (Map.Entry<String, Set<String>> entry : secretsByType.entrySet()) {
             String secretType = entry.getKey();
             for (String secret : entry.getValue()) {
-                detail.append("<tr>");
-                detail.append(String.format("<td>%s</td>", secretType));
-                detail.append(String.format("<td style=\"font-family: monospace; word-break: break-all;\">%s</td>", secret));
-                detail.append("</tr>");
+                detail.append(String.format("<li><b>%s:</b> <code>%s</code></li>", 
+                        secretType, secret));
             }
         }
         
-        detail.append("</table>");
+        detail.append("</ul>");
         
         // Add summary section
         detail.append("<p><b>Summary:</b></p>");
@@ -355,8 +518,6 @@ public class AISecretsDector implements BurpExtension {
         return detail.toString();
     }
 
-    
-    
     /**
     * Extract actual secrets from response markers
     */
@@ -460,5 +621,21 @@ public class AISecretsDector implements BurpExtension {
         if (config != null && config.getConfigSettings().isLoggingEnabled()) {
             config.appendToLog(message);
         }
+    }
+
+    /**
+     * Get the static instance for use by Config
+     */
+    public static AISecretsDector getInstance() {
+        return instance;
+    }
+    
+    /**
+     * Clear all secret counters
+     */
+    public void clearSecretCounters() {
+        secretCounters.clear();
+        saveSecretCounters();
+        logMsg("All secret counters cleared");
     }
 }
