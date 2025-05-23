@@ -9,6 +9,7 @@ package slicingmelon.aisecretsdetector;
 
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.responses.HttpResponse;
+import burp.api.montoya.core.ByteArray;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -109,96 +110,70 @@ public class SecretScanner {
     
     public SecretScanResult scanResponse(HttpResponse response) {
         List<Secret> foundSecrets = new ArrayList<>();
-        
-        // Track unique secrets by value to avoid duplicates within the same response
         Set<String> uniqueSecretValues = new HashSet<>();
         
         try {
-            String responseBody = response.bodyToString();
-            
+            // Get both ByteArray and string representations
+            // ByteArray is more efficient for position calculations
+            // For regex group extraction we still need string
+            ByteArray responseByteArray = response.body();
+            String responseBody = responseByteArray.toString(); // Still needed for regex groups
             int bodyOffset = response.bodyOffset();
             
             for (SecretPattern pattern : secretPatterns) {
                 try {
-
-                    // Skip reCAPTCHA Site Key pattern - we only want reCAPTCHA Secret Keys
+                    // Skip irrelevant patterns
                     if (pattern.getName().equals("reCAPTCHA Site Key")) {
                         continue;
                     }
-
-                    // Skip randomness algorithm detection if disabled in settings
                     if (pattern.getName().equals("Generic Secret") && !SecretScannerUtils.isRandomnessAlgorithmEnabled()) {
-                        config.appendToLog("Skipping Generic Secret pattern - randomness algorithm disabled");
                         continue;
                     }
 
+                    // Use regex on string for group extraction
                     Matcher matcher = pattern.getPattern().matcher(responseBody);
                     
                     while (matcher.find()) {
                         String secretValue;
-                        int bodyStartPos; 
-                        int bodyEndPos;
+                        int bodyStartPos;
                         
+                        // Extract group info
                         if (pattern.getName().equals("Generic Secret") && matcher.groupCount() >= 1) {
-                            // For the random string pattern, we only want to extract the actual secret (group 1)
                             secretValue = matcher.group(1);
                             bodyStartPos = matcher.start(1);
-                            bodyEndPos = matcher.end(1);
-
-                            // Check if this is a reCAPTCHA Site Key by directly using the pattern
-                            // We want to skip reCAPTCHA Site Key, as it's useless
-                            boolean isReCaptchaSiteKey = false;
-                            for (SecretPattern p : secretPatterns) {
-                                if (p.getName().equals("reCAPTCHA Site Key") && p.getPattern().matcher(secretValue).matches()) {
-                                    isReCaptchaSiteKey = true;
-                                    config.appendToLog("Skipping reCAPTCHA Site Key detected by Generic Secret pattern: " + secretValue);
-                                    break;
-                                }
-                            }
                             
-                            // Skip this match if it's a reCAPTCHA Site Key
-                            if (isReCaptchaSiteKey) {
+                            // Skip non-random strings etc.
+                            if (!isRandom(secretValue.getBytes(StandardCharsets.UTF_8))) {
                                 continue;
                             }
-
-                            // Check if this is actually a random string
-                            if (!isRandom(secretValue.getBytes(StandardCharsets.UTF_8))) {
-                                continue;  // Skip if not random enough
-                            }
-
                         } else {
-                            // For other patterns, use the whole match
                             secretValue = matcher.group(0);
                             bodyStartPos = matcher.start(0);
-                            bodyEndPos = matcher.end(0);
                         }
                         
-                        // Skip if we've already found this secret value in this response
-                        // Could kill burp easily
+                        // Skip duplicates
                         if (uniqueSecretValues.contains(secretValue)) {
-                            config.appendToLog("Skipping duplicate secret: " + secretValue);
                             continue;
                         }
-                        
                         uniqueSecretValues.add(secretValue);
                         
-                        // Convert body positions to full response positions by adding bodyOffset
-                        int fullStartPos = bodyOffset + bodyStartPos;
-                        int fullEndPos = bodyOffset + bodyEndPos;
+                        // Find exact position using ByteArray's indexOf
+                        ByteArray secretByteArray = ByteArray.byteArray(secretValue);
+                        int realStartPos = responseByteArray.indexOf(secretByteArray, false);
                         
-                        // Calculate highlight positions with 20 character buffer for better visibility
-                        // int highlightStart = Math.max(bodyOffset, fullStartPos - 20);
-                        // int highlightEnd = Math.min(bodyOffset + responseBody.length(), fullEndPos + 20);
-                        int highlightStart = fullStartPos;
-                        int highlightEnd = fullEndPos;
-                        
-                        Secret secret = new Secret(pattern.getName(), secretValue, highlightStart, highlightEnd);
-                        foundSecrets.add(secret);
-                        
-                        config.appendToLog(String.format(
-                            "Found %s: '%s' at body position %d-%d (highlight: %d-%d)",
-                            pattern.getName(), secretValue, bodyStartPos, bodyEndPos, highlightStart, highlightEnd
-                        ));
+                        if (realStartPos != -1) {
+                            int realEndPos = realStartPos + secretByteArray.length();
+                            Secret secret = new Secret(pattern.getName(), secretValue, 
+                                                     bodyOffset + realStartPos, 
+                                                     bodyOffset + realEndPos);
+                            foundSecrets.add(secret);
+                        } else {
+                            // Fall back to regex positions if ByteArray search fails
+                            int fullStartPos = bodyOffset + bodyStartPos;
+                            int fullEndPos = fullStartPos + secretValue.length();
+                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
+                            foundSecrets.add(secret);
+                        }
                     }
                 } catch (Exception e) {
                     config.appendToLog("Error with pattern " + pattern.getName() + ": " + e.getMessage());

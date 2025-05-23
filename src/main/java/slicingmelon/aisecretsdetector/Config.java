@@ -33,9 +33,11 @@ public class Config {
         private boolean randomnessAlgorithmEnabled;
         private int genericSecretMinLength;
         private int genericSecretMaxLength;
+        private int duplicateThreshold;
         
         public ConfigSettings(int workers, boolean inScopeOnly, Set<ToolType> enabledTools, boolean loggingEnabled,
-                             boolean randomnessAlgorithmEnabled, int genericSecretMinLength, int genericSecretMaxLength) {
+                             boolean randomnessAlgorithmEnabled, int genericSecretMinLength, int genericSecretMaxLength,
+                             int duplicateThreshold) {
             this.workers = workers;
             this.inScopeOnly = inScopeOnly;
             this.enabledTools = enabledTools;
@@ -43,6 +45,7 @@ public class Config {
             this.randomnessAlgorithmEnabled = randomnessAlgorithmEnabled;
             this.genericSecretMinLength = genericSecretMinLength;
             this.genericSecretMaxLength = genericSecretMaxLength;
+            this.duplicateThreshold = duplicateThreshold;
         }
         
         public int getWorkers() {
@@ -112,6 +115,14 @@ public class Config {
         public void setGenericSecretMaxLength(int genericSecretMaxLength) {
             this.genericSecretMaxLength = Math.min(128, genericSecretMaxLength);
         }
+        
+        public int getDuplicateThreshold() {
+            return duplicateThreshold;
+        }
+        
+        public void setDuplicateThreshold(int duplicateThreshold) {
+            this.duplicateThreshold = Math.max(1, duplicateThreshold);
+        }
     }
     
     public static Config getInstance() {
@@ -154,6 +165,9 @@ public class Config {
         int genericSecretMaxLength = (genericSecretMaxLengthValue != null) ? 
                                     Math.min(128, genericSecretMaxLengthValue) : 80;
         
+        Integer duplicateThresholdValue = persistedData.getInteger("duplicate_threshold");
+        int duplicateThreshold = (duplicateThresholdValue != null) ? Math.max(1, duplicateThresholdValue) : 5;
+        
         // Initialize with default tool settings
         Set<ToolType> enabledTools = new HashSet<>();
         enabledTools.add(ToolType.TARGET);
@@ -175,7 +189,7 @@ public class Config {
         }
         
         return new ConfigSettings(workers, inScopeOnly, enabledTools, loggingEnabled, 
-                                 randomnessAlgorithmEnabled, genericSecretMinLength, genericSecretMaxLength);
+                                 randomnessAlgorithmEnabled, genericSecretMinLength, genericSecretMaxLength, duplicateThreshold);
     }
     
     public void saveConfigSettings() {
@@ -186,6 +200,7 @@ public class Config {
         persistedData.setBoolean("randomness_algorithm_enabled", configSettings.isRandomnessAlgorithmEnabled());
         persistedData.setInteger("generic_secret_min_length", configSettings.getGenericSecretMinLength());
         persistedData.setInteger("generic_secret_max_length", configSettings.getGenericSecretMaxLength());
+        persistedData.setInteger("duplicate_threshold", configSettings.getDuplicateThreshold());
         
         StringBuilder toolsBuilder = new StringBuilder();
         for (ToolType tool : configSettings.getEnabledTools()) {
@@ -357,6 +372,37 @@ public class Config {
         rightConstraints.weightx = 0.0; // Don't stretch the spinner
         rightPanel.add(maxLengthSpinner, rightConstraints);
         
+        // Duplicate Threshold setting
+        JLabel duplicateThresholdLabel = new JLabel("Duplicate Secret Threshold (same secret across URLs):");
+        rightConstraints.gridx = 0;
+        rightConstraints.gridy = 3;
+        rightConstraints.weightx = 0.0;
+        rightPanel.add(duplicateThresholdLabel, rightConstraints);
+        
+        SpinnerNumberModel duplicateThresholdModel = new SpinnerNumberModel(
+                configSettings.getDuplicateThreshold(),
+                1,   // Minimum value
+                50,  // Maximum value
+                1
+        );
+        JSpinner duplicateThresholdSpinner = new JSpinner(duplicateThresholdModel);
+        duplicateThresholdSpinner.addChangeListener(_ -> {
+            configSettings.setDuplicateThreshold((Integer) duplicateThresholdSpinner.getValue());
+            saveConfigSettings();
+            api.logging().logToOutput("Configuration updated - Duplicate Threshold: " + 
+                                     configSettings.getDuplicateThreshold());
+        });
+        
+        // Set a reasonable fixed width for the spinner
+        JComponent thresholdEditor = duplicateThresholdSpinner.getEditor();
+        Dimension thresholdPrefSize = new Dimension(60, thresholdEditor.getPreferredSize().height);
+        thresholdEditor.setPreferredSize(thresholdPrefSize);
+        
+        rightConstraints.gridx = 1;
+        rightConstraints.gridy = 3;
+        rightConstraints.weightx = 0.0;
+        rightPanel.add(duplicateThresholdSpinner, rightConstraints);
+        
         // Add left and right panels to the settings panel
         settingsPanel.add(leftPanel);
         settingsPanel.add(rightPanel);
@@ -407,6 +453,28 @@ public class Config {
         JPanel autoSavePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JLabel autoSaveLabel = new JLabel("Settings are saved automatically when changed");
         autoSavePanel.add(autoSaveLabel);
+        
+        // Add Reset Counters button
+        JButton resetCountersButton = new JButton("Reset Secret Counters");
+        resetCountersButton.setToolTipText("Reset all duplicate detection counters. Use this if too many secrets are being skipped.");
+        resetCountersButton.addActionListener(_ -> {
+            int result = JOptionPane.showConfirmDialog(
+                panel, 
+                "This will reset all duplicate secret counters. After reset, you may see duplicate issues reported again. Continue?",
+                "Reset Secret Counters",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE
+            );
+            
+            if (result == JOptionPane.YES_OPTION) {
+                resetSecretCounters();
+                appendToLog("Secret counters reset successfully");
+            }
+        });
+        
+        autoSavePanel.add(Box.createHorizontalStrut(20)); // Add spacing
+        autoSavePanel.add(resetCountersButton);
+        
         loggingPanel.add(autoSavePanel);
         
         // Add all panels to the main panel
@@ -452,6 +520,17 @@ public class Config {
     public void clearLogs() {
         if (logArea != null) {
             SwingUtilities.invokeLater(() -> logArea.setText(""));
+        }
+    }
+    
+    /**
+     * Reset all secret counters in the extension
+     */
+    public void resetSecretCounters() {
+        AISecretsDector detector = AISecretsDector.getInstance();
+        if (detector != null) {
+            detector.clearSecretCounters();
+            api.logging().logToOutput("Secret counters reset");
         }
     }
 }
