@@ -112,6 +112,15 @@ public class SecretScanner {
         List<Secret> foundSecrets = new ArrayList<>();
         Set<String> uniqueSecretValues = new HashSet<>();
         
+        // Find reCAPTCHA Site Key pattern for filtering Generic Secrets
+        Pattern recaptchaSiteKeyPattern = null;
+        for (SecretPattern sp : secretPatterns) {
+            if (sp.getName().equals("reCAPTCHA Site Key")) {
+                recaptchaSiteKeyPattern = sp.getPattern();
+                break;
+            }
+        }
+        
         try {
             // Get both ByteArray and string representations
             // ByteArray is more efficient for position calculations
@@ -144,6 +153,11 @@ public class SecretScanner {
                             
                             // Skip non-random strings etc.
                             if (!isRandom(secretValue.getBytes(StandardCharsets.UTF_8))) {
+                                continue;
+                            }
+                            
+                            // Skip if the Generic Secret matches reCAPTCHA Site Key pattern
+                            if (recaptchaSiteKeyPattern != null && recaptchaSiteKeyPattern.matcher(secretValue).matches()) {
                                 continue;
                             }
                         } else {

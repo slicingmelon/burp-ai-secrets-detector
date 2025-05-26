@@ -188,7 +188,7 @@ public class AISecretsDector implements BurpExtension {
                     secretCounts.put(secret, finalCount);
                     
                     logMsg(String.format("Secret count for %s - Existing: %d, Persisted: %d, Final: %d", 
-                            maskSecret(secret), existingCount, persistedCount, finalCount));
+                            secret, existingCount, persistedCount, finalCount));
                 }
                 
                 int duplicateThreshold = config.getConfigSettings().getDuplicateThreshold();
@@ -206,17 +206,17 @@ public class AISecretsDector implements BurpExtension {
                         // Find which type this secret belongs to
                         for (Map.Entry<String, Set<String>> entry : secretTypeMap.entrySet()) {
                             if (entry.getValue().contains(secret)) {
-                                secretsToReportByType.computeIfAbsent(entry.getKey(), k -> new HashSet<>()).add(secret);
+                                secretsToReportByType.computeIfAbsent(entry.getKey(), _ -> new HashSet<>()).add(secret);
                             }
                         }
                         
-                        logMsg("HTTP Handler: Will report secret: " + maskSecret(secret) + 
+                        logMsg("HTTP Handler: Will report secret: " + secret + 
                                 " (seen " + count + " times, threshold: " + duplicateThreshold + ")");
                         
                         // Increment the counter for this secret
                         incrementSecretCounter(baseUrl, secret);
                     } else {
-                        logMsg("HTTP Handler: Skipping secret due to threshold: " + maskSecret(secret) + 
+                        logMsg("HTTP Handler: Skipping secret due to threshold: " + secret + 
                                 " (seen " + count + " times, threshold: " + duplicateThreshold + ")");
                     }
                 }
@@ -306,7 +306,7 @@ public class AISecretsDector implements BurpExtension {
     * Increment the counter for a specific secret at a base URL
     */
     private void incrementSecretCounter(String baseUrl, String secret) {
-        Map<String, Integer> counters = secretCounters.computeIfAbsent(baseUrl, k -> new HashMap<>());
+        Map<String, Integer> counters = secretCounters.computeIfAbsent(baseUrl, _ -> new HashMap<>());
         int currentCount = counters.getOrDefault(secret, 0);
         counters.put(secret, currentCount + 1);
         
@@ -314,15 +314,7 @@ public class AISecretsDector implements BurpExtension {
         saveSecretCounters();
     }
     
-    /**
-    * Mask a secret value for logging (show first 4 and last 4 chars)
-    */
-    private String maskSecret(String secret) {
-        if (secret == null || secret.length() <= 8) {
-            return "[MASKED]";
-        }
-        return secret.substring(0, 4) + "..." + secret.substring(secret.length() - 4);
-    }
+
     
     /**
     * Load persistent secret counters from extension storage
@@ -470,7 +462,7 @@ public class AISecretsDector implements BurpExtension {
                     for (String secret : secretsFromMarkers) {
                         int count = secretCounts.getOrDefault(secret, 0);
                         secretCounts.put(secret, count + 1);
-                        logMsg("Counted existing secret: " + maskSecret(secret) + " (count=" + (count + 1) + ")");
+                        logMsg("Counted existing secret: " + secret + " (count=" + (count + 1) + ")");
                     }
                 }
             }
@@ -556,7 +548,7 @@ public class AISecretsDector implements BurpExtension {
                     if (secret != null && !secret.isEmpty()) {
                         // Only store non-empty secrets
                         extractedSecrets.add(secret);
-                        logMsg("Extracted secret from marker: " + maskSecret(secret));
+                        logMsg("Extracted secret from marker: " + secret);
                     }
                 } else {
                     logMsg("Invalid marker position: " + startPos + "-" + endPos + 
@@ -569,9 +561,7 @@ public class AISecretsDector implements BurpExtension {
         
         return extractedSecrets;
     }
-    
-    
-        
+                
     // Skip binary content types that are unlikely to contain secrets
     public boolean shouldSkipMimeType(MimeType mimeType) {
         switch (mimeType) {
