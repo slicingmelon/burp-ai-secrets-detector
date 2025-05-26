@@ -206,7 +206,7 @@ public class AISecretsDector implements BurpExtension {
                         // Find which type this secret belongs to
                         for (Map.Entry<String, Set<String>> entry : secretTypeMap.entrySet()) {
                             if (entry.getValue().contains(secret)) {
-                                secretsToReportByType.computeIfAbsent(entry.getKey(), k -> new HashSet<>()).add(secret);
+                                secretsToReportByType.computeIfAbsent(entry.getKey(), _ -> new HashSet<>()).add(secret);
                             }
                         }
                         
@@ -306,7 +306,7 @@ public class AISecretsDector implements BurpExtension {
     * Increment the counter for a specific secret at a base URL
     */
     private void incrementSecretCounter(String baseUrl, String secret) {
-        Map<String, Integer> counters = secretCounters.computeIfAbsent(baseUrl, k -> new HashMap<>());
+        Map<String, Integer> counters = secretCounters.computeIfAbsent(baseUrl, _ -> new HashMap<>());
         int currentCount = counters.getOrDefault(secret, 0);
         counters.put(secret, currentCount + 1);
         
