@@ -126,7 +126,8 @@ public class SecretScanner {
             // ByteArray is more efficient for position calculations
             // For regex group extraction we still need string
             ByteArray responseByteArray = response.body();
-            String responseBody = responseByteArray.toString(); // Still needed for regex groups
+            // String responseBody = responseByteArray.toString(); // Still needed for regex groups
+            String responseBody = response.bodyToString();
             int bodyOffset = response.bodyOffset();
             
             for (SecretPattern pattern : secretPatterns) {
