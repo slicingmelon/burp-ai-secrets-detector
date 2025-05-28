@@ -170,7 +170,7 @@ public class AISecretsDetector implements BurpExtension {
                     String secretType = secret.getType();
                     
                     if (secretValue != null && !secretValue.isEmpty()) {
-                        // Use indexOf to find exact position (exactly like official Montoya API example)
+                        // Use indexOf to find exact position (Montoya API example..)
                         int exactPos = responseString.indexOf(secretValue);
                         
                         if (exactPos != -1) {
