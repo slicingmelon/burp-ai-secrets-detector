@@ -5,7 +5,7 @@ Author: Petru Surugiu <[pedro_infosec](https://x.com/pedro_infosec)>
 
 ## Installation
 
-1. Download the jar file from [burp-ai-secrets-detector-1.0.0.jar](https://raw.githubusercontent.com/slicingmelon/burp-ai-secrets-detector/refs/heads/main/build/libs/burp-ai-secrets-detector-1.0.0.jar)
+1. Download the jar file from [build/libs/ folder](https://github.com/slicingmelon/burp-ai-secrets-detector/tree/main/build/libs).
 2. In burp, add the .jar file: Burp → Extensions → Installed → Add → Select the .jar file
 
 ## How It Works
