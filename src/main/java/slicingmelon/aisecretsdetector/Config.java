@@ -527,7 +527,7 @@ public class Config {
      * Reset all secret counters in the extension
      */
     public void resetSecretCounters() {
-        AISecretsDector detector = AISecretsDector.getInstance();
+        AISecretsDetector detector = AISecretsDetector.getInstance();
         if (detector != null) {
             detector.clearSecretCounters();
             api.logging().logToOutput("Secret counters reset");
