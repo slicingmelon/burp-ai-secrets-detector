@@ -172,23 +172,12 @@ public class SecretScanner {
                         }
                         uniqueSecretValues.add(secretValue);
                         
-                        // Find exact position using ByteArray's indexOf
-                        ByteArray secretByteArray = ByteArray.byteArray(secretValue);
-                        int realStartPos = responseByteArray.indexOf(secretByteArray, false);
-                        
-                        if (realStartPos != -1) {
-                            int realEndPos = realStartPos + secretByteArray.length();
-                            Secret secret = new Secret(pattern.getName(), secretValue, 
-                                                     bodyOffset + realStartPos, 
-                                                     bodyOffset + realEndPos);
-                            foundSecrets.add(secret);
-                        } else {
-                            // Fall back to regex positions if ByteArray search fails
-                            int fullStartPos = bodyOffset + bodyStartPos;
-                            int fullEndPos = fullStartPos + secretValue.length();
-                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
-                            foundSecrets.add(secret);
-                        }
+                        // Use string-based positions to match Burp's text display encoding
+                        // This ensures markers align with what users see in the UI
+                        int fullStartPos = bodyOffset + bodyStartPos;
+                        int fullEndPos = fullStartPos + secretValue.length();
+                        Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
+                        foundSecrets.add(secret);
                     }
                 } catch (Exception e) {
                     config.appendToLog("Error with pattern " + pattern.getName() + ": " + e.getMessage());
