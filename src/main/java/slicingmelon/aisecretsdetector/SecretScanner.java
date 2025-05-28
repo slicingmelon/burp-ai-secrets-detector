@@ -168,12 +168,24 @@ public class SecretScanner {
                         }
                         uniqueSecretValues.add(secretValue);
                         
-                        // Use direct string positions (like Montoya API example)
-                        // No offset needed since we're using the full response string
-                        int fullStartPos = responseStartPos;
-                        int fullEndPos = fullStartPos + secretValue.length();
-                        Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
-                        foundSecrets.add(secret);
+                        // Use indexOf to find exact position (like official Montoya API example)
+                        // This ensures markers align correctly with Burp's display
+                        int exactPos = responseString.indexOf(secretValue);
+                        
+                        if (exactPos != -1) {
+                            // Found the secret at exact position
+                            int fullStartPos = exactPos;
+                            int fullEndPos = fullStartPos + secretValue.length();
+                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
+                            foundSecrets.add(secret);
+                        } else {
+                            // Fallback to regex positions if indexOf fails
+                            config.appendToLog("Warning: Could not find secret using indexOf, using regex position for: " + secretValue);
+                            int fullStartPos = responseStartPos;
+                            int fullEndPos = fullStartPos + secretValue.length();
+                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
+                            foundSecrets.add(secret);
+                        }
                     }
                 } catch (Exception e) {
                     config.appendToLog("Error with pattern " + pattern.getName() + ": " + e.getMessage());
