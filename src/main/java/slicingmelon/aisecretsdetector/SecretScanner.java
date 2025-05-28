@@ -122,13 +122,9 @@ public class SecretScanner {
         }
         
         try {
-            // Get both ByteArray and string representations
-            // ByteArray is more efficient for position calculations
-            // For regex group extraction we still need string
-            ByteArray responseByteArray = response.body();
-            // String responseBody = responseByteArray.toString(); // Still needed for regex groups
-            String responseBody = response.bodyToString();
-            int bodyOffset = response.bodyOffset();
+            // Use full response string (including headers) to match Montoya API example approach
+            // This ensures positions align correctly with Burp's display
+            String responseString = response.toString();
             
             for (SecretPattern pattern : secretPatterns) {
                 try {
@@ -140,17 +136,17 @@ public class SecretScanner {
                         continue;
                     }
 
-                    // Use regex on string for group extraction
-                    Matcher matcher = pattern.getPattern().matcher(responseBody);
+                    // Use regex on full response string for position calculation
+                    Matcher matcher = pattern.getPattern().matcher(responseString);
                     
                     while (matcher.find()) {
                         String secretValue;
-                        int bodyStartPos;
+                        int responseStartPos;
                         
                         // Extract group info
                         if (pattern.getName().equals("Generic Secret") && matcher.groupCount() >= 1) {
                             secretValue = matcher.group(1);
-                            bodyStartPos = matcher.start(1);
+                            responseStartPos = matcher.start(1);
                             
                             // Skip non-random strings etc.
                             if (!isRandom(secretValue.getBytes(StandardCharsets.UTF_8))) {
@@ -163,7 +159,7 @@ public class SecretScanner {
                             }
                         } else {
                             secretValue = matcher.group(0);
-                            bodyStartPos = matcher.start(0);
+                            responseStartPos = matcher.start(0);
                         }
                         
                         // Skip duplicates
@@ -172,19 +168,20 @@ public class SecretScanner {
                         }
                         uniqueSecretValues.add(secretValue);
                         
-                        // Find exact position using ByteArray's indexOf
-                        ByteArray secretByteArray = ByteArray.byteArray(secretValue);
-                        int realStartPos = responseByteArray.indexOf(secretByteArray, false);
+                        // Use indexOf to find exact position (like official Montoya API example)
+                        // This ensures markers align correctly with Burp's display
+                        int exactPos = responseString.indexOf(secretValue);
                         
-                        if (realStartPos != -1) {
-                            int realEndPos = realStartPos + secretByteArray.length();
-                            Secret secret = new Secret(pattern.getName(), secretValue, 
-                                                     bodyOffset + realStartPos, 
-                                                     bodyOffset + realEndPos);
+                        if (exactPos != -1) {
+                            // Found the secret at exact position
+                            int fullStartPos = exactPos;
+                            int fullEndPos = fullStartPos + secretValue.length();
+                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
                             foundSecrets.add(secret);
                         } else {
-                            // Fall back to regex positions if ByteArray search fails
-                            int fullStartPos = bodyOffset + bodyStartPos;
+                            // Fallback to regex positions if indexOf fails
+                            config.appendToLog("Warning: Could not find secret using indexOf, using regex position for: " + secretValue);
+                            int fullStartPos = responseStartPos;
                             int fullEndPos = fullStartPos + secretValue.length();
                             Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
                             foundSecrets.add(secret);
