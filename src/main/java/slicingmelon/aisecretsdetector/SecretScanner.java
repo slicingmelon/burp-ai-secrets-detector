@@ -171,8 +171,14 @@ public class SecretScanner {
                                 continue;
                             }
                         } else {
-                            secretValue = matcher.group(0);
-                            responseStartPos = matcher.start(0);
+                            // Use capture group if available to avoid boundary characters
+                            if (matcher.groupCount() >= 1) {
+                                secretValue = matcher.group(1);
+                                responseStartPos = matcher.start(1);
+                            } else {
+                                secretValue = matcher.group(0);
+                                responseStartPos = matcher.start(0);
+                            }
                         }
                         
                         // Skip duplicates
