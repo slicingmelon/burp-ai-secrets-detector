@@ -154,13 +154,9 @@ public class SecretScannerUtils {
         addPattern("Postman API Token", 
             "\\b(PMAK-(?i)[a-f0-9]{24}\\-[a-f0-9]{34})(?:[\\x60'\"\\s;]|\\\\[nr]|$)");
 
-        // reCAPTCHA Site Key
-        addPattern("reCAPTCHA Site Key", 
-            "\\b6[LM][a-zA-Z0-9_-]{38}\\b");
-        
         // reCAPTCHA Secret Key
-        addPattern("reCAPTCHA Secret Key", 
-            "\\b6[LM][a-zA-Z0-9_-]{39}\\b");
+        addPattern("Google reCAPTCHA Key", 
+            "\\b6[0-9a-zA-Z_-]{39}\\b");
         
         addPattern("Slack Token", 
             "xox[aboprs]-(?:\\d+-)+[\\da-z]+");

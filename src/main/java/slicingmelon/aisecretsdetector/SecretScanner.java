@@ -113,10 +113,10 @@ public class SecretScanner {
         Set<String> uniqueSecretValues = new HashSet<>();
         
         // Find reCAPTCHA Site Key pattern for filtering Generic Secrets
-        Pattern recaptchaSiteKeyPattern = null;
+        Pattern googleRecaptchaSiteKeyPattern = null;
         for (SecretPattern sp : secretPatterns) {
-            if (sp.getName().equals("reCAPTCHA Site Key")) {
-                recaptchaSiteKeyPattern = sp.getPattern();
+            if (sp.getName().equals("Google reCAPTCHA Key")) {
+                googleRecaptchaSiteKeyPattern = sp.getPattern();
                 break;
             }
         }
@@ -154,7 +154,7 @@ public class SecretScanner {
                             }
                             
                             // Skip if the Generic Secret matches reCAPTCHA Site Key pattern
-                            if (recaptchaSiteKeyPattern != null && recaptchaSiteKeyPattern.matcher(secretValue).matches()) {
+                            if (googleRecaptchaSiteKeyPattern != null && googleRecaptchaSiteKeyPattern.matcher(secretValue).matches()) {
                                 continue;
                             }
                         } else {
