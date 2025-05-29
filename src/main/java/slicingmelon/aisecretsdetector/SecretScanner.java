@@ -128,10 +128,6 @@ public class SecretScanner {
             
             for (SecretPattern pattern : secretPatterns) {
                 try {
-                    // Skip irrelevant patterns
-                    if (pattern.getName().equals("reCAPTCHA Site Key")) {
-                        continue;
-                    }
                     if (pattern.getName().equals("Generic Secret") && !SecretScannerUtils.isRandomnessAlgorithmEnabled()) {
                         continue;
                     }

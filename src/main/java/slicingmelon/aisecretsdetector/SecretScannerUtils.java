@@ -128,8 +128,11 @@ public class SecretScannerUtils {
         addPattern("Cloudflare Global API Key", 
             "(?i)[\\w.-]{0,50}?(?:cloudflare)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-f0-9]{37})(?:[\\x60'\"\\s;]|\\\\[nr]|$)");
         
+        addPattern("DigitalOcean Personal Access Token", 
+            "\\b(dop_v1_[a-f0-9]{64})(?:[\\x60'\"\\s;]|\\\\[nr]|$)");
+        
         addPattern("GCP API Key", 
-            "AIzaSy[\\dA-Za-z_-]{33}");
+            "\\b(AIza[\\w-]{35})(?:[\\x60'\"\\s;]|\\\\[nr]|$)");
         
         // Disabled for now.. too many "findings"
         // addPattern("JWT/JWE Token", 
@@ -204,6 +207,9 @@ public class SecretScannerUtils {
         
         addPattern("Squarespace Access Token", 
             "(?i)[\\w.-]{0,50}?(?:squarespace)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[\\x60'\"\\s;]|\\\\[nr]|$)");
+        
+        addPattern("Telegram Bot API Token", 
+            "(?i)[\\w.-]{0,50}?(?:telegr)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([0-9]{5,16}:(?-i:A)[a-z0-9_\\-]{34})(?:[\\x60'\"\\s;]|\\\\[nr]|$)");
         
         // Shopify Access Tokens
         addPattern("Shopify Access Token", 
