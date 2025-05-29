@@ -32,12 +32,14 @@ public class SecretScanner {
         private final String value;
         private final int startIndex;
         private final int endIndex;
+        private final int responsePosition;
         
-        public Secret(String type, String value, int startIndex, int endIndex) {
+        public Secret(String type, String value, int startIndex, int endIndex, int responsePosition) {
             this.type = type;
             this.value = value;
             this.startIndex = startIndex;
             this.endIndex = endIndex;
+            this.responsePosition = responsePosition;
         }
         
         public String getType() {
@@ -54,6 +56,10 @@ public class SecretScanner {
         
         public int getEndIndex() {
             return endIndex;
+        }
+        
+        public int getResponsePosition() {
+            return responsePosition;
         }
     }
     
@@ -122,14 +128,25 @@ public class SecretScanner {
         }
         
         try {
-            // Use full response string (including headers) to match Montoya API example approach
-            // This ensures positions align correctly with Burp's display
-            String responseString = response.toString();
+            // Get ByteArray once for fast pre-filtering
+            ByteArray responseBytes = response.toByteArray();
+            String responseString = null; // Lazy initialization
             
             for (SecretPattern pattern : secretPatterns) {
                 try {
                     if (pattern.getName().equals("Generic Secret") && !SecretScannerUtils.isRandomnessAlgorithmEnabled()) {
                         continue;
+                    }
+
+                    // FAST CHECK: Does pattern exist at all?
+                    int firstMatch = responseBytes.indexOf(pattern.getPattern());
+                    if (firstMatch == -1) {
+                        continue; // Pattern not found, skip expensive string operations
+                    }
+                    
+                    // Pattern found! Now do expensive string conversion only once per response
+                    if (responseString == null) {
+                        responseString = response.toString();
                     }
 
                     // Use regex on full response string for position calculation
@@ -172,14 +189,14 @@ public class SecretScanner {
                             // Found the secret at exact position
                             int fullStartPos = exactPos;
                             int fullEndPos = fullStartPos + secretValue.length();
-                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
+                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos, exactPos);
                             foundSecrets.add(secret);
                         } else {
                             // Fallback to regex positions if indexOf fails
                             config.appendToLog("Warning: Could not find secret using indexOf, using regex position for: " + secretValue);
                             int fullStartPos = responseStartPos;
                             int fullEndPos = fullStartPos + secretValue.length();
-                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
+                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos, responseStartPos);
                             foundSecrets.add(secret);
                         }
                     }

@@ -170,16 +170,10 @@ public class AISecretsDetector implements BurpExtension {
                     String secretType = secret.getType();
                     
                     if (secretValue != null && !secretValue.isEmpty()) {
-                        // Use indexOf to find exact position (Montoya API example..)
-                        int exactPos = responseString.indexOf(secretValue);
-                        
-                        if (exactPos != -1) {
-                            // Create marker with exact position found by indexOf
-                            responseMarkers.add(Marker.marker(exactPos, exactPos + secretValue.length()));
-                            logMsg("HTTP Handler: Found exact position for " + secretType + " at " + exactPos + "-" + (exactPos + secretValue.length()));
-                        } else {
-                            logMsg("HTTP Handler: Warning - Could not find exact position for secret: " + secretValue);
-                        }
+                        // Use pre-calculated position from scanner!
+                        int exactPos = secret.getResponsePosition();
+                        responseMarkers.add(Marker.marker(exactPos, exactPos + secretValue.length()));
+                        logMsg("HTTP Handler: Found exact position for " + secretType + " at " + exactPos + "-" + (exactPos + secretValue.length()));
                         
                         newSecrets.add(secretValue);
                         
