@@ -159,7 +159,7 @@ public class SecretScannerUtils {
 
         // reCAPTCHA Secret Key
         addPattern("Google reCAPTCHA Key", 
-            "\\b6[0-9a-zA-Z_-]{39}\\b");
+            "\\b6[LM][A-Za-z0-9_-]{38}\\b");
         
         addPattern("Slack Token", 
             "xox[aboprs]-(?:\\d+-)+[\\da-z]+");
