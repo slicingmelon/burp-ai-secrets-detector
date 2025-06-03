@@ -159,7 +159,7 @@ public class AISecretsDetector implements BurpExtension {
                 );
                 
                 // Get response string from HttpRequestResponse (like official Montoya API example)
-                String responseString = requestResponse.response().toString();
+                //String responseString = requestResponse.response().toString();
                 
                 // Create markers to highlight where the secrets are in the response
                 List<Marker> responseMarkers = new ArrayList<>();
