@@ -140,16 +140,7 @@ public class SecretScanner {
 
                     // FAST CHECK: Does pattern exist at all? (avoid double regex processing)
                     if (!response.contains(pattern.getPattern())) {
-                        // Debug logging for GCP API Key specifically
-                        if (pattern.getName().equals("GCP API Key")) {
-                            config.appendToLog("DEBUG: GCP API Key pattern not found in fast check");
-                        }
                         continue; // Pattern not found, skip expensive string operations
-                    }
-                    
-                    // Debug logging for GCP API Key specifically
-                    if (pattern.getName().equals("GCP API Key")) {
-                        config.appendToLog("DEBUG: GCP API Key pattern found in fast check, proceeding to full match");
                     }
                     
                     // Pattern found! Now do expensive string conversion only once per response
@@ -159,18 +150,6 @@ public class SecretScanner {
 
                     // Use regex on full response string for position calculation
                     Matcher matcher = pattern.getPattern().matcher(responseString);
-                    
-                    // Debug logging for GCP API Key specifically
-                    if (pattern.getName().equals("GCP API Key")) {
-                        config.appendToLog("DEBUG: GCP API Key attempting full regex match on response");
-                        if (matcher.find()) {
-                            config.appendToLog("DEBUG: GCP API Key regex match found!");
-                            matcher.reset(); // Reset matcher for the actual processing
-                        } else {
-                            config.appendToLog("DEBUG: GCP API Key regex match failed on full string");
-                            continue;
-                        }
-                    }
                     
                     while (matcher.find()) {
                         String secretValue;
