@@ -9,7 +9,7 @@ package slicingmelon.aisecretsdetector;
 
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.responses.HttpResponse;
-import burp.api.montoya.core.ByteArray;
+//import burp.api.montoya.core.ByteArray;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -128,8 +128,6 @@ public class SecretScanner {
         }
         
         try {
-            // Get ByteArray once for fast pre-filtering
-            ByteArray responseBytes = response.toByteArray();
             String responseString = response.toString(); // Convert once upfront since we can't use fast check
             
             for (SecretPattern pattern : secretPatterns) {
