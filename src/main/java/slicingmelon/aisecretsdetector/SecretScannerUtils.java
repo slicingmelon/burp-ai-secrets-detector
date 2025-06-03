@@ -101,10 +101,10 @@ public class SecretScannerUtils {
             "(?i)[\\w.-]{0,50}?(?:algolia)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-z0-9]{32})\\b");
         
         addPattern("Azure Storage Account Key", 
-            "(?i)key\\s*[:=]\\s*[\"']?([\\d+/=A-Za-z]{88})[\"']?\\b");
+            "(?i)(?:account)?key\\s*[:=]\\s*[\"']?([\\d+/=A-Za-z]{88})[\"']?(?:[^\\w]|$)");
         
         addPattern("Azure AD Client Secret", 
-            "\\b([a-zA-Z0-9_~.]{3}\\dQ~[a-zA-Z0-9_~.-]{31,34})\\b");
+            "\\b([a-zA-Z0-9_~.]{3}\\dQ~[a-zA-Z0-9_~.-]{31,34})(?:[^\\w]|$)");
         
         addPattern("AWS Access Key", 
             "\\b((?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16,20})\\b");
@@ -114,7 +114,7 @@ public class SecretScannerUtils {
             "\\b\\$2[abxy]\\$\\d{2}\\$[./A-Za-z0-9]{53}\\b");
         
         addPattern("Fastly API Key", 
-            "(?i)[\\w.-]{0,50}?(?:fastly)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-z0-9=_\\-]{32})\\b");
+            "(?i)[\\w.-]{0,50}?(?:fastly)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-z0-9=_\\-]{32})(?:[^\\w]|$)");
         
         addPattern("GitHub Personal Access Token", 
             "(?:gh[oprsu]|github_pat)_[\\dA-Za-z_]{36}");
@@ -123,15 +123,14 @@ public class SecretScannerUtils {
             "glpat-[\\dA-Za-z_=-]{20,22}");
         
         addPattern("Cloudflare API Key", 
-            "(?i)[\\w.-]{0,50}?(?:cloudflare)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-z0-9_-]{40})\\b");
+            "(?i)[\\w.-]{0,50}?(?:cloudflare)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-z0-9_-]{40})(?:[^\\w]|$)");
         
         addPattern("Cloudflare Global API Key", 
-            "(?i)[\\w.-]{0,50}?(?:cloudflare)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-f0-9]{37})\\b");
+            "(?i)[\\w.-]{0,50}?(?:cloudflare)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-f0-9]{37})(?:[^\\w]|$)");
 
         addPattern("Cloudflare Origin CA Key", 
-            "\\b(v1\\.0-[a-f0-9]{24}-[a-f0-9]{146})\\b");
+            "\\b(v1\\.0-[a-f0-9]{24}-[a-f0-9]{146})(?:[^\\w]|$)");
         
-
         addPattern("DigitalOcean Personal Access Token", 
         "\\b((?:dop|doo|dor)_v1_[a-f0-9]{64})\\b");
         
