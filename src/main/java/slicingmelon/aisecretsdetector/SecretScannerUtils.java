@@ -101,7 +101,7 @@ public class SecretScannerUtils {
             "(?i)[\\w.-]{0,50}?(?:algolia)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-z0-9]{32})\\b");
         
         addPattern("Azure Storage Account Key", 
-            "(?i)accountkey\\s*[:=]\\s*[\"']?([\\d+/=A-Za-z]{88})[\"']?\\b");
+            "(?i)key\\s*[:=]\\s*[\"']?([\\d+/=A-Za-z]{88})[\"']?\\b");
         
         addPattern("Azure AD Client Secret", 
             "\\b([a-zA-Z0-9_~.]{3}\\dQ~[a-zA-Z0-9_~.-]{31,34})\\b");
@@ -127,9 +127,10 @@ public class SecretScannerUtils {
         
         addPattern("Cloudflare Global API Key", 
             "(?i)[\\w.-]{0,50}?(?:cloudflare)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-f0-9]{37})\\b");
+
+        addPattern("Cloudflare Origin CA Key", 
+            "\\b(v1\\.0-[a-f0-9]{24}-[a-f0-9]{146})\\b");
         
-        // addPattern("DigitalOcean Personal Access Token", 
-        //     "\\b(dop_v1_[a-f0-9]{64})\\b");
 
         addPattern("DigitalOcean Personal Access Token", 
         "\\b((?:dop|doo|dor)_v1_[a-f0-9]{64})\\b");
