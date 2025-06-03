@@ -136,8 +136,8 @@ public class SecretScannerUtils {
         //     "\\b(AIza[\\w-]{35})\\b");
 
         addPattern("GCP API Key", 
-        "\\b(AIza[0-9A-Za-z\\-_]{35})\\b");
-        
+        "AIza[0-9A-Za-z-_]{35}");
+
         // Disabled for now.. too many "findings"
         // addPattern("JWT/JWE Token", 
         //     "\\beyJ[\\dA-Za-z=_-]+(?:\\.[\\dA-Za-z=_-]{3,}){1,4}");
