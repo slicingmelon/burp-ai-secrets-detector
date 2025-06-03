@@ -326,7 +326,7 @@ public class AISecretsDetector implements BurpExtension {
     */
     private void incrementSecretCounter(String baseUrl, String secret) {
         Map<String, Integer> counters = secretCounters.computeIfAbsent(baseUrl, _ -> new ConcurrentHashMap<>());
-        counters.compute(secret, (k, v) -> (v == null) ? 1 : v + 1);
+        counters.compute(secret, (_, v) -> (v == null) ? 1 : v + 1);
         
         // Save counters to persist data
         saveSecretCounters();
