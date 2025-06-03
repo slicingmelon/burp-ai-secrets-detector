@@ -254,6 +254,30 @@ def endpoint_seven_fixed_patterns():
     '''
     return render_template_string(html_content)
 
+@app.route('/8-fixed-patterns-no-groups-npm')
+def endpoint_eight_fixed_patterns_no_groups():
+    # Static secrets that match our new regex patterns exactly
+    npm_token = "npm_n3A6gZxL5PqWsCtVmRbKyDjeFHuQiTwY0921"
+
+    html_content = f'''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Fixed Pattern Secrets Example</title>
+    </head>
+    <body>
+        <h1>Page with Properly Formatted Secrets</h1>
+        <p>This page contains secrets formatted to match our regex patterns.</p>
+        
+        <div class="config-section">
+            <h2>NPM token</h2>
+            <p>AWS Access Key: {npm_token}</p>
+        </div>
+    </body>
+    </html>
+    '''
+    return render_template_string(html_content)
+
 @app.route('/')
 def index():
     """Show an index of all available endpoints"""
@@ -263,7 +287,8 @@ def index():
         {"path": "/3-github", "name": "GitHub Token Example"},
         {"path": "/4-all", "name": "Multiple Secrets Example"},
         {"path": "/6-static-aws-github", "name": "Static AWS and GitHub Secrets"},
-        {"path": "/7-fixed-patterns-aws-github-gcp", "name": "Fixed Pattern Secrets (AWS, GitHub, GCP)"}
+        {"path": "/7-fixed-patterns-aws-github-gcp", "name": "Fixed Pattern Secrets (AWS, GitHub, GCP)"},
+        {"path": "/8-fixed-patterns-no-groups-npm", "name": "Fixed Pattern Secrets - No Groups (NPM)"}
     ]
     
     html_content = '''

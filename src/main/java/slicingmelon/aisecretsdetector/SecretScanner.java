@@ -9,7 +9,7 @@ package slicingmelon.aisecretsdetector;
 
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.responses.HttpResponse;
-import burp.api.montoya.core.ByteArray;
+//import burp.api.montoya.core.ByteArray;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,12 +32,14 @@ public class SecretScanner {
         private final String value;
         private final int startIndex;
         private final int endIndex;
+        private final int responsePosition;
         
-        public Secret(String type, String value, int startIndex, int endIndex) {
+        public Secret(String type, String value, int startIndex, int endIndex, int responsePosition) {
             this.type = type;
             this.value = value;
             this.startIndex = startIndex;
             this.endIndex = endIndex;
+            this.responsePosition = responsePosition;
         }
         
         public String getType() {
@@ -54,6 +56,10 @@ public class SecretScanner {
         
         public int getEndIndex() {
             return endIndex;
+        }
+        
+        public int getResponsePosition() {
+            return responsePosition;
         }
     }
     
@@ -113,25 +119,19 @@ public class SecretScanner {
         Set<String> uniqueSecretValues = new HashSet<>();
         
         // Find reCAPTCHA Site Key pattern for filtering Generic Secrets
-        Pattern recaptchaSiteKeyPattern = null;
+        Pattern googleRecaptchaSiteKeyPattern = null;
         for (SecretPattern sp : secretPatterns) {
-            if (sp.getName().equals("reCAPTCHA Site Key")) {
-                recaptchaSiteKeyPattern = sp.getPattern();
+            if (sp.getName().equals("Google reCAPTCHA Key")) {
+                googleRecaptchaSiteKeyPattern = sp.getPattern();
                 break;
             }
         }
         
         try {
-            // Use full response string (including headers) to match Montoya API example approach
-            // This ensures positions align correctly with Burp's display
-            String responseString = response.toString();
+            String responseString = response.toString(); // Convert once upfront since we can't use fast check
             
             for (SecretPattern pattern : secretPatterns) {
                 try {
-                    // Skip irrelevant patterns
-                    if (pattern.getName().equals("reCAPTCHA Site Key")) {
-                        continue;
-                    }
                     if (pattern.getName().equals("Generic Secret") && !SecretScannerUtils.isRandomnessAlgorithmEnabled()) {
                         continue;
                     }
@@ -154,12 +154,18 @@ public class SecretScanner {
                             }
                             
                             // Skip if the Generic Secret matches reCAPTCHA Site Key pattern
-                            if (recaptchaSiteKeyPattern != null && recaptchaSiteKeyPattern.matcher(secretValue).matches()) {
+                            if (googleRecaptchaSiteKeyPattern != null && googleRecaptchaSiteKeyPattern.matcher(secretValue).matches()) {
                                 continue;
                             }
                         } else {
-                            secretValue = matcher.group(0);
-                            responseStartPos = matcher.start(0);
+                            // Use capture group if available to avoid boundary characters
+                            if (matcher.groupCount() >= 1) {
+                                secretValue = matcher.group(1);
+                                responseStartPos = matcher.start(1);
+                            } else {
+                                secretValue = matcher.group(0);
+                                responseStartPos = matcher.start(0);
+                            }
                         }
                         
                         // Skip duplicates
@@ -176,14 +182,14 @@ public class SecretScanner {
                             // Found the secret at exact position
                             int fullStartPos = exactPos;
                             int fullEndPos = fullStartPos + secretValue.length();
-                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
+                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos, exactPos);
                             foundSecrets.add(secret);
                         } else {
                             // Fallback to regex positions if indexOf fails
                             config.appendToLog("Warning: Could not find secret using indexOf, using regex position for: " + secretValue);
                             int fullStartPos = responseStartPos;
                             int fullEndPos = fullStartPos + secretValue.length();
-                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
+                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos, responseStartPos);
                             foundSecrets.add(secret);
                         }
                     }

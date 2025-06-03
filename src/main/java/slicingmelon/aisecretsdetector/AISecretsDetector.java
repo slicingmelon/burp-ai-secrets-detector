@@ -25,6 +25,7 @@ import javax.swing.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -42,7 +43,7 @@ public class AISecretsDetector implements BurpExtension {
     private Config config;
     
     // Persistent secret counter map stored as JSON in Burp's extension data
-    private Map<String, Map<String, Integer>> secretCounters = new HashMap<>();
+    private Map<String, Map<String, Integer>> secretCounters = new ConcurrentHashMap<>();
     private static final String SECRET_COUNTERS_KEY = "secret_counters";
     
     // Static instance for accessing from Config
@@ -158,7 +159,7 @@ public class AISecretsDetector implements BurpExtension {
                 );
                 
                 // Get response string from HttpRequestResponse (like official Montoya API example)
-                String responseString = requestResponse.response().toString();
+                //String responseString = requestResponse.response().toString();
                 
                 // Create markers to highlight where the secrets are in the response
                 List<Marker> responseMarkers = new ArrayList<>();
@@ -170,16 +171,10 @@ public class AISecretsDetector implements BurpExtension {
                     String secretType = secret.getType();
                     
                     if (secretValue != null && !secretValue.isEmpty()) {
-                        // Use indexOf to find exact position (Montoya API example..)
-                        int exactPos = responseString.indexOf(secretValue);
-                        
-                        if (exactPos != -1) {
-                            // Create marker with exact position found by indexOf
-                            responseMarkers.add(Marker.marker(exactPos, exactPos + secretValue.length()));
-                            logMsg("HTTP Handler: Found exact position for " + secretType + " at " + exactPos + "-" + (exactPos + secretValue.length()));
-                        } else {
-                            logMsg("HTTP Handler: Warning - Could not find exact position for secret: " + secretValue);
-                        }
+                        // Use pre-calculated position from scanner!
+                        int exactPos = secret.getResponsePosition();
+                        responseMarkers.add(Marker.marker(exactPos, exactPos + secretValue.length()));
+                        logMsg("HTTP Handler: Found exact position for " + secretType + " at " + exactPos + "-" + (exactPos + secretValue.length()));
                         
                         newSecrets.add(secretValue);
                         
@@ -330,15 +325,13 @@ public class AISecretsDetector implements BurpExtension {
     * Increment the counter for a specific secret at a base URL
     */
     private void incrementSecretCounter(String baseUrl, String secret) {
-        Map<String, Integer> counters = secretCounters.computeIfAbsent(baseUrl, _ -> new HashMap<>());
-        int currentCount = counters.getOrDefault(secret, 0);
-        counters.put(secret, currentCount + 1);
+        Map<String, Integer> counters = secretCounters.computeIfAbsent(baseUrl, _ -> new ConcurrentHashMap<>());
+        counters.compute(secret, (_, v) -> (v == null) ? 1 : v + 1);
         
         // Save counters to persist data
         saveSecretCounters();
     }
     
-
     
     /**
     * Load persistent secret counters from extension storage
@@ -372,7 +365,7 @@ public class AISecretsDetector implements BurpExtension {
                         secretsString = secretsString.substring(0, secretsString.length() - 1);
                     }
                     
-                    Map<String, Integer> secretMap = new HashMap<>();
+                    Map<String, Integer> secretMap = new ConcurrentHashMap<>();
                     String[] secretEntries = secretsString.split(",");
                     
                     for (String secretEntry : secretEntries) {
