@@ -131,8 +131,9 @@ public class SecretScannerUtils {
         addPattern("DigitalOcean Personal Access Token", 
             "\\b(dop_v1_[a-f0-9]{64})(?:[\\x60'\"\\s;]|\\\\[nr]|$)");
         
+
         addPattern("GCP API Key", 
-            "\\b(AIza[\\w-]{35})(?:[\\x60'\"\\s;]|\\\\[nr]|$)");
+        "\\b(AIza[\\w-]{35})\\b");
         
         // Disabled for now.. too many "findings"
         // addPattern("JWT/JWE Token", 

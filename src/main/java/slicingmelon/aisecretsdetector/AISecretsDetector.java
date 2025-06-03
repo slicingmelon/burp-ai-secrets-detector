@@ -25,6 +25,7 @@ import javax.swing.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -42,7 +43,7 @@ public class AISecretsDetector implements BurpExtension {
     private Config config;
     
     // Persistent secret counter map stored as JSON in Burp's extension data
-    private Map<String, Map<String, Integer>> secretCounters = new HashMap<>();
+    private Map<String, Map<String, Integer>> secretCounters = new ConcurrentHashMap<>();
     private static final String SECRET_COUNTERS_KEY = "secret_counters";
     
     // Static instance for accessing from Config
@@ -324,15 +325,13 @@ public class AISecretsDetector implements BurpExtension {
     * Increment the counter for a specific secret at a base URL
     */
     private void incrementSecretCounter(String baseUrl, String secret) {
-        Map<String, Integer> counters = secretCounters.computeIfAbsent(baseUrl, _ -> new HashMap<>());
-        int currentCount = counters.getOrDefault(secret, 0);
-        counters.put(secret, currentCount + 1);
+        Map<String, Integer> counters = secretCounters.computeIfAbsent(baseUrl, _ -> new ConcurrentHashMap<>());
+        counters.compute(secret, (k, v) -> (v == null) ? 1 : v + 1);
         
         // Save counters to persist data
         saveSecretCounters();
     }
     
-
     
     /**
     * Load persistent secret counters from extension storage
@@ -366,7 +365,7 @@ public class AISecretsDetector implements BurpExtension {
                         secretsString = secretsString.substring(0, secretsString.length() - 1);
                     }
                     
-                    Map<String, Integer> secretMap = new HashMap<>();
+                    Map<String, Integer> secretMap = new ConcurrentHashMap<>();
                     String[] secretEntries = secretsString.split(",");
                     
                     for (String secretEntry : secretEntries) {
