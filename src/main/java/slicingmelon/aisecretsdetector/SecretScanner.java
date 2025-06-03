@@ -138,10 +138,10 @@ public class SecretScanner {
                         continue;
                     }
 
-                    // FAST CHECK: Does pattern exist at all? (avoid double regex processing)
-                    if (!response.contains(pattern.getPattern())) {
-                        continue; // Pattern not found, skip expensive string operations
-                    }
+                    // // FAST CHECK: Does pattern exist at all? (avoid double regex processing)
+                    // if (!response.contains(pattern.getPattern())) {
+                    //     continue; // Pattern not found, skip expensive string operations
+                    // }
                     
                     // Pattern found! Now do expensive string conversion only once per response
                     if (responseString == null) {
