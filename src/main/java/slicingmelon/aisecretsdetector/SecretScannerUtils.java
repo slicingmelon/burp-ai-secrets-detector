@@ -87,7 +87,7 @@ public class SecretScannerUtils {
     }
 
     // Load and compile patterns during load time
-    // Credits to gitleaks for most of the fixed patterns regexes
+    // Credits to gitleaks for some of the fixed patterns regexes. These have been update to be more accurate.
     private static void initializePatterns() {
         // URL with Credentials
         addPattern("URL with Credentials", 
@@ -135,7 +135,7 @@ public class SecretScannerUtils {
         "\\b((?:dop|doo|dor)_v1_[a-f0-9]{64})\\b");
         
         addPattern("Google Cloud Platform (GCP) API Key", 
-        "\\b(AIza[0-9A-Za-z-_]{35})\\b");
+        "\\b(AIza[\\w-]{35})\\b");
 
         // Disabled for now.. too many "findings"
         // addPattern("JWT/JWE Token", 
