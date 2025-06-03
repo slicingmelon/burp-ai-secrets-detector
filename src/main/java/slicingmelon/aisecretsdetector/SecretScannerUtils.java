@@ -128,15 +128,14 @@ public class SecretScannerUtils {
         addPattern("Cloudflare Global API Key", 
             "(?i)[\\w.-]{0,50}?(?:cloudflare)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-f0-9]{37})\\b");
         
+        // addPattern("DigitalOcean Personal Access Token", 
+        //     "\\b(dop_v1_[a-f0-9]{64})\\b");
+
         addPattern("DigitalOcean Personal Access Token", 
-            "\\b(dop_v1_[a-f0-9]{64})\\b");
+        "\\b((?:dop|doo|dor)_v1_[a-f0-9]{64})\\b");
         
-
-        // addPattern("GCP API Key", 
-        //     "\\b(AIza[\\w-]{35})\\b");
-
-        addPattern("GCP API Key", 
-        "AIza[0-9A-Za-z-_]{35}");
+        addPattern("Google Cloud Platform (GCP) API Key", 
+        "\\b(AIza[0-9A-Za-z-_]{35})\\b");
 
         // Disabled for now.. too many "findings"
         // addPattern("JWT/JWE Token", 
