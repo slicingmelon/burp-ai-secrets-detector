@@ -130,22 +130,12 @@ public class SecretScanner {
         try {
             // Get ByteArray once for fast pre-filtering
             ByteArray responseBytes = response.toByteArray();
-            String responseString = null; // Lazy initialization
+            String responseString = response.toString(); // Convert once upfront since we can't use fast check
             
             for (SecretPattern pattern : secretPatterns) {
                 try {
                     if (pattern.getName().equals("Generic Secret") && !SecretScannerUtils.isRandomnessAlgorithmEnabled()) {
                         continue;
-                    }
-
-                    // // FAST CHECK: Does pattern exist at all? (avoid double regex processing)
-                    // if (!response.contains(pattern.getPattern())) {
-                    //     continue; // Pattern not found, skip expensive string operations
-                    // }
-                    
-                    // Pattern found! Now do expensive string conversion only once per response
-                    if (responseString == null) {
-                        responseString = response.toString();
                     }
 
                     // Use regex on full response string for position calculation
