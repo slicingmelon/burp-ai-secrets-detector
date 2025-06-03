@@ -132,8 +132,11 @@ public class SecretScannerUtils {
             "\\b(dop_v1_[a-f0-9]{64})\\b");
         
 
+        // addPattern("GCP API Key", 
+        //     "\\b(AIza[\\w-]{35})\\b");
+
         addPattern("GCP API Key", 
-            "\\b(AIza[\\w-]{35})\\b");
+        "\\b(AIza[0-9A-Za-z\\-_]{35})\\b");
         
         // Disabled for now.. too many "findings"
         // addPattern("JWT/JWE Token", 
@@ -226,10 +229,10 @@ public class SecretScannerUtils {
             "shpss_[a-fA-F0-9]{32}");
         
         addPattern("Twilio API Key", 
-            "(?:AC|SK)[\\da-z]{32}");
+            "(?:AC|SK)[0-9a-fA-F]{32}");
         
         addPattern("Mailchimp API Key", 
-            "[\\da-f]{32}-us\\d{1,2}");
+            "[0-9a-f]{32}-us[0-9]{1,2}");
         
         addPattern("Intra42 Secret", 
             "s-s4t2(?:af|ud)-[\\da-f]{64}");
