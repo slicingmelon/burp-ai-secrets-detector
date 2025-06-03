@@ -106,8 +106,11 @@ public class SecretScannerUtils {
         addPattern("Azure AD Client Secret", 
             "\\b([a-zA-Z0-9_~.]{3}\\dQ~[a-zA-Z0-9_~.-]{31,34})\\b");
         
+        // addPattern("AWS Access Key", 
+        //     "\\b((?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16,20})\\b");
+
         addPattern("AWS Access Key", 
-            "\\b((?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16,20})\\b");
+        "((?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16,20})");
 
         // Bcrypt Hash pattern
         addPattern("Bcrypt Hash", 
