@@ -20,8 +20,10 @@ import java.nio.charset.StandardCharsets;
 
 public class SecretScanner {
     private final UIConfig config;
-
     private final List<SecretPattern> secretPatterns;
+    
+    // Cached reCAPTCHA pattern for performance
+    private static Pattern cachedRecaptchaPattern = null;
 
     // Secret detection related classes
     public static class Secret {
@@ -109,15 +111,6 @@ public class SecretScanner {
         List<Secret> foundSecrets = new ArrayList<>();
         Set<String> uniqueSecretValues = new HashSet<>();
         
-        // Find reCAPTCHA Site Key pattern for filtering Generic Secrets
-        Pattern googleRecaptchaSiteKeyPattern = null;
-        for (SecretPattern sp : secretPatterns) {
-            if (sp.getName().equals("Google reCAPTCHA Key")) {
-                googleRecaptchaSiteKeyPattern = sp.getPattern();
-                break;
-            }
-        }
-        
         // Get max highlights setting once outside all loops for efficiency
         int maxHighlights = config.getConfigSettings().getMaxHighlightsPerSecret();
         
@@ -156,7 +149,7 @@ public class SecretScanner {
                             }
                             
                             // Skip if the Generic Secret matches reCAPTCHA Site Key pattern
-                            if (isRecaptchaSecret(secretValue, googleRecaptchaSiteKeyPattern)) {
+                            if (isRecaptchaSecret(secretValue)) {
                                 continue;
                             }
                         } else {
@@ -223,7 +216,16 @@ public class SecretScanner {
     /**
      * Helper method to check if a secret matches the Google reCAPTCHA pattern
      */
-    private boolean isRecaptchaSecret(String secretValue, Pattern googleRecaptchaSiteKeyPattern) {
-        return googleRecaptchaSiteKeyPattern != null && googleRecaptchaSiteKeyPattern.matcher(secretValue).matches();
+    private boolean isRecaptchaSecret(String secretValue) {
+        if (cachedRecaptchaPattern == null) {
+            // Find and cache the pattern once
+            for (SecretPattern sp : secretPatterns) {
+                if (sp.getName().equals("Google reCAPTCHA Key")) {
+                    cachedRecaptchaPattern = sp.getPattern();
+                    break;
+                }
+            }
+        }
+        return cachedRecaptchaPattern != null && cachedRecaptchaPattern.matcher(secretValue).matches();
     }
 }
