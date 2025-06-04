@@ -118,8 +118,21 @@ public class SecretScanner {
             }
         }
         
+        // Get max highlights setting once outside all loops for efficiency
+        int maxHighlights = config.getConfigSettings().getMaxHighlightsPerSecret();
+        
         try {
             String responseString = response.toString(); // Convert once upfront since we can't use fast check
+            
+            // Declare variables outside loops for efficiency
+            String secretValue;
+            int responseStartPos;
+            int searchStart;
+            int highlightsCreated;
+            int exactPos;
+            int fullStartPos;
+            int fullEndPos;
+            Secret secret;
             
             for (SecretPattern pattern : secretPatterns) {
                 try {
@@ -131,8 +144,6 @@ public class SecretScanner {
                     Matcher matcher = pattern.getPattern().matcher(responseString);
                     
                     while (matcher.find()) {
-                        String secretValue;
-                        int responseStartPos;
                         
                         // Extract group info
                         if (pattern.getName().equals("Generic Secret") && matcher.groupCount() >= 1) {
@@ -145,7 +156,7 @@ public class SecretScanner {
                             }
                             
                             // Skip if the Generic Secret matches reCAPTCHA Site Key pattern
-                            if (googleRecaptchaSiteKeyPattern != null && googleRecaptchaSiteKeyPattern.matcher(secretValue).matches()) {
+                            if (isRecaptchaSecret(secretValue, googleRecaptchaSiteKeyPattern)) {
                                 continue;
                             }
                         } else {
@@ -166,13 +177,11 @@ public class SecretScanner {
                         uniqueSecretValues.add(secretValue);
                         
                         // Find all occurrences of this secret in the response (like Burp Montoya API example)
-                        int searchStart = 0;
-                        boolean foundAtLeastOne = false;
-                        int highlightsCreated = 0;
-                        int maxHighlights = config.getConfigSettings().getMaxHighlightsPerSecret();
+                        searchStart = 0;
+                        highlightsCreated = 0;
                         
                         while (searchStart < responseString.length() && highlightsCreated < maxHighlights) {
-                            int exactPos = responseString.indexOf(secretValue, searchStart);
+                            exactPos = responseString.indexOf(secretValue, searchStart);
                             
                             if (exactPos == -1) {
                                 break; // No more occurrences
@@ -181,11 +190,10 @@ public class SecretScanner {
                             // *** STEP 1: SECRET POSITION CALCULATION ***
                             // Found an occurrence - calculate exact start/end positions in response
                             // These positions will later be used to create RED response markers/highlights in Burp
-                            int fullStartPos = exactPos;
-                            int fullEndPos = fullStartPos + secretValue.length();
-                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
+                            fullStartPos = exactPos;
+                            fullEndPos = fullStartPos + secretValue.length();
+                            secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
                             foundSecrets.add(secret);
-                            foundAtLeastOne = true;
                             highlightsCreated++;
                             
                             // Move search start past this occurrence
@@ -200,17 +208,6 @@ public class SecretScanner {
                                     secretValue, maxHighlights));
                             }
                         }
-                        
-                        // Fallback to regex position if indexOf completely fails
-                        if (!foundAtLeastOne) {
-                            config.appendToLog("Warning: Could not find secret using indexOf, using regex position for: " + secretValue);
-                            // *** STEP 1 (FALLBACK): SECRET POSITION CALCULATION ***
-                            // Using regex-detected position as fallback for RED response markers/highlights
-                            int fullStartPos = responseStartPos;
-                            int fullEndPos = fullStartPos + secretValue.length();
-                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
-                            foundSecrets.add(secret);
-                        }
                     }
                 } catch (Exception e) {
                     config.appendToLog("Error with pattern " + pattern.getName() + ": " + e.getMessage());
@@ -221,5 +218,12 @@ public class SecretScanner {
         }
         
         return new SecretScanResult(response, foundSecrets);
+    }
+    
+    /**
+     * Helper method to check if a secret matches the Google reCAPTCHA pattern
+     */
+    private boolean isRecaptchaSecret(String secretValue, Pattern googleRecaptchaSiteKeyPattern) {
+        return googleRecaptchaSiteKeyPattern != null && googleRecaptchaSiteKeyPattern.matcher(secretValue).matches();
     }
 }
