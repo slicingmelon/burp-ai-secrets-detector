@@ -338,13 +338,46 @@ public class AISecretsDetector implements BurpExtension {
                 
                 secretCounters.clear();
                 
-                // Parse the JSON object - we'll need to use JsonUtils to read the structure
-                // Since JsonUtils is path-based, we'll need to fallback to simple parsing for now
-                // This is a limitation of the current JsonUtils API design
-                loadCountersSimpleApproach(countersJson);
+                // Parse the JSON using Burp's API
+                JsonNode rootNode = JsonNode.jsonNode(countersJson);
+                if (rootNode.isObject()) {
+                    JsonObjectNode rootObject = rootNode.asObject();
+                    
+                    // Iterate through each base URL in the root object
+                    for (Map.Entry<String, JsonNode> baseUrlEntry : rootObject.asMap().entrySet()) {
+                        String baseUrl = baseUrlEntry.getKey();
+                        JsonNode secretsNode = baseUrlEntry.getValue();
+                        
+                        if (secretsNode.isObject()) {
+                            JsonObjectNode secretsObject = secretsNode.asObject();
+                            Map<String, Integer> secretMap = new HashMap<>();
+                            
+                            // Iterate through each secret in this base URL
+                            for (Map.Entry<String, JsonNode> secretEntry : secretsObject.asMap().entrySet()) {
+                                String encodedSecret = secretEntry.getKey();
+                                JsonNode countNode = secretEntry.getValue();
+                                
+                                if (countNode.isNumber()) {
+                                    try {
+                                        int count = countNode.asNumber().intValue();
+                                        // Base64 decode the secret value
+                                        String decodedSecret = api.utilities().base64Utils().decode(encodedSecret).toString();
+                                        secretMap.put(decodedSecret, count);
+                                    } catch (Exception e) {
+                                        logMsg("Error decoding secret: " + e.getMessage());
+                                    }
+                                }
+                            }
+                            
+                            if (!secretMap.isEmpty()) {
+                                secretCounters.put(baseUrl, new ConcurrentHashMap<>(secretMap));
+                            }
+                        }
+                    }
+                }
             }
             
-            logMsg("Loaded " + secretCounters.size() + " base URLs with secret counts using JsonUtils");
+            logMsg("Loaded " + secretCounters.size() + " base URLs with secret counts using Burp JsonNode API");
             
             // Log loaded counters for debugging
             for (Map.Entry<String, Map<String, Integer>> entry : secretCounters.entrySet()) {
@@ -353,93 +386,6 @@ public class AISecretsDetector implements BurpExtension {
         } catch (Exception e) {
             logMsg("Error loading secret counters: " + e.getMessage());
             secretCounters.clear();
-        }
-    }
-    
-    /**
-     * Simple approach to load counters from JSON until we can find a better JsonUtils pattern
-     */
-    private void loadCountersSimpleApproach(String jsonString) {
-        try {
-            // Parse using a simpler approach - treat as valid JSON and extract
-            // This is temporary until we find the proper JsonUtils iteration approach
-            if (jsonString.equals("{}")) {
-                return; // Empty object
-            }
-            
-            // For now, let's revert to the working approach but clean it up
-            // Remove outer braces  
-            String content = jsonString.trim();
-            if (content.startsWith("{") && content.endsWith("}")) {
-                content = content.substring(1, content.length() - 1).trim();
-            }
-            
-            if (content.isEmpty()) {
-                return;
-            }
-            
-            // Simple parsing for key-value pairs at root level
-            String[] baseUrlEntries = content.split(",(?=\\\"[^\\\"]*\\\"\\s*:\\s*\\{)");
-            
-            for (String entry : baseUrlEntries) {
-                entry = entry.trim();
-                if (entry.isEmpty()) continue;
-                
-                // Extract base URL (first quoted string)
-                int firstQuote = entry.indexOf('"');
-                if (firstQuote == -1) continue;
-                int secondQuote = entry.indexOf('"', firstQuote + 1);
-                if (secondQuote == -1) continue;
-                
-                String baseUrl = entry.substring(firstQuote + 1, secondQuote);
-                
-                // Extract secrets object (everything after first colon)
-                int colonPos = entry.indexOf(':', secondQuote);
-                if (colonPos == -1) continue;
-                
-                String secretsStr = entry.substring(colonPos + 1).trim();
-                if (secretsStr.startsWith("{") && secretsStr.endsWith("}")) {
-                    secretsStr = secretsStr.substring(1, secretsStr.length() - 1).trim();
-                }
-                
-                Map<String, Integer> secretMap = new HashMap<>();
-                if (!secretsStr.isEmpty()) {
-                    // Parse secret entries
-                    String[] secretEntries = secretsStr.split(",(?=\\\"[^\\\"]*\\\"\\s*:)");
-                    for (String secretEntry : secretEntries) {
-                        secretEntry = secretEntry.trim();
-                        if (secretEntry.isEmpty()) continue;
-                        
-                        // Extract encoded secret and count
-                        int sq1 = secretEntry.indexOf('"');
-                        if (sq1 == -1) continue;
-                        int sq2 = secretEntry.indexOf('"', sq1 + 1);
-                        if (sq2 == -1) continue;
-                        
-                        String encodedSecret = secretEntry.substring(sq1 + 1, sq2);
-                        
-                        int sc = secretEntry.indexOf(':', sq2);
-                        if (sc == -1) continue;
-                        
-                        String countStr = secretEntry.substring(sc + 1).trim();
-                        try {
-                            int count = Integer.parseInt(countStr);
-                            // Base64 decode the secret value
-                            String decodedSecret = api.utilities().base64Utils().decode(encodedSecret).toString();
-                            secretMap.put(decodedSecret, count);
-                        } catch (Exception e) {
-                            logMsg("Error parsing secret entry: " + e.getMessage());
-                        }
-                    }
-                }
-                
-                if (!secretMap.isEmpty()) {
-                    secretCounters.put(baseUrl, new ConcurrentHashMap<>(secretMap));
-                }
-            }
-            
-        } catch (Exception e) {
-            logMsg("Error in simple JSON parsing: " + e.getMessage());
         }
     }
     
