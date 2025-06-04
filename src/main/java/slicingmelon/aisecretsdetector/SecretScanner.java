@@ -174,18 +174,30 @@ public class SecretScanner {
                         }
                         uniqueSecretValues.add(secretValue);
                         
-                        // Use indexOf to find exact position (like official Montoya API example)
-                        // This ensures markers align correctly with Burp's display
-                        int exactPos = responseString.indexOf(secretValue);
+                        // Find all occurrences of this secret in the response (like Burp Montoya API example)
+                        int searchStart = 0;
+                        boolean foundAtLeastOne = false;
                         
-                        if (exactPos != -1) {
-                            // Found the secret at exact position
+                        while (searchStart < responseString.length()) {
+                            int exactPos = responseString.indexOf(secretValue, searchStart);
+                            
+                            if (exactPos == -1) {
+                                break; // No more occurrences
+                            }
+                            
+                            // Found an occurrence - create a secret for this position
                             int fullStartPos = exactPos;
                             int fullEndPos = fullStartPos + secretValue.length();
                             Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos, exactPos);
                             foundSecrets.add(secret);
-                        } else {
-                            // Fallback to regex positions if indexOf fails
+                            foundAtLeastOne = true;
+                            
+                            // Move search start past this occurrence
+                            searchStart = exactPos + secretValue.length();
+                        }
+                        
+                        // Fallback to regex position if indexOf completely fails
+                        if (!foundAtLeastOne) {
                             config.appendToLog("Warning: Could not find secret using indexOf, using regex position for: " + secretValue);
                             int fullStartPos = responseStartPos;
                             int fullEndPos = fullStartPos + secretValue.length();
