@@ -84,9 +84,9 @@ public class SecretScanner {
             this.detectedSecrets = detectedSecrets;
         }
         
-        // public HttpResponse getResponse() {
-        //     return response;
-        // }
+        public HttpResponse getResponse() {
+            return response;
+        }
         
         public List<Secret> getDetectedSecrets() {
             return detectedSecrets;
@@ -119,7 +119,6 @@ public class SecretScanner {
             
             // Declare variables outside loops for efficiency
             String secretValue;
-            int responseStartPos;
             int searchStart;
             int highlightsCreated;
             int exactPos;
@@ -141,7 +140,6 @@ public class SecretScanner {
                         // Extract group info
                         if (pattern.getName().equals("Generic Secret") && matcher.groupCount() >= 1) {
                             secretValue = matcher.group(1);
-                            responseStartPos = matcher.start(1);
                             
                             // Skip non-random strings etc.
                             if (!RandomnessAlgorithm.isRandom(secretValue.getBytes(StandardCharsets.UTF_8))) {
@@ -156,10 +154,8 @@ public class SecretScanner {
                             // Use capture group if available to avoid boundary characters
                             if (matcher.groupCount() >= 1) {
                                 secretValue = matcher.group(1);
-                                responseStartPos = matcher.start(1);
                             } else {
                                 secretValue = matcher.group(0);
-                                responseStartPos = matcher.start(0);
                             }
                         }
                         
