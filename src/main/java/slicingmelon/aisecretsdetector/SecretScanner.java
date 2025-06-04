@@ -22,7 +22,6 @@ public class SecretScanner {
     private final UIConfig config;
     private final List<SecretPattern> secretPatterns;
     
-    // Cached reCAPTCHA pattern for performance
     private static Pattern cachedRecaptchaPattern = null;
 
     // Secret detection related classes
