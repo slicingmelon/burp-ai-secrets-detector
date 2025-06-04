@@ -74,15 +74,7 @@ public class AISecretsDetector implements BurpExtension {
             @Override
             public ResponseReceivedAction handleHttpResponseReceived(HttpResponseReceived responseReceived) {
                 // Check if response is from an enabled tool
-                boolean isFromEnabledTool = false;
-                for (ToolType tool : config.getConfigSettings().getEnabledTools()) {
-                    if (responseReceived.toolSource().isFromTool(tool)) {
-                        isFromEnabledTool = true;
-                        break;
-                    }
-                }
-                
-                if (!isFromEnabledTool) {
+                if (!isToolEnabled(responseReceived)) {
                     return ResponseReceivedAction.continueWith(responseReceived);
                 }
 
@@ -580,7 +572,21 @@ public class AISecretsDetector implements BurpExtension {
         
         return extractedSecrets;
     }
-                
+    
+    /**
+     * Check if the response is from an enabled tool (proxy, scanner, etc)
+     * @param responseReceived The HTTP response to check
+     * @return true if the response is from an enabled tool, false otherwise
+     */
+    private boolean isToolEnabled(HttpResponseReceived responseReceived) {
+        for (ToolType tool : config.getConfigSettings().getEnabledTools()) {
+            if (responseReceived.toolSource().isFromTool(tool)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Skip binary content types that are unlikely to contain secrets
     public boolean shouldSkipMimeType(MimeType mimeType) {
         switch (mimeType) {
@@ -605,6 +611,7 @@ public class AISecretsDetector implements BurpExtension {
                 return false;
         }
     }
+
 
     private void logPoolStats() {
         if (executorService instanceof ThreadPoolExecutor) {
