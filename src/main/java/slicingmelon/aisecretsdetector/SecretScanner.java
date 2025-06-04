@@ -168,8 +168,10 @@ public class SecretScanner {
                         // Find all occurrences of this secret in the response (like Burp Montoya API example)
                         int searchStart = 0;
                         boolean foundAtLeastOne = false;
+                        int highlightsCreated = 0;
+                        int maxHighlights = config.getConfigSettings().getMaxHighlightsPerSecret();
                         
-                        while (searchStart < responseString.length()) {
+                        while (searchStart < responseString.length() && highlightsCreated < maxHighlights) {
                             int exactPos = responseString.indexOf(secretValue, searchStart);
                             
                             if (exactPos == -1) {
@@ -184,9 +186,19 @@ public class SecretScanner {
                             Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
                             foundSecrets.add(secret);
                             foundAtLeastOne = true;
+                            highlightsCreated++;
                             
                             // Move search start past this occurrence
                             searchStart = exactPos + secretValue.length();
+                        }
+                        
+                        // Log if we hit the limit and there might be more occurrences
+                        if (highlightsCreated >= maxHighlights && searchStart < responseString.length()) {
+                            int remainingPos = responseString.indexOf(secretValue, searchStart);
+                            if (remainingPos != -1) {
+                                config.appendToLog(String.format("Limited highlights for secret '%s' to %d (more occurrences exist but not highlighted for performance)", 
+                                    secretValue, maxHighlights));
+                            }
                         }
                         
                         // Fallback to regex position if indexOf completely fails

@@ -34,10 +34,11 @@ public class UIConfig {
         private int genericSecretMinLength;
         private int genericSecretMaxLength;
         private int duplicateThreshold;
+        private int maxHighlightsPerSecret;
         
         public ConfigSettings(int workers, boolean inScopeOnly, Set<ToolType> enabledTools, boolean loggingEnabled,
                              boolean randomnessAlgorithmEnabled, int genericSecretMinLength, int genericSecretMaxLength,
-                             int duplicateThreshold) {
+                             int duplicateThreshold, int maxHighlightsPerSecret) {
             this.workers = workers;
             this.inScopeOnly = inScopeOnly;
             this.enabledTools = enabledTools;
@@ -46,6 +47,7 @@ public class UIConfig {
             this.genericSecretMinLength = genericSecretMinLength;
             this.genericSecretMaxLength = genericSecretMaxLength;
             this.duplicateThreshold = duplicateThreshold;
+            this.maxHighlightsPerSecret = maxHighlightsPerSecret;
         }
         
         public int getWorkers() {
@@ -123,6 +125,14 @@ public class UIConfig {
         public void setDuplicateThreshold(int duplicateThreshold) {
             this.duplicateThreshold = Math.max(1, duplicateThreshold);
         }
+        
+        public int getMaxHighlightsPerSecret() {
+            return maxHighlightsPerSecret;
+        }
+        
+        public void setMaxHighlightsPerSecret(int maxHighlightsPerSecret) {
+            this.maxHighlightsPerSecret = Math.max(1, maxHighlightsPerSecret);
+        }
     }
     
     public static UIConfig getInstance() {
@@ -168,6 +178,9 @@ public class UIConfig {
         Integer duplicateThresholdValue = persistedData.getInteger("duplicate_threshold");
         int duplicateThreshold = (duplicateThresholdValue != null) ? Math.max(1, duplicateThresholdValue) : 5;
         
+        Integer maxHighlightsPerSecretValue = persistedData.getInteger("max_highlights_per_secret");
+        int maxHighlightsPerSecret = (maxHighlightsPerSecretValue != null) ? Math.max(1, maxHighlightsPerSecretValue) : 5;
+        
         // Initialize with default tool settings
         Set<ToolType> enabledTools = new HashSet<>();
         enabledTools.add(ToolType.TARGET);
@@ -189,7 +202,7 @@ public class UIConfig {
         }
         
         return new ConfigSettings(workers, inScopeOnly, enabledTools, loggingEnabled, 
-                                 randomnessAlgorithmEnabled, genericSecretMinLength, genericSecretMaxLength, duplicateThreshold);
+                                 randomnessAlgorithmEnabled, genericSecretMinLength, genericSecretMaxLength, duplicateThreshold, maxHighlightsPerSecret);
     }
     
     public void saveConfigSettings() {
@@ -201,6 +214,7 @@ public class UIConfig {
         persistedData.setInteger("generic_secret_min_length", configSettings.getGenericSecretMinLength());
         persistedData.setInteger("generic_secret_max_length", configSettings.getGenericSecretMaxLength());
         persistedData.setInteger("duplicate_threshold", configSettings.getDuplicateThreshold());
+        persistedData.setInteger("max_highlights_per_secret", configSettings.getMaxHighlightsPerSecret());
         
         StringBuilder toolsBuilder = new StringBuilder();
         for (ToolType tool : configSettings.getEnabledTools()) {
@@ -402,6 +416,37 @@ public class UIConfig {
         rightConstraints.gridy = 3;
         rightConstraints.weightx = 0.0;
         rightPanel.add(duplicateThresholdSpinner, rightConstraints);
+        
+        // Max Highlights Per Secret setting
+        JLabel maxHighlightsLabel = new JLabel("Max Highlights Per Unique Secret (performance optimization):");
+        rightConstraints.gridx = 0;
+        rightConstraints.gridy = 4;
+        rightConstraints.weightx = 0.0;
+        rightPanel.add(maxHighlightsLabel, rightConstraints);
+        
+        SpinnerNumberModel maxHighlightsModel = new SpinnerNumberModel(
+                configSettings.getMaxHighlightsPerSecret(),
+                1,   // Minimum value
+                50,  // Maximum value
+                1
+        );
+        JSpinner maxHighlightsSpinner = new JSpinner(maxHighlightsModel);
+        maxHighlightsSpinner.addChangeListener(_ -> {
+            configSettings.setMaxHighlightsPerSecret((Integer) maxHighlightsSpinner.getValue());
+            saveConfigSettings();
+            api.logging().logToOutput("Configuration updated - Max Highlights Per Secret: " + 
+                                     configSettings.getMaxHighlightsPerSecret());
+        });
+        
+        // Set a reasonable fixed width for the spinner
+        JComponent highlightsEditor = maxHighlightsSpinner.getEditor();
+        Dimension highlightsPrefSize = new Dimension(60, highlightsEditor.getPreferredSize().height);
+        highlightsEditor.setPreferredSize(highlightsPrefSize);
+        
+        rightConstraints.gridx = 1;
+        rightConstraints.gridy = 4;
+        rightConstraints.weightx = 0.0;
+        rightPanel.add(maxHighlightsSpinner, rightConstraints);
         
         // Setting panel - left and right panels
         settingsPanel.add(leftPanel);
