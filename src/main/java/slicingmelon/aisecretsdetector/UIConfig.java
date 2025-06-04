@@ -179,7 +179,7 @@ public class UIConfig {
         int duplicateThreshold = (duplicateThresholdValue != null) ? Math.max(1, duplicateThresholdValue) : 5;
         
         Integer maxHighlightsPerSecretValue = persistedData.getInteger("max_highlights_per_secret");
-        int maxHighlightsPerSecret = (maxHighlightsPerSecretValue != null) ? Math.max(1, maxHighlightsPerSecretValue) : 1;
+        int maxHighlightsPerSecret = (maxHighlightsPerSecretValue != null) ? Math.max(1, maxHighlightsPerSecretValue) : 3;
         
         // Initialize with default tool settings
         Set<ToolType> enabledTools = new HashSet<>();
