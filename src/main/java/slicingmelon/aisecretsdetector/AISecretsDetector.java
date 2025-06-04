@@ -317,7 +317,6 @@ public class AISecretsDetector implements BurpExtension {
         saveSecretCounters();
     }
     
-    
     /**
     * Load persistent secret counters from extension storage
     */
