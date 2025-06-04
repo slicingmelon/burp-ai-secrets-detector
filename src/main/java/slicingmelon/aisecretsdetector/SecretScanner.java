@@ -84,9 +84,9 @@ public class SecretScanner {
             this.detectedSecrets = detectedSecrets;
         }
         
-        public HttpResponse getResponse() {
-            return response;
-        }
+        // public HttpResponse getResponse() {
+        //     return response;
+        // }
         
         public List<Secret> getDetectedSecrets() {
             return detectedSecrets;
