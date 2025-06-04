@@ -17,13 +17,13 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
 
-public class Config {
+public class UIConfig {
     private MontoyaApi api;
     private ConfigSettings configSettings;
     private Runnable onConfigChangedCallback;
     private JTextArea logArea;
 
-    private static Config instance;
+    private static UIConfig instance;
     
     public static class ConfigSettings {
         private int workers;
@@ -34,10 +34,11 @@ public class Config {
         private int genericSecretMinLength;
         private int genericSecretMaxLength;
         private int duplicateThreshold;
+        private int maxHighlightsPerSecret;
         
         public ConfigSettings(int workers, boolean inScopeOnly, Set<ToolType> enabledTools, boolean loggingEnabled,
                              boolean randomnessAlgorithmEnabled, int genericSecretMinLength, int genericSecretMaxLength,
-                             int duplicateThreshold) {
+                             int duplicateThreshold, int maxHighlightsPerSecret) {
             this.workers = workers;
             this.inScopeOnly = inScopeOnly;
             this.enabledTools = enabledTools;
@@ -46,6 +47,7 @@ public class Config {
             this.genericSecretMinLength = genericSecretMinLength;
             this.genericSecretMaxLength = genericSecretMaxLength;
             this.duplicateThreshold = duplicateThreshold;
+            this.maxHighlightsPerSecret = maxHighlightsPerSecret;
         }
         
         public int getWorkers() {
@@ -123,13 +125,21 @@ public class Config {
         public void setDuplicateThreshold(int duplicateThreshold) {
             this.duplicateThreshold = Math.max(1, duplicateThreshold);
         }
+        
+        public int getMaxHighlightsPerSecret() {
+            return maxHighlightsPerSecret;
+        }
+        
+        public void setMaxHighlightsPerSecret(int maxHighlightsPerSecret) {
+            this.maxHighlightsPerSecret = Math.max(1, maxHighlightsPerSecret);
+        }
     }
     
-    public static Config getInstance() {
+    public static UIConfig getInstance() {
         return instance;
     }
 
-    public Config(MontoyaApi api, Runnable onConfigChangedCallback) {
+    public UIConfig(MontoyaApi api, Runnable onConfigChangedCallback) {
         this.api = api;
         this.onConfigChangedCallback = onConfigChangedCallback;
         
@@ -168,6 +178,9 @@ public class Config {
         Integer duplicateThresholdValue = persistedData.getInteger("duplicate_threshold");
         int duplicateThreshold = (duplicateThresholdValue != null) ? Math.max(1, duplicateThresholdValue) : 5;
         
+        Integer maxHighlightsPerSecretValue = persistedData.getInteger("max_highlights_per_secret");
+        int maxHighlightsPerSecret = (maxHighlightsPerSecretValue != null) ? Math.max(1, maxHighlightsPerSecretValue) : 1;
+        
         // Initialize with default tool settings
         Set<ToolType> enabledTools = new HashSet<>();
         enabledTools.add(ToolType.TARGET);
@@ -189,7 +202,7 @@ public class Config {
         }
         
         return new ConfigSettings(workers, inScopeOnly, enabledTools, loggingEnabled, 
-                                 randomnessAlgorithmEnabled, genericSecretMinLength, genericSecretMaxLength, duplicateThreshold);
+                                 randomnessAlgorithmEnabled, genericSecretMinLength, genericSecretMaxLength, duplicateThreshold, maxHighlightsPerSecret);
     }
     
     public void saveConfigSettings() {
@@ -201,6 +214,7 @@ public class Config {
         persistedData.setInteger("generic_secret_min_length", configSettings.getGenericSecretMinLength());
         persistedData.setInteger("generic_secret_max_length", configSettings.getGenericSecretMaxLength());
         persistedData.setInteger("duplicate_threshold", configSettings.getDuplicateThreshold());
+        persistedData.setInteger("max_highlights_per_secret", configSettings.getMaxHighlightsPerSecret());
         
         StringBuilder toolsBuilder = new StringBuilder();
         for (ToolType tool : configSettings.getEnabledTools()) {
@@ -369,11 +383,11 @@ public class Config {
         
         rightConstraints.gridx = 1;
         rightConstraints.gridy = 2;
-        rightConstraints.weightx = 0.0; // Don't stretch the spinner
+        rightConstraints.weightx = 0.0;
         rightPanel.add(maxLengthSpinner, rightConstraints);
         
         // Duplicate Threshold setting
-        JLabel duplicateThresholdLabel = new JLabel("Duplicate Secret Threshold (same secret across URLs):");
+        JLabel duplicateThresholdLabel = new JLabel("Duplicate Secret Threshold (same secret value across target host):");
         rightConstraints.gridx = 0;
         rightConstraints.gridy = 3;
         rightConstraints.weightx = 0.0;
@@ -403,11 +417,42 @@ public class Config {
         rightConstraints.weightx = 0.0;
         rightPanel.add(duplicateThresholdSpinner, rightConstraints);
         
-        // Add left and right panels to the settings panel
+        // Max Highlights Per Secret setting
+        JLabel maxHighlightsLabel = new JLabel("Max Highlights Per Unique Secret In Response:");
+        rightConstraints.gridx = 0;
+        rightConstraints.gridy = 4;
+        rightConstraints.weightx = 0.0;
+        rightPanel.add(maxHighlightsLabel, rightConstraints);
+        
+        SpinnerNumberModel maxHighlightsModel = new SpinnerNumberModel(
+                configSettings.getMaxHighlightsPerSecret(),
+                1,   // Minimum value
+                50,  // Maximum value
+                1
+        );
+        JSpinner maxHighlightsSpinner = new JSpinner(maxHighlightsModel);
+        maxHighlightsSpinner.addChangeListener(_ -> {
+            configSettings.setMaxHighlightsPerSecret((Integer) maxHighlightsSpinner.getValue());
+            saveConfigSettings();
+            api.logging().logToOutput("Configuration updated - Max Highlights Per Secret: " + 
+                                     configSettings.getMaxHighlightsPerSecret());
+        });
+        
+        // Set a reasonable fixed width for the spinner
+        JComponent highlightsEditor = maxHighlightsSpinner.getEditor();
+        Dimension highlightsPrefSize = new Dimension(60, highlightsEditor.getPreferredSize().height);
+        highlightsEditor.setPreferredSize(highlightsPrefSize);
+        
+        rightConstraints.gridx = 1;
+        rightConstraints.gridy = 4;
+        rightConstraints.weightx = 0.0;
+        rightPanel.add(maxHighlightsSpinner, rightConstraints);
+        
+        // Setting panel - left and right panels
         settingsPanel.add(leftPanel);
         settingsPanel.add(rightPanel);
         
-        // Tool source settings - changing layout to improve alignment
+        // Tool source settings
         JPanel toolsPanel = new JPanel();
         toolsPanel.setBorder(BorderFactory.createTitledBorder("Process Messages from Tools:"));
         toolsPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 0)); // Use FlowLayout with LEFT alignment and horizontal gap
@@ -419,7 +464,7 @@ public class Config {
             ToolType.EXTENSIONS, ToolType.REPEATER, ToolType.INTRUDER
         };
         
-        // Create a single row for all tool checkboxes
+        // Single row for all tool checkboxes
         for (ToolType tool : relevantTools) {
             JCheckBox checkbox = new JCheckBox(tool.name(), configSettings.isToolEnabled(tool));
             checkbox.addActionListener(_ -> {
@@ -449,7 +494,7 @@ public class Config {
         
         loggingPanel.add(loggingCheckbox);
         
-        // Create a panel for the auto-save message with left alignment
+        // Auto-save message (left alignment)
         JPanel autoSavePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JLabel autoSaveLabel = new JLabel("Settings are saved automatically when changed");
         autoSavePanel.add(autoSaveLabel);
@@ -472,7 +517,7 @@ public class Config {
             }
         });
         
-        autoSavePanel.add(Box.createHorizontalStrut(20)); // Add spacing
+        autoSavePanel.add(Box.createHorizontalStrut(20));
         autoSavePanel.add(resetCountersButton);
         
         loggingPanel.add(autoSavePanel);

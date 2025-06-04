@@ -20,11 +20,14 @@ import burp.api.montoya.sitemap.SiteMapFilter;
 import burp.api.montoya.sitemap.SiteMapNode;
 import burp.api.montoya.core.ToolType;
 import burp.api.montoya.http.message.MimeType;
+import burp.api.montoya.utilities.json.JsonUtils;
+import burp.api.montoya.utilities.json.JsonObjectNode;
+import burp.api.montoya.utilities.json.JsonNode;
+import burp.api.montoya.utilities.json.JsonNumberNode;
 
 import javax.swing.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.ArrayList;
@@ -40,7 +43,7 @@ public class AISecretsDetector implements BurpExtension {
     
     private MontoyaApi api;
     private ExecutorService executorService;
-    private Config config;
+    private UIConfig config;
     
     // Persistent secret counter map stored as JSON in Burp's extension data
     private Map<String, Map<String, Integer>> secretCounters = new ConcurrentHashMap<>();
@@ -57,7 +60,7 @@ public class AISecretsDetector implements BurpExtension {
         // Set instance for Config access
         instance = this;
         
-        config = new Config(api, this::updateWorkers);
+        config = new UIConfig(api, this::updateWorkers);
         
         // Load persistent secret counters
         loadSecretCounters();
@@ -74,15 +77,7 @@ public class AISecretsDetector implements BurpExtension {
             @Override
             public ResponseReceivedAction handleHttpResponseReceived(HttpResponseReceived responseReceived) {
                 // Check if response is from an enabled tool
-                boolean isFromEnabledTool = false;
-                for (ToolType tool : config.getConfigSettings().getEnabledTools()) {
-                    if (responseReceived.toolSource().isFromTool(tool)) {
-                        isFromEnabledTool = true;
-                        break;
-                    }
-                }
-                
-                if (!isFromEnabledTool) {
+                if (!isToolEnabled(responseReceived)) {
                     return ResponseReceivedAction.continueWith(responseReceived);
                 }
 
@@ -158,10 +153,9 @@ public class AISecretsDetector implements BurpExtension {
                     tempResponse
                 );
                 
-                // Get response string from HttpRequestResponse (like official Montoya API example)
-                //String responseString = requestResponse.response().toString();
-                
+                // *** STEP 2: MARKER CREATION ***
                 // Create markers to highlight where the secrets are in the response
+                // These markers will create the RED highlights visible in Burp's response panel
                 List<Marker> responseMarkers = new ArrayList<>();
                 Set<String> newSecrets = new HashSet<>();
                 Map<String, Set<String>> secretTypeMap = new HashMap<>();
@@ -171,17 +165,14 @@ public class AISecretsDetector implements BurpExtension {
                     String secretType = secret.getType();
                     
                     if (secretValue != null && !secretValue.isEmpty()) {
-                        // Use pre-calculated position from scanner!
-                        int exactPos = secret.getResponsePosition();
-                        responseMarkers.add(Marker.marker(exactPos, exactPos + secretValue.length()));
-                        logMsg("HTTP Handler: Found exact position for " + secretType + " at " + exactPos + "-" + (exactPos + secretValue.length()));
+                        // *** STEP 2: CREATE INDIVIDUAL MARKER ***
+                        // Use pre-calculated start and end positions from scanner to create each RED marker
+                        responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
+                        logMsg("HTTP Handler: Found exact position for " + secretType + " at " + secret.getStartIndex() + "-" + secret.getEndIndex());
                         
                         newSecrets.add(secretValue);
                         
-                        if (!secretTypeMap.containsKey(secretType)) {
-                            secretTypeMap.put(secretType, new HashSet<>());
-                        }
-                        secretTypeMap.get(secretType).add(secretValue);
+                        secretTypeMap.computeIfAbsent(secretType, _ -> new HashSet<>()).add(secretValue);
                         
                         logMsg("HTTP Handler: Found " + secretType + ": " + secretValue);
                     }
@@ -234,7 +225,9 @@ public class AISecretsDetector implements BurpExtension {
                 }
                 
                 if (!secretsToReport.isEmpty()) {
-                    // Create back the HttpRequestResponse object for markers and issue reporting
+                    // *** STEP 3: MARKER APPLICATION - CREATE RED RESPONSE HIGHLIGHTS ***
+                    // Apply all the markers to the HttpRequestResponse to create the actual RED highlights
+                    // that will be visible in Burp's response panel when viewing the audit issue
                     HttpRequestResponse markedRequestResponse = requestResponse
                         .withResponseMarkers(responseMarkers);
                     
@@ -332,64 +325,63 @@ public class AISecretsDetector implements BurpExtension {
         saveSecretCounters();
     }
     
-    
     /**
-    * Load persistent secret counters from extension storage
+    * Load persistent secret counters from extension storage using Burp's JsonUtils
     */
     private void loadSecretCounters() {
         try {
             String countersJson = api.persistence().extensionData().getString(SECRET_COUNTERS_KEY);
             if (countersJson != null && !countersJson.isEmpty()) {
-                // Simple parsing of the format used in saveSecretCounters
+                JsonUtils jsonUtils = api.utilities().jsonUtils();
+                
+                // Validate JSON first
+                if (!jsonUtils.isValidJson(countersJson)) {
+                    logMsg("Invalid JSON format in stored counters, resetting");
+                    return;
+                }
+                
                 secretCounters.clear();
                 
-                // Remove outer braces
-                countersJson = countersJson.substring(1, countersJson.length() - 1);
-                
-                // Split by baseUrl entries
-                String[] baseUrlEntries = countersJson.split("\\},");
-                
-                for (String baseUrlEntry : baseUrlEntries) {
-                    // Parse baseUrl
-                    int baseUrlEnd = baseUrlEntry.indexOf("={");
-                    if (baseUrlEnd == -1) continue;
+                // Parse the JSON using Burp's API
+                JsonNode rootNode = JsonNode.jsonNode(countersJson);
+                if (rootNode.isObject()) {
+                    JsonObjectNode rootObject = rootNode.asObject();
                     
-                    String baseUrl = baseUrlEntry.substring(0, baseUrlEnd).trim();
-                    if (baseUrl.startsWith("\"")) {
-                        baseUrl = baseUrl.substring(1, baseUrl.length() - 1);
-                    }
-                    
-                    // Parse secret counts
-                    String secretsString = baseUrlEntry.substring(baseUrlEnd + 2);
-                    if (secretsString.endsWith("}")) {
-                        secretsString = secretsString.substring(0, secretsString.length() - 1);
-                    }
-                    
-                    Map<String, Integer> secretMap = new ConcurrentHashMap<>();
-                    String[] secretEntries = secretsString.split(",");
-                    
-                    for (String secretEntry : secretEntries) {
-                        String[] keyValue = secretEntry.split("=");
-                        if (keyValue.length != 2) continue;
+                    // Iterate through each base URL in the root object
+                    for (Map.Entry<String, JsonNode> baseUrlEntry : rootObject.asMap().entrySet()) {
+                        String baseUrl = baseUrlEntry.getKey();
+                        JsonNode secretsNode = baseUrlEntry.getValue();
                         
-                        String secret = keyValue[0].trim();
-                        if (secret.startsWith("\"")) {
-                            secret = secret.substring(1, secret.length() - 1);
-                        }
-                        
-                        try {
-                            int count = Integer.parseInt(keyValue[1].trim());
-                            secretMap.put(secret, count);
-                        } catch (NumberFormatException e) {
-                            continue;
+                        if (secretsNode.isObject()) {
+                            JsonObjectNode secretsObject = secretsNode.asObject();
+                            Map<String, Integer> secretMap = new HashMap<>();
+                            
+                            // Iterate through each secret in this base URL
+                            for (Map.Entry<String, JsonNode> secretEntry : secretsObject.asMap().entrySet()) {
+                                String encodedSecret = secretEntry.getKey();
+                                JsonNode countNode = secretEntry.getValue();
+                                
+                                if (countNode.isNumber()) {
+                                    try {
+                                        int count = countNode.asNumber().intValue();
+                                        // Base64 decode the secret value
+                                        String decodedSecret = api.utilities().base64Utils().decode(encodedSecret).toString();
+                                        secretMap.put(decodedSecret, count);
+                                    } catch (Exception e) {
+                                        logMsg("Error decoding secret: " + e.getMessage());
+                                    }
+                                }
+                            }
+                            
+                            if (!secretMap.isEmpty()) {
+                                secretCounters.put(baseUrl, new ConcurrentHashMap<>(secretMap));
+                            }
                         }
                     }
-                    
-                    secretCounters.put(baseUrl, secretMap);
                 }
             }
             
-            logMsg("Loaded " + secretCounters.size() + " base URLs with secret counts from persistent storage");
+            logMsg("Loaded " + secretCounters.size() + " base URLs with secret counts using Burp JsonNode API");
             
             // Log loaded counters for debugging
             for (Map.Entry<String, Map<String, Integer>> entry : secretCounters.entrySet()) {
@@ -402,39 +394,33 @@ public class AISecretsDetector implements BurpExtension {
     }
     
     /**
-    * Save persistent secret counters to extension storage
+    * Save persistent secret counters to extension storage using Burp's JsonObjectNode
     */
     private void saveSecretCounters() {
         try {
-            // Simple JSON-like serialization without using external libraries
-            StringBuilder json = new StringBuilder("{");
+            // Create the main JSON object using Burp's API
+            JsonObjectNode mainJson = JsonObjectNode.jsonObjectNode();
             
-            boolean firstBaseUrl = true;
+            // Add each base URL and its secrets
             for (Map.Entry<String, Map<String, Integer>> baseUrlEntry : secretCounters.entrySet()) {
-                if (!firstBaseUrl) {
-                    json.append(",");
-                }
-                firstBaseUrl = false;
+                String baseUrl = baseUrlEntry.getKey();
                 
-                json.append("\"").append(baseUrlEntry.getKey()).append("\"={");
-                
-                boolean firstSecret = true;
+                // Create secrets object for this base URL
+                JsonObjectNode secretsJson = JsonObjectNode.jsonObjectNode();
                 for (Map.Entry<String, Integer> secretEntry : baseUrlEntry.getValue().entrySet()) {
-                    if (!firstSecret) {
-                        json.append(",");
-                    }
-                    firstSecret = false;
-                    
-                    json.append("\"").append(secretEntry.getKey()).append("\"=").append(secretEntry.getValue());
+                    // Base64 encode secret value to handle special characters safely
+                    String encodedSecret = api.utilities().base64Utils().encodeToString(secretEntry.getKey());
+                    secretsJson.put(encodedSecret, JsonNumberNode.jsonNumberNode(secretEntry.getValue()));
                 }
                 
-                json.append("}");
+                // Add this base URL's secrets to the main JSON
+                mainJson.put(baseUrl, secretsJson);
             }
             
-            json.append("}");
-            
-            api.persistence().extensionData().setString(SECRET_COUNTERS_KEY, json.toString());
-            logMsg("Saved secret counters to persistent storage");
+            // Convert to JSON string and save
+            String jsonString = mainJson.toJsonString();
+            api.persistence().extensionData().setString(SECRET_COUNTERS_KEY, jsonString);
+            logMsg("Saved secret counters using Burp JsonObjectNode (base64 encoded secrets)");
         } catch (Exception e) {
             logMsg("Error saving secret counters: " + e.getMessage());
         }
@@ -583,7 +569,21 @@ public class AISecretsDetector implements BurpExtension {
         
         return extractedSecrets;
     }
-                
+    
+    /**
+     * Check if the response is from an enabled tool (proxy, scanner, etc)
+     * @param responseReceived The HTTP response to check
+     * @return true if the response is from an enabled tool, false otherwise
+     */
+    private boolean isToolEnabled(HttpResponseReceived responseReceived) {
+        for (ToolType tool : config.getConfigSettings().getEnabledTools()) {
+            if (responseReceived.toolSource().isFromTool(tool)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Skip binary content types that are unlikely to contain secrets
     public boolean shouldSkipMimeType(MimeType mimeType) {
         switch (mimeType) {
@@ -606,19 +606,6 @@ public class AISecretsDetector implements BurpExtension {
             // Process all other MIME types
             default:
                 return false;
-        }
-    }
-
-    private void logPoolStats() {
-        if (executorService instanceof ThreadPoolExecutor) {
-            ThreadPoolExecutor pool = (ThreadPoolExecutor) executorService;
-            logMsg(String.format(
-                "Thread pool stats - Active: %d, Completed: %d, Task Count: %d, Queue Size: %d",
-                pool.getActiveCount(),
-                pool.getCompletedTaskCount(),
-                pool.getTaskCount(),
-                pool.getQueue().size()
-            ));
         }
     }
 

@@ -228,7 +228,7 @@ public class SecretScannerUtils {
             "shpss_[a-fA-F0-9]{32}");
         
         addPattern("Twilio API Key", 
-            "(?:AC|SK)[0-9a-fA-F]{32}");
+            "\\b(?:AC|SK)[0-9a-fA-F]{32}\\b");
         
         addPattern("Mailchimp API Key", 
             "[0-9a-f]{32}-us[0-9]{1,2}");
