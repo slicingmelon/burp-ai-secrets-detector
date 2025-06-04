@@ -659,19 +659,6 @@ public class AISecretsDetector implements BurpExtension {
         }
     }
 
-    private void logPoolStats() {
-        if (executorService instanceof ThreadPoolExecutor) {
-            ThreadPoolExecutor pool = (ThreadPoolExecutor) executorService;
-            logMsg(String.format(
-                "Thread pool stats - Active: %d, Completed: %d, Task Count: %d, Queue Size: %d",
-                pool.getActiveCount(),
-                pool.getCompletedTaskCount(),
-                pool.getTaskCount(),
-                pool.getQueue().size()
-            ));
-        }
-    }
-
     // helper function to log messages 
     private void logMsg(String message) {
         // burp's logger
