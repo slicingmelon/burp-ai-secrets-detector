@@ -369,11 +369,11 @@ public class UIConfig {
         
         rightConstraints.gridx = 1;
         rightConstraints.gridy = 2;
-        rightConstraints.weightx = 0.0; // Don't stretch the spinner
+        rightConstraints.weightx = 0.0;
         rightPanel.add(maxLengthSpinner, rightConstraints);
         
         // Duplicate Threshold setting
-        JLabel duplicateThresholdLabel = new JLabel("Duplicate Secret Threshold (same secret across URLs):");
+        JLabel duplicateThresholdLabel = new JLabel("Duplicate Secret Threshold (same secret value across target host):");
         rightConstraints.gridx = 0;
         rightConstraints.gridy = 3;
         rightConstraints.weightx = 0.0;
@@ -403,11 +403,11 @@ public class UIConfig {
         rightConstraints.weightx = 0.0;
         rightPanel.add(duplicateThresholdSpinner, rightConstraints);
         
-        // Add left and right panels to the settings panel
+        // Setting panel - left and right panels
         settingsPanel.add(leftPanel);
         settingsPanel.add(rightPanel);
         
-        // Tool source settings - changing layout to improve alignment
+        // Tool source settings
         JPanel toolsPanel = new JPanel();
         toolsPanel.setBorder(BorderFactory.createTitledBorder("Process Messages from Tools:"));
         toolsPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 0)); // Use FlowLayout with LEFT alignment and horizontal gap
@@ -419,7 +419,7 @@ public class UIConfig {
             ToolType.EXTENSIONS, ToolType.REPEATER, ToolType.INTRUDER
         };
         
-        // Create a single row for all tool checkboxes
+        // Single row for all tool checkboxes
         for (ToolType tool : relevantTools) {
             JCheckBox checkbox = new JCheckBox(tool.name(), configSettings.isToolEnabled(tool));
             checkbox.addActionListener(_ -> {
@@ -449,7 +449,7 @@ public class UIConfig {
         
         loggingPanel.add(loggingCheckbox);
         
-        // Create a panel for the auto-save message with left alignment
+        // Auto-save message (left alignment)
         JPanel autoSavePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JLabel autoSaveLabel = new JLabel("Settings are saved automatically when changed");
         autoSavePanel.add(autoSaveLabel);
@@ -472,7 +472,7 @@ public class UIConfig {
             }
         });
         
-        autoSavePanel.add(Box.createHorizontalStrut(20)); // Add spacing
+        autoSavePanel.add(Box.createHorizontalStrut(20));
         autoSavePanel.add(resetCountersButton);
         
         loggingPanel.add(autoSavePanel);

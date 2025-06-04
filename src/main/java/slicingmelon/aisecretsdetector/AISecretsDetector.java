@@ -608,7 +608,6 @@ public class AISecretsDetector implements BurpExtension {
         }
     }
 
-
     private void logPoolStats() {
         if (executorService instanceof ThreadPoolExecutor) {
             ThreadPoolExecutor pool = (ThreadPoolExecutor) executorService;
