@@ -150,9 +150,6 @@ public class AISecretsDetector implements BurpExtension {
                     tempResponse
                 );
                 
-                // Get response string from HttpRequestResponse (like official Montoya API example)
-                //String responseString = requestResponse.response().toString();
-                
                 // Create markers to highlight where the secrets are in the response
                 List<Marker> responseMarkers = new ArrayList<>();
                 Set<String> newSecrets = new HashSet<>();
@@ -163,10 +160,9 @@ public class AISecretsDetector implements BurpExtension {
                     String secretType = secret.getType();
                     
                     if (secretValue != null && !secretValue.isEmpty()) {
-                        // Use pre-calculated position from scanner!
-                        int exactPos = secret.getResponsePosition();
-                        responseMarkers.add(Marker.marker(exactPos, exactPos + secretValue.length()));
-                        logMsg("HTTP Handler: Found exact position for " + secretType + " at " + exactPos + "-" + (exactPos + secretValue.length()));
+                        // Use pre-calculated start and end positions from scanner!
+                        responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
+                        logMsg("HTTP Handler: Found exact position for " + secretType + " at " + secret.getStartIndex() + "-" + secret.getEndIndex());
                         
                         newSecrets.add(secretValue);
                         

@@ -29,14 +29,12 @@ public class SecretScanner {
         private final String value;
         private final int startIndex;
         private final int endIndex;
-        private final int responsePosition;
         
-        public Secret(String type, String value, int startIndex, int endIndex, int responsePosition) {
+        public Secret(String type, String value, int startIndex, int endIndex) {
             this.type = type;
             this.value = value;
             this.startIndex = startIndex;
             this.endIndex = endIndex;
-            this.responsePosition = responsePosition;
         }
         
         public String getType() {
@@ -53,10 +51,6 @@ public class SecretScanner {
         
         public int getEndIndex() {
             return endIndex;
-        }
-        
-        public int getResponsePosition() {
-            return responsePosition;
         }
     }
     
@@ -185,7 +179,7 @@ public class SecretScanner {
                             // Found an occurrence - create a secret for this position
                             int fullStartPos = exactPos;
                             int fullEndPos = fullStartPos + secretValue.length();
-                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos, exactPos);
+                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
                             foundSecrets.add(secret);
                             foundAtLeastOne = true;
                             
@@ -198,7 +192,7 @@ public class SecretScanner {
                             config.appendToLog("Warning: Could not find secret using indexOf, using regex position for: " + secretValue);
                             int fullStartPos = responseStartPos;
                             int fullEndPos = fullStartPos + secretValue.length();
-                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos, responseStartPos);
+                            Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
                             foundSecrets.add(secret);
                         }
                     }
