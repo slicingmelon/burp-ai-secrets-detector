@@ -178,10 +178,7 @@ public class AISecretsDetector implements BurpExtension {
                         
                         newSecrets.add(secretValue);
                         
-                        if (!secretTypeMap.containsKey(secretType)) {
-                            secretTypeMap.put(secretType, new HashSet<>());
-                        }
-                        secretTypeMap.get(secretType).add(secretValue);
+                        secretTypeMap.computeIfAbsent(secretType, _ -> new HashSet<>()).add(secretValue);
                         
                         logMsg("HTTP Handler: Found " + secretType + ": " + secretValue);
                     }
