@@ -20,6 +20,7 @@ import burp.api.montoya.sitemap.SiteMapFilter;
 import burp.api.montoya.sitemap.SiteMapNode;
 import burp.api.montoya.core.ToolType;
 import burp.api.montoya.http.message.MimeType;
+import burp.api.montoya.utilities.json.JsonUtils;
 
 import javax.swing.*;
 import java.util.concurrent.ExecutorService;
@@ -318,67 +319,33 @@ public class AISecretsDetector implements BurpExtension {
     }
     
     /**
-    * Load persistent secret counters from extension storage with JSON parsing and base64 decoding
+    * Load persistent secret counters from extension storage using Burp's JsonUtils
     */
     private void loadSecretCounters() {
         try {
             String countersJson = api.persistence().extensionData().getString(SECRET_COUNTERS_KEY);
             if (countersJson != null && !countersJson.isEmpty()) {
-                secretCounters.clear();
+                JsonUtils jsonUtils = api.utilities().jsonUtils();
                 
-                // Parse proper JSON format: {"url1":{"secret1":count1,"secret2":count2},"url2":{...}}
-                countersJson = countersJson.trim();
-                if (!countersJson.startsWith("{") || !countersJson.endsWith("}")) {
+                // Validate JSON first
+                if (!jsonUtils.isValidJson(countersJson)) {
                     logMsg("Invalid JSON format in stored counters, resetting");
                     return;
                 }
                 
-                // Remove outer braces
-                String content = countersJson.substring(1, countersJson.length() - 1).trim();
-                if (content.isEmpty()) {
-                    return;
-                }
+                secretCounters.clear();
                 
-                // Parse each base URL entry
-                int pos = 0;
-                while (pos < content.length()) {
-                    // Find base URL
-                    if (content.charAt(pos) != '"') break;
-                    int urlStart = pos + 1;
-                    int urlEnd = findClosingQuote(content, urlStart);
-                    if (urlEnd == -1) break;
-                    
-                    String baseUrl = unescapeJsonString(content.substring(urlStart, urlEnd));
-                    pos = urlEnd + 1;
-                    
-                    // Skip to colon and opening brace
-                    while (pos < content.length() && content.charAt(pos) != ':') pos++;
-                    pos++; // Skip colon
-                    while (pos < content.length() && content.charAt(pos) != '{') pos++;
-                    pos++; // Skip opening brace
-                    
-                    // Find matching closing brace
-                    int braceCount = 1;
-                    int secretsStart = pos;
-                    while (pos < content.length() && braceCount > 0) {
-                        if (content.charAt(pos) == '{') braceCount++;
-                        else if (content.charAt(pos) == '}') braceCount--;
-                        pos++;
-                    }
-                    
-                    String secretsContent = content.substring(secretsStart, pos - 1).trim();
-                    Map<String, Integer> secretMap = parseSecretsMap(secretsContent);
-                    
-                    if (!secretMap.isEmpty()) {
-                        secretCounters.put(baseUrl, new ConcurrentHashMap<>(secretMap));
-                    }
-                    
-                    // Skip comma if present
-                    while (pos < content.length() && (content.charAt(pos) == ',' || Character.isWhitespace(content.charAt(pos)))) pos++;
-                }
+                // Read the main JSON object to get all base URLs
+                // Since we can't directly iterate over JSON keys with JsonUtils, 
+                // we'll need to extract them differently
+                // For now, let's read the entire JSON and parse it manually
+                
+                // This is a limitation of JsonUtils - it's designed for known paths
+                // We'll keep a hybrid approach for now but use JsonUtils for reading values
+                parseJsonManually(countersJson, jsonUtils);
             }
             
-            logMsg("Loaded " + secretCounters.size() + " base URLs with secret counts from persistent storage (JSON format)");
+            logMsg("Loaded " + secretCounters.size() + " base URLs with secret counts using JsonUtils");
             
             // Log loaded counters for debugging
             for (Map.Entry<String, Map<String, Integer>> entry : secretCounters.entrySet()) {
@@ -391,42 +358,143 @@ public class AISecretsDetector implements BurpExtension {
     }
     
     /**
-    * Save persistent secret counters to extension storage using proper JSON format and base64 encoding
+     * Parse JSON manually since JsonUtils doesn't provide iteration over object keys
+     */
+    private void parseJsonManually(String json, JsonUtils jsonUtils) {
+        try {
+            // Remove outer braces and parse manually
+            String content = json.trim();
+            if (!content.startsWith("{") || !content.endsWith("}")) {
+                return;
+            }
+            
+            content = content.substring(1, content.length() - 1).trim();
+            if (content.isEmpty()) {
+                return;
+            }
+            
+            // Parse each base URL entry
+            int pos = 0;
+            while (pos < content.length()) {
+                // Find base URL
+                if (content.charAt(pos) != '"') break;
+                int urlStart = pos + 1;
+                int urlEnd = findClosingQuote(content, urlStart);
+                if (urlEnd == -1) break;
+                
+                String baseUrl = unescapeJsonString(content.substring(urlStart, urlEnd));
+                pos = urlEnd + 1;
+                
+                // Skip to colon and opening brace
+                while (pos < content.length() && content.charAt(pos) != ':') pos++;
+                pos++; // Skip colon
+                while (pos < content.length() && content.charAt(pos) != '{') pos++;
+                pos++; // Skip opening brace
+                
+                // Find matching closing brace
+                int braceCount = 1;
+                int secretsStart = pos;
+                while (pos < content.length() && braceCount > 0) {
+                    if (content.charAt(pos) == '{') braceCount++;
+                    else if (content.charAt(pos) == '}') braceCount--;
+                    pos++;
+                }
+                
+                String secretsContent = content.substring(secretsStart, pos - 1).trim();
+                Map<String, Integer> secretMap = parseSecretsMapWithJsonUtils(secretsContent, jsonUtils);
+                
+                if (!secretMap.isEmpty()) {
+                    secretCounters.put(baseUrl, new ConcurrentHashMap<>(secretMap));
+                }
+                
+                // Skip comma if present
+                while (pos < content.length() && (content.charAt(pos) == ',' || Character.isWhitespace(content.charAt(pos)))) pos++;
+            }
+        } catch (Exception e) {
+            logMsg("Error parsing JSON manually: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Parse secrets map using JsonUtils for value reading
+     */
+    private Map<String, Integer> parseSecretsMapWithJsonUtils(String secretsContent, JsonUtils jsonUtils) {
+        Map<String, Integer> secretMap = new HashMap<>();
+        if (secretsContent.trim().isEmpty()) {
+            return secretMap;
+        }
+        
+        // Parse JSON-style secret entries: "base64secret1":count1,"base64secret2":count2
+        int pos = 0;
+        while (pos < secretsContent.length()) {
+            // Skip whitespace
+            while (pos < secretsContent.length() && Character.isWhitespace(secretsContent.charAt(pos))) pos++;
+            if (pos >= secretsContent.length()) break;
+            
+            // Find quoted secret key
+            if (secretsContent.charAt(pos) != '"') break;
+            int keyStart = pos + 1;
+            int keyEnd = findClosingQuote(secretsContent, keyStart);
+            if (keyEnd == -1) break;
+            
+            String encodedSecret = secretsContent.substring(keyStart, keyEnd);
+            pos = keyEnd + 1;
+            
+            // Skip to colon
+            while (pos < secretsContent.length() && secretsContent.charAt(pos) != ':') pos++;
+            pos++; // Skip colon
+            
+            // Parse count value
+            while (pos < secretsContent.length() && Character.isWhitespace(secretsContent.charAt(pos))) pos++;
+            int valueStart = pos;
+            while (pos < secretsContent.length() && Character.isDigit(secretsContent.charAt(pos))) pos++;
+            
+            if (valueStart < pos) {
+                try {
+                    int count = Integer.parseInt(secretsContent.substring(valueStart, pos));
+                    // Base64 decode the secret value using Burp's utilities
+                    String decodedSecret = api.utilities().base64Utils().decode(encodedSecret).toString();
+                    secretMap.put(decodedSecret, count);
+                } catch (Exception e) {
+                    logMsg("Error decoding secret: " + e.getMessage());
+                }
+            }
+            
+            // Skip comma if present
+            while (pos < secretsContent.length() && (secretsContent.charAt(pos) == ',' || Character.isWhitespace(secretsContent.charAt(pos)))) pos++;
+        }
+        
+        return secretMap;
+    }
+    
+    /**
+    * Save persistent secret counters to extension storage using Burp's JsonUtils
     */
     private void saveSecretCounters() {
         try {
-            // Use proper JSON format with base64 encoded secret values
-            StringBuilder json = new StringBuilder("{");
+            JsonUtils jsonUtils = api.utilities().jsonUtils();
             
-            boolean firstBaseUrl = true;
+            // Start with empty JSON object
+            String json = "{}";
+            
+            // Add each base URL and its secrets
             for (Map.Entry<String, Map<String, Integer>> baseUrlEntry : secretCounters.entrySet()) {
-                if (!firstBaseUrl) {
-                    json.append(",");
-                }
-                firstBaseUrl = false;
+                String baseUrl = baseUrlEntry.getKey();
                 
-                // Properly escape base URL for JSON
-                json.append("\"").append(escapeJsonString(baseUrlEntry.getKey())).append("\":{");
-                
-                boolean firstSecret = true;
+                // Create secrets object for this base URL
+                String secretsJson = "{}";
                 for (Map.Entry<String, Integer> secretEntry : baseUrlEntry.getValue().entrySet()) {
-                    if (!firstSecret) {
-                        json.append(",");
-                    }
-                    firstSecret = false;
-                    
                     // Base64 encode secret value to handle special characters safely
                     String encodedSecret = api.utilities().base64Utils().encodeToString(secretEntry.getKey());
-                    json.append("\"").append(encodedSecret).append("\":").append(secretEntry.getValue());
+                    secretsJson = jsonUtils.add(secretsJson, encodedSecret, secretEntry.getValue().toString());
                 }
                 
-                json.append("}");
+                // Add this base URL's secrets to the main JSON
+                json = jsonUtils.add(json, baseUrl, secretsJson);
             }
             
-            json.append("}");
-            
-            api.persistence().extensionData().setString(SECRET_COUNTERS_KEY, json.toString());
-            logMsg("Saved secret counters to persistent storage (JSON format with base64 encoding)");
+            api.persistence().extensionData().setString(SECRET_COUNTERS_KEY, json);
+            logMsg("Saved secret counters using Burp JsonUtils (base64 encoded secrets)");
         } catch (Exception e) {
             logMsg("Error saving secret counters: " + e.getMessage());
         }
@@ -655,18 +723,6 @@ public class AISecretsDetector implements BurpExtension {
         logMsg("All secret counters cleared");
     }
 
-    /**
-     * Escape special characters in strings for JSON format
-     */
-    private String escapeJsonString(String input) {
-        if (input == null) return "";
-        return input.replace("\\", "\\\\")
-                   .replace("\"", "\\\"")
-                   .replace("\n", "\\n")
-                   .replace("\r", "\\r")
-                   .replace("\t", "\\t");
-    }
-
     private String unescapeJsonString(String input) {
         if (input == null) return "";
         return input.replace("\\n", "\n")
@@ -674,55 +730,6 @@ public class AISecretsDetector implements BurpExtension {
                    .replace("\\t", "\t")
                    .replace("\\\"", "\"")
                    .replace("\\\\", "\\");
-    }
-
-    private Map<String, Integer> parseSecretsMap(String secretsContent) {
-        Map<String, Integer> secretMap = new HashMap<>();
-        if (secretsContent.trim().isEmpty()) {
-            return secretMap;
-        }
-        
-        // Parse JSON-style secret entries: "base64secret1":count1,"base64secret2":count2
-        int pos = 0;
-        while (pos < secretsContent.length()) {
-            // Skip whitespace
-            while (pos < secretsContent.length() && Character.isWhitespace(secretsContent.charAt(pos))) pos++;
-            if (pos >= secretsContent.length()) break;
-            
-            // Find quoted secret key
-            if (secretsContent.charAt(pos) != '"') break;
-            int keyStart = pos + 1;
-            int keyEnd = findClosingQuote(secretsContent, keyStart);
-            if (keyEnd == -1) break;
-            
-            String encodedSecret = secretsContent.substring(keyStart, keyEnd);
-            pos = keyEnd + 1;
-            
-            // Skip to colon
-            while (pos < secretsContent.length() && secretsContent.charAt(pos) != ':') pos++;
-            pos++; // Skip colon
-            
-            // Parse count value
-            while (pos < secretsContent.length() && Character.isWhitespace(secretsContent.charAt(pos))) pos++;
-            int valueStart = pos;
-            while (pos < secretsContent.length() && Character.isDigit(secretsContent.charAt(pos))) pos++;
-            
-            if (valueStart < pos) {
-                try {
-                    int count = Integer.parseInt(secretsContent.substring(valueStart, pos));
-                    // Base64 decode the secret value using Burp's utilities
-                    String decodedSecret = api.utilities().base64Utils().decode(encodedSecret).toString();
-                    secretMap.put(decodedSecret, count);
-                } catch (Exception e) {
-                    logMsg("Error decoding secret: " + e.getMessage());
-                }
-            }
-            
-            // Skip comma if present
-            while (pos < secretsContent.length() && (secretsContent.charAt(pos) == ',' || Character.isWhitespace(secretsContent.charAt(pos)))) pos++;
-        }
-        
-        return secretMap;
     }
 
     private int findClosingQuote(String content, int startPos) {
