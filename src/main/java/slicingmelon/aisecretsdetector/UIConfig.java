@@ -17,13 +17,13 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
 
-public class Config {
+public class UIConfig {
     private MontoyaApi api;
     private ConfigSettings configSettings;
     private Runnable onConfigChangedCallback;
     private JTextArea logArea;
 
-    private static Config instance;
+    private static UIConfig instance;
     
     public static class ConfigSettings {
         private int workers;
@@ -125,11 +125,11 @@ public class Config {
         }
     }
     
-    public static Config getInstance() {
+    public static UIConfig getInstance() {
         return instance;
     }
 
-    public Config(MontoyaApi api, Runnable onConfigChangedCallback) {
+    public UIConfig(MontoyaApi api, Runnable onConfigChangedCallback) {
         this.api = api;
         this.onConfigChangedCallback = onConfigChangedCallback;
         

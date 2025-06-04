@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
 import java.nio.charset.StandardCharsets;
 
 public class SecretScanner {
-    private final Config config;
+    private final UIConfig config;
 
     private final List<SecretPattern> secretPatterns;
 
@@ -111,7 +111,7 @@ public class SecretScanner {
     public SecretScanner(MontoyaApi api) {
         //this.api = api;
         this.secretPatterns = SecretScannerUtils.getAllPatterns();
-        this.config = Config.getInstance();
+        this.config = UIConfig.getInstance();
     }
     
     public SecretScanResult scanResponse(HttpResponse response) {

@@ -40,7 +40,7 @@ public class AISecretsDetector implements BurpExtension {
     
     private MontoyaApi api;
     private ExecutorService executorService;
-    private Config config;
+    private UIConfig config;
     
     // Persistent secret counter map stored as JSON in Burp's extension data
     private Map<String, Map<String, Integer>> secretCounters = new ConcurrentHashMap<>();
@@ -57,7 +57,7 @@ public class AISecretsDetector implements BurpExtension {
         // Set instance for Config access
         instance = this;
         
-        config = new Config(api, this::updateWorkers);
+        config = new UIConfig(api, this::updateWorkers);
         
         // Load persistent secret counters
         loadSecretCounters();
