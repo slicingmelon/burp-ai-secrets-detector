@@ -176,7 +176,9 @@ public class SecretScanner {
                                 break; // No more occurrences
                             }
                             
-                            // Found an occurrence - create a secret for this position
+                            // *** STEP 1: SECRET POSITION CALCULATION ***
+                            // Found an occurrence - calculate exact start/end positions in response
+                            // These positions will later be used to create RED response markers/highlights in Burp
                             int fullStartPos = exactPos;
                             int fullEndPos = fullStartPos + secretValue.length();
                             Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
@@ -190,6 +192,8 @@ public class SecretScanner {
                         // Fallback to regex position if indexOf completely fails
                         if (!foundAtLeastOne) {
                             config.appendToLog("Warning: Could not find secret using indexOf, using regex position for: " + secretValue);
+                            // *** STEP 1 (FALLBACK): SECRET POSITION CALCULATION ***
+                            // Using regex-detected position as fallback for RED response markers/highlights
                             int fullStartPos = responseStartPos;
                             int fullEndPos = fullStartPos + secretValue.length();
                             Secret secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);

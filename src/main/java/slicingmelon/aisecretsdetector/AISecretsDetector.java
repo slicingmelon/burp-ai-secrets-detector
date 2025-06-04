@@ -28,7 +28,6 @@ import burp.api.montoya.utilities.json.JsonNumberNode;
 import javax.swing.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.ArrayList;
@@ -154,7 +153,9 @@ public class AISecretsDetector implements BurpExtension {
                     tempResponse
                 );
                 
+                // *** STEP 2: MARKER CREATION ***
                 // Create markers to highlight where the secrets are in the response
+                // These markers will create the RED highlights visible in Burp's response panel
                 List<Marker> responseMarkers = new ArrayList<>();
                 Set<String> newSecrets = new HashSet<>();
                 Map<String, Set<String>> secretTypeMap = new HashMap<>();
@@ -164,7 +165,8 @@ public class AISecretsDetector implements BurpExtension {
                     String secretType = secret.getType();
                     
                     if (secretValue != null && !secretValue.isEmpty()) {
-                        // Use pre-calculated start and end positions from scanner!
+                        // *** STEP 2: CREATE INDIVIDUAL MARKER ***
+                        // Use pre-calculated start and end positions from scanner to create each RED marker
                         responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
                         logMsg("HTTP Handler: Found exact position for " + secretType + " at " + secret.getStartIndex() + "-" + secret.getEndIndex());
                         
@@ -223,7 +225,9 @@ public class AISecretsDetector implements BurpExtension {
                 }
                 
                 if (!secretsToReport.isEmpty()) {
-                    // Create back the HttpRequestResponse object for markers and issue reporting
+                    // *** STEP 3: MARKER APPLICATION - CREATE RED RESPONSE HIGHLIGHTS ***
+                    // Apply all the markers to the HttpRequestResponse to create the actual RED highlights
+                    // that will be visible in Burp's response panel when viewing the audit issue
                     HttpRequestResponse markedRequestResponse = requestResponse
                         .withResponseMarkers(responseMarkers);
                     
