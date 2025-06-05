@@ -23,7 +23,7 @@ public class SecretScannerUtils {
     private static int genericSecretMaxLength = 80;
     private static boolean randomnessAlgorithmEnabled = true;
 
-    /***
+    /**
     * Set the minimum length for generic secrets (random algorithm matcher) and regenerate patterns
     * @param length The new minimum length
     */
