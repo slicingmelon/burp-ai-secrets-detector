@@ -9,6 +9,7 @@ package slicingmelon.aisecretsdetector;
 
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.responses.HttpResponse;
+import burp.api.montoya.core.ByteArray;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -114,15 +115,17 @@ public class SecretScanner {
         int maxHighlights = config.getConfigSettings().getMaxHighlightsPerSecret();
         
         try {
-            String responseString = response.toString(); // Convert once upfront since we can't use fast check
+            // Use ByteArray directly instead of converting entire response to string
+            ByteArray responseBytes = response.toByteArray();
             
             // Declare variables outside loops for efficiency
             String secretValue;
-            int searchStart;
             int highlightsCreated;
-            int exactPos;
-            int fullStartPos;
-            int fullEndPos;
+            int matchPos;
+            int contextStart;
+            int contextEnd;
+            String contextString;
+            Matcher contextMatcher;
             Secret secret;
             
             for (SecretPattern pattern : secretPatterns) {
@@ -131,70 +134,90 @@ public class SecretScanner {
                         continue;
                     }
 
-                    // Use regex on full response string for position calculation
-                    Matcher matcher = pattern.getPattern().matcher(responseString);
+                    // Use ByteArray indexOf to find matches efficiently
+                    matchPos = 0;
+                    highlightsCreated = 0;
                     
-                    while (matcher.find()) {
+                    while (matchPos < responseBytes.length() && highlightsCreated < maxHighlights) {
+                        // Find next match position using ByteArray API
+                        matchPos = responseBytes.indexOf(pattern.getPattern(), matchPos, responseBytes.length());
                         
-                        // Extract group info
-                        if (pattern.getName().equals("Generic Secret") && matcher.groupCount() >= 1) {
-                            secretValue = matcher.group(1);
-                            
-                            // Skip non-random strings etc.
-                            if (!RandomnessAlgorithm.isRandom(secretValue.getBytes(StandardCharsets.UTF_8))) {
-                                continue;
+                        if (matchPos == -1) {
+                            break; // No more matches
+                        }
+                        
+                        // Extract context around the match for group processing
+                        // We need enough context to ensure we capture the full match with groups
+                        contextStart = Math.max(0, matchPos - 50);
+                        contextEnd = Math.min(responseBytes.length(), matchPos + 200);
+                        
+                        // Convert only this small context to string
+                        ByteArray contextBytes = responseBytes.subArray(contextStart, contextEnd);
+                        contextString = contextBytes.toString();
+                        
+                        // Apply the full regex with groups on this context
+                        contextMatcher = pattern.getPattern().matcher(contextString);
+                        
+                        // Find the match within this context
+                        if (contextMatcher.find()) {
+                            // Extract group info
+                            if (pattern.getName().equals("Generic Secret") && contextMatcher.groupCount() >= 1) {
+                                secretValue = contextMatcher.group(1);
+                                
+                                // Skip non-random strings etc.
+                                if (!RandomnessAlgorithm.isRandom(secretValue.getBytes(StandardCharsets.UTF_8))) {
+                                    matchPos++;
+                                    continue;
+                                }
+                                
+                                // Skip if the Generic Secret matches reCAPTCHA Site Key pattern
+                                if (isRecaptchaSecret(secretValue)) {
+                                    matchPos++;
+                                    continue;
+                                }
+                            } else {
+                                // Use capture group if available to avoid boundary characters
+                                if (contextMatcher.groupCount() >= 1) {
+                                    secretValue = contextMatcher.group(1);
+                                } else {
+                                    secretValue = contextMatcher.group(0);
+                                }
                             }
                             
-                            // Skip if the Generic Secret matches reCAPTCHA Site Key pattern
-                            if (isRecaptchaSecret(secretValue)) {
+                            // Skip duplicates
+                            if (uniqueSecretValues.contains(secretValue)) {
+                                matchPos++;
                                 continue;
+                            }
+                            uniqueSecretValues.add(secretValue);
+                            
+                            // Find exact position of the secret value in the full response
+                            int secretStartInResponse = responseBytes.indexOf(secretValue, false, contextStart, responseBytes.length());
+                            if (secretStartInResponse != -1) {
+                                int secretEndInResponse = secretStartInResponse + secretValue.length();
+                                
+                                secret = new Secret(pattern.getName(), secretValue, secretStartInResponse, secretEndInResponse);
+                                foundSecrets.add(secret);
+                                highlightsCreated++;
+                                
+                                // Move search past this match
+                                matchPos = secretStartInResponse + secretValue.length();
+                            } else {
+                                // Fallback: couldn't find exact position, move past context match
+                                matchPos = contextStart + contextMatcher.end();
                             }
                         } else {
-                            // Use capture group if available to avoid boundary characters
-                            if (matcher.groupCount() >= 1) {
-                                secretValue = matcher.group(1);
-                            } else {
-                                secretValue = matcher.group(0);
-                            }
+                            // This shouldn't happen, but if it does, move forward
+                            matchPos++;
                         }
-                        
-                        // Skip duplicates
-                        if (uniqueSecretValues.contains(secretValue)) {
-                            continue;
-                        }
-                        uniqueSecretValues.add(secretValue);
-                        
-                        // Find all occurrences of this secret in the response (like Burp Montoya API example)
-                        searchStart = 0;
-                        highlightsCreated = 0;
-                        
-                        while (searchStart < responseString.length() && highlightsCreated < maxHighlights) {
-                            exactPos = responseString.indexOf(secretValue, searchStart);
-                            
-                            if (exactPos == -1) {
-                                break; // No more occurrences
-                            }
-                            
-                            // *** STEP 1: SECRET POSITION CALCULATION ***
-                            // Found an occurrence - calculate exact start/end positions in response
-                            // These positions will later be used to create RED response markers/highlights in Burp
-                            fullStartPos = exactPos;
-                            fullEndPos = fullStartPos + secretValue.length();
-                            secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
-                            foundSecrets.add(secret);
-                            highlightsCreated++;
-                            
-                            // Move search start past this occurrence
-                            searchStart = exactPos + secretValue.length();
-                        }
-                        
-                        // Log if we hit the limit and there might be more occurrences
-                        if (highlightsCreated >= maxHighlights && searchStart < responseString.length()) {
-                            int remainingPos = responseString.indexOf(secretValue, searchStart);
-                            if (remainingPos != -1) {
-                                config.appendToLog(String.format("Limited highlights for secret '%s' to %d (more occurrences exist but not highlighted for performance)", 
-                                    secretValue, maxHighlights));
-                            }
+                    }
+                    
+                    // Log if we hit the limit
+                    if (highlightsCreated >= maxHighlights) {
+                        int remainingMatches = responseBytes.countMatches(pattern.getPattern(), matchPos, responseBytes.length());
+                        if (remainingMatches > 0) {
+                            config.appendToLog(String.format("Limited highlights for pattern '%s' to %d (approximately %d more matches exist but not highlighted for performance)", 
+                                pattern.getName(), maxHighlights, remainingMatches));
                         }
                     }
                 } catch (Exception e) {
