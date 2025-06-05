@@ -155,6 +155,12 @@ public class SecretScanner {
                         contextStart = matchPos;
                         contextEnd = Math.min(responseBytes.length(), matchPos + 200);
                         
+                        // Additional bounds checking for subArray
+                        if (contextStart >= responseBytes.length() || contextEnd <= contextStart) {
+                            matchPos++;
+                            continue;
+                        }
+                        
                         // Convert only this small context to string
                         ByteArray contextBytes = responseBytes.subArray(contextStart, contextEnd);
                         contextString = contextBytes.toString();
@@ -196,7 +202,10 @@ public class SecretScanner {
                             uniqueSecretValues.add(secretValue);
                             
                             // Find exact position of the secret value in the full response
-                            int secretStartInResponse = responseBytes.indexOf(secretValue, false, contextStart, responseBytes.length());
+                            int secretStartInResponse = -1;
+                            if (contextStart < responseBytes.length()) {
+                                secretStartInResponse = responseBytes.indexOf(secretValue, false, contextStart, responseBytes.length());
+                            }
                             if (secretStartInResponse != -1) {
                                 int secretEndInResponse = secretStartInResponse + secretValue.length();
                                 
