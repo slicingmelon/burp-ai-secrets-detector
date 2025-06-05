@@ -270,40 +270,23 @@ public class AISecretsDetector implements BurpExtension {
     * Extract base URL (scheme + host + port) for deduplication
     */
     private String extractBaseUrl(String url) {
+        // Simple and reliable URL base extraction
         try {
-            URI uri = new URI(url);
-            return new URI(uri.getScheme(), 
-                          uri.getUserInfo(), 
-                          uri.getHost(), 
-                          uri.getPort(),
-                          null, // No path
-                          null, // No query
-                          null) // No fragment
-                     .toString();
-        } catch (URISyntaxException e) {
-            logMsg("Failed to parse URL via Java URI for base URL extraction: " + e.getMessage() + " - URL: " + url);
-            
-            // Fallback to simple extraction
-            try {
-                if (url.contains("://")) {
-                    String[] parts = url.split("://", 2);
-                    if (parts.length == 2) {
-                        String remaining = parts[1];
-                        String hostPart = remaining.split("/")[0];
-                        String fallbackUrl = parts[0] + "://" + hostPart;
-                        logMsg("Using fallback base URL extraction: " + fallbackUrl);
-                        return fallbackUrl;
-                    }
+            if (url.contains("://")) {
+                String[] parts = url.split("://", 2);
+                if (parts.length == 2) {
+                    String remaining = parts[1];
+                    String hostPart = remaining.split("/")[0];
+                    return parts[0] + "://" + hostPart;
                 }
-                
-                // If fallback also fails
-                logMsg("Fallback base URL extraction also failed for URL: " + url);
-                return url;
-                
-            } catch (Exception fallbackException) {
-                logMsg("Fallback base URL extraction threw exception: " + fallbackException.getMessage() + " - URL: " + url);
-                return url;
             }
+            
+            // If no protocol, return as-is
+            return url;
+            
+        } catch (Exception e) {
+            logMsg("Base URL extraction failed: " + e.getMessage() + " - URL: " + url);
+            return url;
         }
     }
 
