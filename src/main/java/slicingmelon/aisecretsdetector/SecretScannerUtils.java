@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
 */
 public class SecretScannerUtils {
     // Random string pattern
-    public static final String RANDOM_STRING_REGEX_TEMPLATE = "(?i:auth|credential|key|token|secret|pass|passwd|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-|>)\\s*[\\t \"'`]?([\\w+./=~\\-\\\\`^]{%d,%d})(?:[\\t\\n \"'`]|$)";
+    public static final String RANDOM_STRING_REGEX_TEMPLATE = "(?i:auth|credential|key|token|secret|pass|passwd|password)\\w*\\s*(?:[:=]|:=|=>|<-|>)\\s*(?:[\"'`]|\\\\[\"'])?([\\w+./=~\\-\\\\`^]{%d,%d})(?:[\"'`]|\\\\[\"']|[\\s]|$)";
 
     private static final List<SecretScanner.SecretPattern> SECRET_PATTERNS = new ArrayList<>();
     private static int genericSecretMinLength = 15;
@@ -91,7 +91,7 @@ public class SecretScannerUtils {
     private static void initializePatterns() {
         // URL with Credentials
         addPattern("URL with Credentials", 
-            "(?i)\\b[a-zA-Z]+://(?:[A-Za-z0-9_-]{1,32}):(?:[^@{}|^\\\\[\\\\]`]+)@([a-zA-Z0-9.-]+)(?:/[^/\\s]*)?\\b");
+            "(?i)\\b([a-zA-Z]+://(?:[A-Za-z0-9_-]{1,32}):(?:[^@{}|^\\\\[\\\\]`]+)@[a-zA-Z0-9.-]+(?:/[^/\\s]*)?)\\b");
         
         // Age Secret Key
         addPattern("Age Secret Key", 
