@@ -140,6 +140,10 @@ public class SecretScanner {
                     
                     while (matchPos < responseBytes.length() && highlightsCreated < maxHighlights) {
                         // Find next match position using ByteArray API
+                        // Add bounds check to prevent ArrayIndexOutOfBoundsException
+                        if (matchPos >= responseBytes.length()) {
+                            break;
+                        }
                         matchPos = responseBytes.indexOf(pattern.getPattern(), matchPos, responseBytes.length());
                         
                         if (matchPos == -1) {
@@ -214,7 +218,10 @@ public class SecretScanner {
                     
                     // Log if we hit the limit
                     if (highlightsCreated >= maxHighlights) {
-                        int remainingMatches = responseBytes.countMatches(pattern.getPattern(), matchPos, responseBytes.length());
+                        int remainingMatches = 0;
+                        if (matchPos < responseBytes.length()) {
+                            remainingMatches = responseBytes.countMatches(pattern.getPattern(), matchPos, responseBytes.length());
+                        }
                         if (remainingMatches > 0) {
                             config.appendToLog(String.format("Limited highlights for pattern '%s' to %d (approximately %d more matches exist but not highlighted for performance)", 
                                 pattern.getName(), maxHighlights, remainingMatches));
