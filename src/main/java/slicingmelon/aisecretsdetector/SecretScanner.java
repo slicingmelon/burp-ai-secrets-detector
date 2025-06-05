@@ -153,7 +153,7 @@ public class SecretScanner {
                         // Extract context around the match for group processing
                         // We need enough context to ensure we capture the full match with groups
                         contextStart = matchPos;
-                        contextEnd = Math.min(responseBytes.length(), matchPos + 200);
+                        contextEnd = Math.min(responseBytes.length(), matchPos + 1000);
                         
                         // Additional bounds checking for subArray
                         if (contextStart >= responseBytes.length() || contextEnd <= contextStart) {
