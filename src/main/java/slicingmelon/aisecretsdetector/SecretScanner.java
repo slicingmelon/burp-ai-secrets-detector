@@ -221,7 +221,11 @@ public class SecretScanner {
                         }
                     }
                 } catch (Exception e) {
-                    config.appendToLog("Error with pattern " + pattern.getName() + ": " + e.getMessage());
+                    String errorMsg = e.getMessage();
+                    if (errorMsg == null) {
+                        errorMsg = e.getClass().getSimpleName();
+                    }
+                    config.appendToLog("Error with pattern " + pattern.getName() + ": " + errorMsg);
                 }
             }
         } catch (Exception e) {
