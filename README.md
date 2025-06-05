@@ -75,7 +75,6 @@ Results comparison vs Trufflehog:
 
 ![Results](./images/burp-secrets-detector-vs-trufflehog.jpg)
 
-**NOTE**: This extension was not inspired by the Trufflehog Burp Integration extension.
 
 ## TO DO
 
