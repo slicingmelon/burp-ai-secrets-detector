@@ -35,8 +35,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Set;
-import java.net.URI;
-import java.net.URISyntaxException;
 import burp.api.montoya.core.ByteArray;
 
 public class AISecretsDetector implements BurpExtension {
