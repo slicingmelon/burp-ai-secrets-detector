@@ -127,7 +127,7 @@ public class SecretScanner {
             
             for (SecretPattern pattern : secretPatterns) {
                 try {
-                    if (pattern.getName().equals("Generic Secret") && !SecretScannerUtils.isRandomnessAlgorithmEnabled()) {
+                    if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2")) && !SecretScannerUtils.isRandomnessAlgorithmEnabled()) {
                         continue;
                     }
 
@@ -137,7 +137,7 @@ public class SecretScanner {
                     while (matcher.find()) {
                         
                         // Extract group info
-                        if (pattern.getName().equals("Generic Secret") && matcher.groupCount() >= 1) {
+                        if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2")) && matcher.groupCount() >= 1) {
                             secretValue = matcher.group(1);
                             
                             // Skip non-random strings etc.

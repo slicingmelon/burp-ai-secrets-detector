@@ -15,8 +15,11 @@ import java.util.regex.Pattern;
 * Utility class for SecretScanner
 */
 public class SecretScannerUtils {
-    // Random string pattern
+    // Random string pattern (original)
     public static final String RANDOM_STRING_REGEX_TEMPLATE = "(?i:auth|credential|key|token|secret|pass|passwd|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-|>)\\s*[\\t \"'`]?([\\w+./=~\\-\\\\`^]{%d,%d})(?=\\\\[\"']|[\\t\\n \"'`]|</|$)";
+    
+    // Random string pattern v2 (TruffleHog-style with buildPrefixRegex)
+    public static final String RANDOM_STRING_REGEX_TEMPLATE2 = buildPrefixRegex(new String[]{"auth", "credential", "key", "token", "secret", "pass", "passwd", "password"}) + "\\b([\\w+./=~\\-\\\\`^]{%d,%d})\\b";
 
     private static final List<SecretScanner.SecretPattern> SECRET_PATTERNS = new ArrayList<>();
     
@@ -262,9 +265,13 @@ public class SecretScannerUtils {
         addPattern("Generic Private Key", 
             "(?i)-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\\s\\S-]{64,}?KEY(?: BLOCK)?-----");
         
-        // Generic Secret pattern
+        // Generic Secret pattern (original)
         String randomStringRegex = String.format(RANDOM_STRING_REGEX_TEMPLATE, genericSecretMinLength, genericSecretMaxLength);
         addPattern("Generic Secret", randomStringRegex);
+        
+        // Generic Secret pattern v2 (TruffleHog-style)
+        String randomStringRegex2 = String.format(RANDOM_STRING_REGEX_TEMPLATE2, genericSecretMinLength, genericSecretMaxLength);
+        addPattern("Generic Secret v2", randomStringRegex2);
     }
     
     /**
