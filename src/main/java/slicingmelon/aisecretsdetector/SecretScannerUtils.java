@@ -19,6 +19,20 @@ public class SecretScannerUtils {
     public static final String RANDOM_STRING_REGEX_TEMPLATE = "(?i:auth|credential|key|token|secret|pass|passwd|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-|>)\\s*[\\t \"'`]?([\\w+./=~\\-\\\\`^]{%d,%d})(?=\\\\[\"']|[\\t\\n \"'`]|</|$)";
 
     private static final List<SecretScanner.SecretPattern> SECRET_PATTERNS = new ArrayList<>();
+    
+    /**
+     * Helper function similar to TruffleHog's PrefixRegex
+     * Creates a case-insensitive prefix pattern that allows up to 40 characters between keyword and secret
+     * @param keywords Array of keywords to match (e.g., ["cloudflare", "cf"])
+     * @return Regex string for prefix matching
+     */
+    public static String buildPrefixRegex(String[] keywords) {
+        String pre = "(?i:";
+        String middle = String.join("|", keywords);
+        String post = ")(?:.|[\\n\\r]){0,40}?";
+        return pre + middle + post;
+    }
+    
     private static int genericSecretMinLength = 15;
     private static int genericSecretMaxLength = 80;
     private static boolean randomnessAlgorithmEnabled = true;
@@ -123,13 +137,13 @@ public class SecretScannerUtils {
             "glpat-[\\dA-Za-z_=-]{20,22}");
         
         addPattern("Cloudflare API Key", 
-            "(?i)[\\w.-]{0,50}?(?:cloudflare)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-z0-9_-]{40})(?:[^\\w]|$)");
+            buildPrefixRegex(new String[]{"cloudflare", "cf"}) + "\\b([a-z0-9_-]{40})\\b");
         
         addPattern("Cloudflare Global API Key", 
-            "(?i)[\\w.-]{0,50}?(?:cloudflare)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-f0-9]{37})(?:[^\\w]|$)");
+            buildPrefixRegex(new String[]{"cloudflare"}) + "\\b([a-f0-9]{37})\\b");
 
         addPattern("Cloudflare Origin CA Key", 
-            "\\b(v1\\.0-[a-f0-9]{24}-[a-f0-9]{146})(?:[^\\w]|$)");
+            "\\b(v1\\.0-[A-Za-z0-9-]{171})\\b");
         
         addPattern("DigitalOcean Personal Access Token", 
         "\\b((?:dop|doo|dor)_v1_[a-f0-9]{64})\\b");
