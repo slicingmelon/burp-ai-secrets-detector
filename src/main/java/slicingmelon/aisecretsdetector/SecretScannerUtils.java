@@ -101,7 +101,7 @@ public class SecretScannerUtils {
     // Load and compile patterns
     static {
         // Initialize RANDOM_STRING_REGEX_TEMPLATE2 here to avoid circular dependency
-        RANDOM_STRING_REGEX_TEMPLATE2 = buildPrefixRegex(new String[]{"auth", "credential", "key", "token", "secret", "pass", "passwd", "password"}) + "\\b([\\w+./=~\\-\\\\`^!@#$%&*()_<>;]{%d,%d})\\b";
+        RANDOM_STRING_REGEX_TEMPLATE2 = buildPrefixRegex(new String[]{"auth", "credential", "key", "token", "secret", "pass", "passwd", "password"}) + "\\b([\\w+./=~\\-\\\\`\\^\\!\\@\\#\\$\\%\\&\\*\\(\\)\\_\\<\\>\\;]{%d,%d})\\b";
         
         initializePatterns();
     }
