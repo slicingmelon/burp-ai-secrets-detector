@@ -136,11 +136,11 @@ public class SecretScannerUtils {
         addPattern("GitLab Token", 
             "glpat-[\\dA-Za-z_=-]{20,22}");
         
-        addPattern("Cloudflare API Key", 
-            buildPrefixRegex(new String[]{"cloudflare", "cf"}) + "\\b([a-z0-9_-]{40})\\b");
+        addPattern("Cloudflare API Token", 
+            buildPrefixRegex(new String[]{"cloudflare"}) + "\\b([A-Za-z0-9_-]{40})\\b");
         
         addPattern("Cloudflare Global API Key", 
-            buildPrefixRegex(new String[]{"cloudflare"}) + "\\b([a-f0-9]{37})\\b");
+            buildPrefixRegex(new String[]{"cloudflare"}) + "\\b([A-Za-z0-9_-]{40})\\b");
 
         addPattern("Cloudflare Origin CA Key", 
             "\\b(v1\\.0-[A-Za-z0-9-]{171})\\b");
