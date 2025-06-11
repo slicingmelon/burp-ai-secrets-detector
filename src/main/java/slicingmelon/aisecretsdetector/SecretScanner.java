@@ -101,9 +101,27 @@ public class SecretScanner {
     }
     
     public SecretScanner(MontoyaApi api) {
-        //this.api = api;
-        this.secretPatterns = SecretScannerUtils.getAllPatterns();
-        this.config = UIConfig.getInstance();
+        // Set up logging for SecretScannerUtils
+        SecretScannerUtils.setLogging(api.logging());
+        
+        List<SecretPattern> patterns;
+        UIConfig configInstance;
+        
+        try {
+            //this.api = api;
+            patterns = SecretScannerUtils.getAllPatterns();
+            configInstance = UIConfig.getInstance();
+            
+            api.logging().logToOutput("SecretScanner initialized with " + patterns.size() + " patterns");
+        } catch (Exception e) {
+            api.logging().logToError("Error initializing SecretScanner: " + e.getMessage());
+            e.printStackTrace();
+            patterns = new ArrayList<>(); // fallback to empty list
+            configInstance = UIConfig.getInstance();
+        }
+        
+        this.secretPatterns = patterns;
+        this.config = configInstance;
     }
     
     public SecretScanResult scanResponse(HttpResponse response) {

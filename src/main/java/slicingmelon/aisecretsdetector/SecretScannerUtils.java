@@ -10,6 +10,7 @@ package slicingmelon.aisecretsdetector;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.regex.Pattern;
+import burp.api.montoya.logging.Logging;
 
 /**
 * Utility class for SecretScanner
@@ -22,6 +23,14 @@ public class SecretScannerUtils {
     public static String RANDOM_STRING_REGEX_TEMPLATE2;
 
     private static final List<SecretScanner.SecretPattern> SECRET_PATTERNS = new ArrayList<>();
+    private static Logging logging = null;
+    
+    /**
+     * Set the logging instance for error reporting
+     */
+    public static void setLogging(Logging loggingInstance) {
+        logging = loggingInstance;
+    }
     
     /**
      * Helper function similar to TruffleHog's PrefixRegex
@@ -30,10 +39,17 @@ public class SecretScannerUtils {
      * @return Regex string for prefix matching
      */
     public static String buildPrefixRegex(String[] keywords) {
-        String pre = "(?i:";
-        String middle = String.join("|", keywords);
-        String post = ")(?:.|[\\n\\r\\t]){0,40}?";
-        return pre + middle + post;
+        try {
+            String pre = "(?i:";
+            String middle = String.join("|", keywords);
+            String post = ")(?:.|[\\n\\r\\t]){0,40}?";
+            return pre + middle + post;
+        } catch (Exception e) {
+            if (logging != null) {
+                logging.logToError("Error in buildPrefixRegex: " + e.getMessage());
+            }
+            return "(?i:error)"; // fallback
+        }
     }
     
     private static int genericSecretMinLength = 15;
@@ -100,10 +116,15 @@ public class SecretScannerUtils {
 
     // Load and compile patterns
     static {
-        // Initialize RANDOM_STRING_REGEX_TEMPLATE2 here to avoid circular dependency
-        RANDOM_STRING_REGEX_TEMPLATE2 = buildPrefixRegex(new String[]{"auth", "credential", "key", "token", "secret", "pass", "passwd", "password"}) + "\\b([\\w+./=~\\-\\\\`\\^\\!\\@\\#\\$\\%\\&\\*\\(\\)\\_\\<\\>\\;]{%d,%d})\\b";
-        
-        initializePatterns();
+        try {
+            // Initialize RANDOM_STRING_REGEX_TEMPLATE2 here to avoid circular dependency
+            RANDOM_STRING_REGEX_TEMPLATE2 = buildPrefixRegex(new String[]{"auth", "credential", "key", "token", "secret", "pass", "passwd", "password"}) + "\\b([\\w+./=~\\-\\\\`\\^\\!\\@\\#\\$\\%\\&\\*\\(\\)\\_\\<\\>\\;]{%d,%d})\\b";
+            
+            initializePatterns();
+        } catch (Exception e) {
+            System.err.println("Critical error in SecretScannerUtils static initialization: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     // Load and compile patterns during load time
@@ -281,8 +302,17 @@ public class SecretScannerUtils {
     * Helper method to compile and store a pattern with its metadataa
     */
     private static void addPattern(String name, String regex) {
-        SECRET_PATTERNS.add(new SecretScanner.SecretPattern(
-            name, Pattern.compile(regex)));
+        try {
+            SECRET_PATTERNS.add(new SecretScanner.SecretPattern(
+                name, Pattern.compile(regex)));
+        } catch (Exception e) {
+            String errorMsg = "Failed to compile pattern '" + name + "': " + e.getMessage() + " | Regex: " + regex;
+            if (logging != null) {
+                logging.logToError(errorMsg);
+            } else {
+                System.err.println(errorMsg);
+            }
+        }
     }
     
     /**
