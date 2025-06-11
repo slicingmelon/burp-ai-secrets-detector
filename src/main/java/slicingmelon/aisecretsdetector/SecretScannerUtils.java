@@ -18,9 +18,6 @@ import burp.api.montoya.logging.Logging;
 public class SecretScannerUtils {
     // Random string pattern (original)
     public static final String RANDOM_STRING_REGEX_TEMPLATE = "(?i:auth|credential|key|token|secret|pass|passwd|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-|>)\\s*[\\t \"'`]?([\\w+./=~\\-\\\\`^]{%d,%d})(?=\\\\[\"']|[\\t\\n \"'`]|</|$)";
-    
-    // Random string pattern v2 (TruffleHog-style) - will be initialized properly
-    public static String RANDOM_STRING_REGEX_TEMPLATE2;
 
     private static final List<SecretScanner.SecretPattern> SECRET_PATTERNS = new ArrayList<>();
     private static Logging logging = null;
@@ -109,9 +106,6 @@ public class SecretScannerUtils {
 
     // Load and compile patterns
     static {
-        // Initialize RANDOM_STRING_REGEX_TEMPLATE2 simply
-        RANDOM_STRING_REGEX_TEMPLATE2 = buildPrefixRegex(new String[]{"auth", "credential", "key", "token", "secret", "pass", "passwd", "password"}) + "\\b([\\w+./=~\\-\\\\`\\^!@#$%&*()_<>;]{%d,%d})\\b";
-        
         initializePatterns();
     }
 
@@ -281,8 +275,8 @@ public class SecretScannerUtils {
         String randomStringRegex = String.format(RANDOM_STRING_REGEX_TEMPLATE, genericSecretMinLength, genericSecretMaxLength);
         addPattern("Generic Secret", randomStringRegex);
         
-        // Generic Secret pattern v2 (TruffleHog-style)
-        String randomStringRegex2 = String.format(RANDOM_STRING_REGEX_TEMPLATE2, genericSecretMinLength, genericSecretMaxLength);
+        // Generic Secret pattern v2 (TruffleHog-style) - built directly like other patterns
+        String randomStringRegex2 = buildPrefixRegex(new String[]{"auth", "credential", "key", "token", "secret", "pass", "passwd", "password"}) + "\\b([\\w+./=~\\-\\\\`\\^!@#$%&*()_<>;]{" + genericSecretMinLength + "," + genericSecretMaxLength + "})\\b";
         addPattern("Generic Secret v2", randomStringRegex2);
     }
     
