@@ -19,7 +19,7 @@ public class SecretScannerUtils {
     // Random string pattern (original)
     public static final String RANDOM_STRING_REGEX_TEMPLATE = "(?i:auth|credential|key|token|secret|pass|passwd|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-|>)\\s*[\\t \"'`]?([\\w+./=~\\-\\\\`^]{%d,%d})(?=\\\\[\"']|[\\t\\n \"'`]|</|$)";
     
-    // Random string pattern v2 (TruffleHog-style) - initialized in static block
+    // Random string pattern v2 (TruffleHog-style) - will be initialized properly
     public static String RANDOM_STRING_REGEX_TEMPLATE2;
 
     private static final List<SecretScanner.SecretPattern> SECRET_PATTERNS = new ArrayList<>();
@@ -39,17 +39,10 @@ public class SecretScannerUtils {
      * @return Regex string for prefix matching
      */
     public static String buildPrefixRegex(String[] keywords) {
-        try {
-            String pre = "(?i:";
-            String middle = String.join("|", keywords);
-            String post = ")(?:.|[\\n\\r\\t]){0,40}?";
-            return pre + middle + post;
-        } catch (Exception e) {
-            if (logging != null) {
-                logging.logToError("Error in buildPrefixRegex: " + e.getMessage());
-            }
-            return "(?i:error)"; // fallback
-        }
+        String pre = "(?i:";
+        String middle = String.join("|", keywords);
+        String post = ")(?:.|[\\n\\r\\t]){0,40}?";
+        return pre + middle + post;
     }
     
     private static int genericSecretMinLength = 15;
@@ -116,15 +109,10 @@ public class SecretScannerUtils {
 
     // Load and compile patterns
     static {
-        try {
-            // Initialize RANDOM_STRING_REGEX_TEMPLATE2 here to avoid circular dependency
-            RANDOM_STRING_REGEX_TEMPLATE2 = buildPrefixRegex(new String[]{"auth", "credential", "key", "token", "secret", "pass", "passwd", "password"}) + "\\b([\\w+./=~\\-\\\\`\\^\\!\\@\\#\\$\\%\\&\\*\\(\\)\\_\\<\\>\\;]{%d,%d})\\b";
-            
-            initializePatterns();
-        } catch (Exception e) {
-            System.err.println("Critical error in SecretScannerUtils static initialization: " + e.getMessage());
-            e.printStackTrace();
-        }
+        // Initialize RANDOM_STRING_REGEX_TEMPLATE2 simply
+        RANDOM_STRING_REGEX_TEMPLATE2 = buildPrefixRegex(new String[]{"auth", "credential", "key", "token", "secret", "pass", "passwd", "password"}) + "\\b([\\w+./=~\\-\\\\`\\^!@#$%&*()_<>;]{%d,%d})\\b";
+        
+        initializePatterns();
     }
 
     // Load and compile patterns during load time
