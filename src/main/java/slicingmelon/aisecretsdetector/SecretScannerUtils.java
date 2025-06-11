@@ -137,6 +137,9 @@ public class SecretScannerUtils {
         addPattern("Google Cloud Platform (GCP) API Key", 
         "\\b(AIza[\\w-]{35})\\b");
 
+        addPattern("Heroku API Key v2", 
+            "\\b(HRKU-AA[0-9a-zA-Z_-]{58})\\b");
+
         // Disabled for now.. too many "findings"
         // addPattern("JWT/JWE Token", 
         //     "\\beyJ[\\dA-Za-z=_-]+(?:\\.[\\dA-Za-z=_-]{3,}){1,4}");
