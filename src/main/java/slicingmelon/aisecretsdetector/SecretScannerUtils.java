@@ -18,8 +18,8 @@ public class SecretScannerUtils {
     // Random string pattern (original)
     public static final String RANDOM_STRING_REGEX_TEMPLATE = "(?i:auth|credential|key|token|secret|pass|passwd|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-|>)\\s*[\\t \"'`]?([\\w+./=~\\-\\\\`^]{%d,%d})(?=\\\\[\"']|[\\t\\n \"'`]|</|$)";
     
-    // Random string pattern v2 (TruffleHog-style with buildPrefixRegex)
-    public static final String RANDOM_STRING_REGEX_TEMPLATE2 = buildPrefixRegex(new String[]{"auth", "credential", "key", "token", "secret", "pass", "passwd", "password"}) + "\\b([\\w+./=~\\-\\\\`^]{%d,%d})\\b";
+    // Random string pattern v2 (TruffleHog-style) - initialized in static block
+    public static String RANDOM_STRING_REGEX_TEMPLATE2;
 
     private static final List<SecretScanner.SecretPattern> SECRET_PATTERNS = new ArrayList<>();
     
@@ -100,6 +100,9 @@ public class SecretScannerUtils {
 
     // Load and compile patterns
     static {
+        // Initialize RANDOM_STRING_REGEX_TEMPLATE2 here to avoid circular dependency
+        RANDOM_STRING_REGEX_TEMPLATE2 = buildPrefixRegex(new String[]{"auth", "credential", "key", "token", "secret", "pass", "passwd", "password"}) + "\\b([\\w+./=~\\-\\\\`^!@#$%&*()_<>;]{%d,%d})\\b";
+        
         initializePatterns();
     }
 
