@@ -176,10 +176,10 @@ public class SecretScanner {
                             }
                         }
                         
-                        // Skip duplicates
-                        if (uniqueSecretValues.contains(secretValue)) {
-                            continue;
-                        }
+                        // // Skip duplicates
+                        // if (uniqueSecretValues.contains(secretValue)) {
+                        //     continue;
+                        // }
                         uniqueSecretValues.add(secretValue);
                         
                         // Find all occurrences of this secret in the response (like Burp Montoya API example)
