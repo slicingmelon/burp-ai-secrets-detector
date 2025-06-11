@@ -36,9 +36,20 @@ public class SecretScannerUtils {
      * @return Regex string for prefix matching
      */
     public static String buildPrefixRegex(String[] keywords) {
+        return buildPrefixRegex(keywords, 40);
+    }
+    
+    /**
+     * Helper function similar to TruffleHog's PrefixRegex with configurable max prefix length
+     * Creates a case-insensitive prefix pattern that allows up to maxPrefixLen characters between keyword and secret
+     * @param keywords Array of keywords to match (e.g., ["cloudflare", "cf"])
+     * @param maxPrefixLen Maximum number of characters allowed between keyword and secret
+     * @return Regex string for prefix matching
+     */
+    public static String buildPrefixRegex(String[] keywords, int maxPrefixLen) {
         String pre = "(?i:";
         String middle = String.join("|", keywords);
-        String post = ")(?:.|[\\n\\r\\t]){0,40}?";
+        String post = ")(?:.|[\\n\\r\\t]){0," + maxPrefixLen + "}?";
         return pre + middle + post;
     }
     
@@ -276,7 +287,7 @@ public class SecretScannerUtils {
         addPattern("Generic Secret", randomStringRegex);
         
         // Generic Secret pattern v2 (TruffleHog-style) - built directly like other patterns
-        String randomStringRegex2 = buildPrefixRegex(new String[]{"auth", "credential", "key", "token", "secret", "pass", "passwd", "password"}) + "\\b([\\w+./=~\\-\\\\`\\^!@#$%&*()_<>;]{" + genericSecretMinLength + "," + genericSecretMaxLength + "})\\b";
+        String randomStringRegex2 = buildPrefixRegex(new String[]{"auth", "credential", "key", "token", "secret", "pass", "passwd", "password"}, 15) + "\\b([\\w+./=~\\-\\\\`\\^!@#$%&*()_<>;]{" + genericSecretMinLength + "," + genericSecretMaxLength + "})\\b";
         addPattern("Generic Secret v2", randomStringRegex2);
     }
     
