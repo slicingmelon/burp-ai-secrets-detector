@@ -232,7 +232,7 @@ public class SecretScannerUtils {
             "(?i)[\\w.-]{0,50}?(?:squarespace)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\\b");
         
         addPattern("Telegram Bot API Token", 
-            "(?i)[\\w.-]{0,50}?(?:telegr)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([0-9]{5,16}:(?-i:A)[a-z0-9_\\-]{34})\\b");
+            buildPrefixRegex(new String[]{"telegram", "tgram://"}) + "\\b([0-9]{8,10}:[a-zA-Z0-9_-]{35})\\b");
         
         // Shopify Access Tokens
         addPattern("Shopify Access Token", 
