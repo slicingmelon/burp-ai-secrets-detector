@@ -29,7 +29,7 @@ public class SecretScannerUtils {
     public static String buildPrefixRegex(String[] keywords) {
         String pre = "(?i:";
         String middle = String.join("|", keywords);
-        String post = ")(?:.|[\\n\\r]){0,40}?";
+        String post = ")(?:.|[\\n\\r\\t]){0,40}?";
         return pre + middle + post;
     }
     
@@ -111,8 +111,11 @@ public class SecretScannerUtils {
         addPattern("Age Secret Key", 
             "AGE-SECRET-KEY-1[\\dA-Z]{58}");
 
-        addPattern("Algolia API Key", 
-            "(?i)[\\w.-]{0,50}?(?:algolia)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-z0-9]{32})\\b");
+        addPattern("Algolia ID", 
+            buildPrefixRegex(new String[]{"algolia", "docsearch", "appId"}) + "\\b([A-Z0-9]{10})\\b");
+        
+        addPattern("Algolia Key", 
+            buildPrefixRegex(new String[]{"algolia", "docsearch", "apiKey"}) + "\\b([a-zA-Z0-9]{32})\\b");
         
         addPattern("Azure Storage Account Key", 
             "(?i)(?:account)?key\\s*[:=]\\s*[\"']?([\\d+/=A-Za-z]{88})[\"']?(?:[^\\w]|$)");
@@ -140,7 +143,7 @@ public class SecretScannerUtils {
             buildPrefixRegex(new String[]{"cloudflare"}) + "\\b([A-Za-z0-9_-]{40})\\b");
         
         addPattern("Cloudflare Global API Key", 
-            buildPrefixRegex(new String[]{"cloudflare"}) + "\\b([A-Za-z0-9_-]{40})\\b");
+            buildPrefixRegex(new String[]{"cloudflare"}) + "\\b([A-Za-z0-9_-]{37})\\b");
 
         addPattern("Cloudflare Origin CA Key", 
             "\\b(v1\\.0-[A-Za-z0-9-]{171})\\b");
