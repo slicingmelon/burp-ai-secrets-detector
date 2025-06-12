@@ -101,14 +101,12 @@ public class AISecretsDetector implements BurpExtension {
         });
         
         api.extension().registerUnloadingHandler(() -> {
-            api.logging().logToOutput("AI Secrets Detector extension unloading...");
             logMsg("AI Secrets Detector extension unloading...");
             saveSecretCounters();
             shutdownWorkers();
             config.clearLogs();
         });
         
-        api.logging().logToOutput("AI Secrets Detector extension loaded successfully");
         logMsg("AI Secrets Detector extension loaded successfully");
     }
     
@@ -259,7 +257,7 @@ public class AISecretsDetector implements BurpExtension {
             }
             
         } catch (Exception e) {
-            api.logging().logToError("Error processing HTTP response: " + e.getMessage());
+            logMsgError("Error processing HTTP response: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -457,7 +455,7 @@ public class AISecretsDetector implements BurpExtension {
             }
             
         } catch (Exception e) {
-            api.logging().logToError("Error counting existing secrets: " + e.getMessage());
+            logMsgError("Error counting existing secrets: " + e.getMessage());
             e.printStackTrace();
         }
         
@@ -591,7 +589,7 @@ public class AISecretsDetector implements BurpExtension {
     }
 
     // helper function to log messages 
-    private void logMsg(String message) {
+    public void logMsg(String message) {
         // burp's logger
         //api.logging().logToOutput(message);
         
@@ -602,7 +600,7 @@ public class AISecretsDetector implements BurpExtension {
     }
 
     // helper function to log messages 
-    private void logMsgError(String message) {
+    public void logMsgError(String message) {
         // burp's logger
         api.logging().logToError(message);
         

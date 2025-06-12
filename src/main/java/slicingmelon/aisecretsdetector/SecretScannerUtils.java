@@ -10,7 +10,7 @@ package slicingmelon.aisecretsdetector;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.regex.Pattern;
-import burp.api.montoya.logging.Logging;
+
 
 /**
 * Utility class for SecretScanner
@@ -20,14 +20,6 @@ public class SecretScannerUtils {
     public static final String RANDOM_STRING_REGEX_TEMPLATE = "(?i:auth|credential|key|token|secret|pass|passwd|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-|>)\\s*[\\t \"'`]?([\\w+./=~\\-\\\\`^]{%d,%d})(?=\\\\[\"']|[\\t\\n \"'`]|</|$)";
 
     private static final List<SecretScanner.SecretPattern> SECRET_PATTERNS = new ArrayList<>();
-    private static Logging logging = null;
-    
-    /**
-     * Set the logging instance for error reporting
-     */
-    public static void setLogging(Logging loggingInstance) {
-        logging = loggingInstance;
-    }
     
     /**
      * Helper function similar to TruffleHog's PrefixRegex
@@ -295,9 +287,15 @@ public class SecretScannerUtils {
     * Helper method to log error messages
     */
     private static void logToError(String message) {
-        if (logging != null) {
-            logging.logToError(message);
-        } else {
+        try {
+            AISecretsDetector detector = AISecretsDetector.getInstance();
+            if (detector != null) {
+                detector.logMsgError(message);
+            } else {
+                System.err.println(message);
+            }
+        } catch (Exception e) {
+            // Fallback to System.err if anything goes wrong
             System.err.println(message);
         }
     }

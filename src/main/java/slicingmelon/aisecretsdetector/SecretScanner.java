@@ -102,7 +102,7 @@ public class SecretScanner {
     
     public SecretScanner(MontoyaApi api) {
         // Set up logging for SecretScannerUtils
-        SecretScannerUtils.setLogging(api.logging());
+        
         
         List<SecretPattern> patterns;
         UIConfig configInstance;
@@ -112,9 +112,9 @@ public class SecretScanner {
             patterns = SecretScannerUtils.getAllPatterns();
             configInstance = UIConfig.getInstance();
             
-            api.logging().logToOutput("SecretScanner initialized with " + patterns.size() + " patterns");
+            AISecretsDetector.getInstance().logMsg("SecretScanner initialized with " + patterns.size() + " patterns");
         } catch (Exception e) {
-            api.logging().logToError("Error initializing SecretScanner: " + e.getMessage());
+            AISecretsDetector.getInstance().logMsgError("Error initializing SecretScanner: " + e.getMessage());
             e.printStackTrace();
             patterns = new ArrayList<>(); // fallback to empty list
             configInstance = UIConfig.getInstance();
