@@ -292,6 +292,17 @@ public class SecretScannerUtils {
     }
     
     /**
+    * Helper method to log error messages
+    */
+    private static void logToError(String message) {
+        if (logging != null) {
+            logging.logToError(message);
+        } else {
+            System.err.println(message);
+        }
+    }
+    
+    /**
     * Helper method to compile and store a pattern with its metadataa
     */
     private static void addPattern(String name, String regex) {
@@ -300,11 +311,7 @@ public class SecretScannerUtils {
                 name, Pattern.compile(regex)));
         } catch (Exception e) {
             String errorMsg = "Failed to compile pattern '" + name + "': " + e.getMessage() + " | Regex: " + regex;
-            if (logging != null) {
-                logging.logToError(errorMsg);
-            } else {
-                System.err.println(errorMsg);
-            }
+            logToError(errorMsg);
         }
     }
     

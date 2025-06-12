@@ -601,6 +601,17 @@ public class AISecretsDetector implements BurpExtension {
         }
     }
 
+    // helper function to log messages 
+    private void logMsgError(String message) {
+        // burp's logger
+        api.logging().logToError(message);
+        
+        // Also log to UI if enabled
+        if (config != null && config.getConfigSettings().isLoggingEnabled()) {
+            config.appendToLog(message);
+        }
+    }
+
     /**
      * Get the static instance for use by Config
      */
