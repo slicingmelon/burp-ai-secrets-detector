@@ -101,9 +101,7 @@ public class SecretScanner {
     }
     
     public SecretScanner(MontoyaApi api) {
-        // Set up logging for SecretScannerUtils
-        
-        
+
         List<SecretPattern> patterns;
         UIConfig configInstance;
         
