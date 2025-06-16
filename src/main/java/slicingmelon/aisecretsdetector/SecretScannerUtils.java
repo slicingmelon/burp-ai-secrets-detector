@@ -52,8 +52,8 @@ public class SecretScannerUtils {
      * @return Regex string for suffix boundary matching
      */
     public static String buildSuffixRegex() {
-        // Match common terminators: whitespace, quotes, backticks, semicolons, escaped newlines, escaped quotes, HTML/XML tags, end of string
-        return "(?:[\\x60'\"\\s;]|\\\\[nr]|\\\\\"|</|$)";
+        // Match common terminators: whitespace, quotes, backticks, semicolons, escaped whitespace chars, escaped quotes, HTML/XML tags, end of string
+        return "(?:[\\x60'\"\\s;]|\\\\[nrt]|\\\\\"|</|$)";
     }
     
     private static int genericSecretMinLength = 15;
