@@ -1,10 +1,12 @@
 // Configuration file for endpoint ep4
+// SECRET_SOURCE: endpoint-ep4
+// SECRET_TYPE: github_token
 const API_SETTINGS = {
     timeout: 30000,
     retries: 3,
-    github_token: "ghp_iU80uksduv1E73T2wF0T0BmLGgwriAbGCd2a",
+    github_token: "ghp_RCJkZgY3NSkfbG4pc45Ctnnpz25Y15Qs5HHx",
     endpoint_id: "ep4"
 };
 
-// Endpoint-specific identifier in secret
-const ENDPOINT_SECRET = "ghp_iU80uksduv1E73T2wF0T0BmLGgwriAbGCd2a";
+// Pure secret for pattern matching (source: endpoint-ep4)
+const ENDPOINT_SECRET = "ghp_RCJkZgY3NSkfbG4pc45Ctnnpz25Y15Qs5HHx";
