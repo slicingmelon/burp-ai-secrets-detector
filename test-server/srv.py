@@ -101,26 +101,26 @@ def endpoint_one():
         <script>
             // Initialize API configuration
             const config = {{
-                apiKey: "ep1-{api_key}",
+                apiKey: "{api_key}",
                 endpoint: "https://api.example.com",
                 timeout: 5000
             }};
             
             // JSON string format
-            const jsonData = `{{"secret":"ep1-{api_key_2}"}}`;
+            const jsonData = `{{"secret":"{api_key_2}"}}`;
             
             // Escaped JSON format
-            const escapedJson = "\\"apiKey\\":\\"ep1-{api_key_3}\\"";
+            const escapedJson = "\\"apiKey\\":\\"{api_key_3}\\"";
             
             // Full URL with secret
-            const fullURL = "https://site.com/api.php?secret=ep1-{api_key}&token=ep1-{api_key_2}&page=1";
+            const fullURL = "https://site.com/api.php?secret={api_key}&token={api_key_2}&page=1";
             
             console.log("API initialized with configuration for endpoint 1");
         </script>
         
         <div style="margin-top: 50px; padding: 20px; background-color: #f0f0f0; border: 1px solid #ccc;">
             <h3>Total Secrets: 6</h3>
-            <p>This endpoint contains 6 secrets that should be detected (all prefixed with 'ep1-'):
+            <p>This endpoint contains 6 secrets that should be detected:
             <ul>
                 <li>1 GitHub token in external secrets-ep1.js file</li>
                 <li>1 API key in JavaScript config object</li>
@@ -146,19 +146,19 @@ def endpoint_two():
         "endpoint_id": "ep2-aws",
         "data": {
             "user": "testuser",
-            "aws_access_key": f"ep2-{aws_key}",
+            "aws_access_key": f"{aws_key}",
             "region": "us-west-2"
         },
         "config": {
-            "json_data": f'{{"aws_secret":"ep2-{aws_key_2}"}}',
-            "escaped_json": f'\\"aws_key\\":\\"ep2-{aws_key_3}\\"',
-            "full_url": f"https://aws.amazon.com/console?access_key=ep2-{aws_key}&secret=ep2-{aws_key_2}&region=us-east-1"
+            "json_data": f'{{"aws_secret":"{aws_key_2}"}}',
+            "escaped_json": f'\\"aws_key\\":\\"{aws_key_3}\\"',
+            "full_url": f"https://aws.amazon.com/console?access_key={aws_key}&secret={aws_key_2}&region=us-east-1"
         },
         "total_secrets": 5,
         "secret_breakdown": {
             "aws_keys_in_json": 3,
             "aws_keys_in_url": 2,
-            "note": "All secrets prefixed with 'ep2-'"
+            "note": "Pure AWS key format without prefixes"
         }
     })
 
@@ -186,7 +186,7 @@ def endpoint_three():
         function authenticateWithGitHub() {{
             // Sample code showing token usage
             const headers = {{
-                'Authorization': 'token ep3-{github_token}'
+                'Authorization': 'token {github_token}'
             }};
             
             fetch('https://api.github.com/user', {{
@@ -200,20 +200,20 @@ def endpoint_three():
         
         <script>
             // JSON string format
-            const githubConfig = `{{"github_token":"ep3-{github_token_2}"}}`;
+            const githubConfig = `{{"github_token":"{github_token_2}"}}`;
             
             // Escaped JSON format
-            const escapedGithubJson = "\\"token\\":\\"ep3-{github_token_3}\\"";
+            const escapedGithubJson = "\\"token\\":\\"{github_token_3}\\"";
             
             // Full URL with GitHub token
-            const githubURL = "https://github.com/api/user?token=ep3-{github_token}&access_token=ep3-{github_token_2}";
+            const githubURL = "https://github.com/api/user?token={github_token}&access_token={github_token_2}";
             
             console.log("GitHub tokens loaded for endpoint 3");
         </script>
         
         <div style="margin-top: 50px; padding: 20px; background-color: #f0f0f0; border: 1px solid #ccc;">
             <h3>Total Secrets: 6</h3>
-            <p>This endpoint contains 6 secrets that should be detected (all prefixed with 'ep3-'):
+            <p>This endpoint contains 6 secrets that should be detected:
             <ul>
                 <li>1 GitHub token in external secrets-ep3.js file</li>
                 <li>1 GitHub token in pre tag</li>
@@ -255,19 +255,19 @@ def endpoint_four():
         <p>This page contains multiple different types of secrets for testing detection.</p>
         
         <!-- AWS Key in HTML comment -->
-        <!-- AWS Access Key: ep4-{aws_key} -->
+        <!-- AWS Access Key: {aws_key} -->
         
         <div class="config-section">
             <h2>AWS Configuration</h2>
             <p>Region: us-east-1</p>
             <p>Access Key ID: AKIAIOSFODNN7EXAMPLE</p>
-            <p>Secret Access Key: ep4-{aws_key}</p>
+            <p>Secret Access Key: {aws_key}</p>
         </div>
         
         <script>
             // Initialize API configuration with API key
             const config = {{
-                apiKey: "ep4-{api_key}",
+                apiKey: "{api_key}",
                 endpoint: "https://api.example.com",
                 timeout: 5000
             }};
@@ -277,7 +277,7 @@ def endpoint_four():
             // GitHub token used in JavaScript function
             function authenticateWithGitHub() {{
                 const headers = {{
-                    'Authorization': 'token ep4-{github_token}'
+                    'Authorization': 'token {github_token}'
                 }};
                 
                 fetch('https://api.github.com/user', {{
@@ -289,33 +289,33 @@ def endpoint_four():
             }}
             
             // JSON string formats
-            const awsConfig = `{{"aws_access_key":"ep4-{aws_key_2}","region":"us-west-2"}}`;
-            const apiConfig = `{{"api_key":"ep4-{api_key_2}","timeout":5000}}`;
-            const githubConfig = `{{"github_token":"ep4-{github_token_2}"}}`;
+            const awsConfig = `{{"aws_access_key":"{aws_key_2}","region":"us-west-2"}}`;
+            const apiConfig = `{{"api_key":"{api_key_2}","timeout":5000}}`;
+            const githubConfig = `{{"github_token":"{github_token_2}"}}`;
             
             // Escaped JSON formats
-            const escapedAws = "\\"aws_key\\":\\"ep4-{aws_key}\\"";
-            const escapedApi = "\\"apiKey\\":\\"ep4-{api_key_2}\\"";
-            const escapedGithub = "\\"github_token\\":\\"ep4-{github_token_2}\\"";
+            const escapedAws = "\\"aws_key\\":\\"{aws_key}\\"";
+            const escapedApi = "\\"apiKey\\":\\"{api_key_2}\\"";
+            const escapedGithub = "\\"github_token\\":\\"{github_token_2}\\"";
             
             // Full URLs with secrets
-            const awsURL = "https://console.aws.amazon.com/s3?access_key=ep4-{aws_key}&secret=ep4-{aws_key_2}";
-            const apiURL = "https://api.service.com/endpoint?key=ep4-{api_key}&token=ep4-{api_key_2}";
-            const githubURL = "https://api.github.com/repos/user/repo?token=ep4-{github_token}&access_token=ep4-{github_token_2}";
+            const awsURL = "https://console.aws.amazon.com/s3?access_key={aws_key}&secret={aws_key_2}";
+            const apiURL = "https://api.service.com/endpoint?key={api_key}&token={api_key_2}";
+            const githubURL = "https://api.github.com/repos/user/repo?token={github_token}&access_token={github_token_2}";
         </script>
         
         <h3>Sample Code</h3>
         <pre>
         // Example GitHub authentication
         const githubAuth = {{
-            token: "ep4-ghp_{github_token[4:]}",
+            token: "{github_token}",
             username: "testuser"
         }};
         </pre>
         
         <div style="margin-top: 50px; padding: 20px; background-color: #f0f0f0; border: 1px solid #ccc;">
             <h3>Total Secrets: 17</h3>
-            <p>This endpoint contains 17 secrets that should be detected (all prefixed with 'ep4-'):
+            <p>This endpoint contains 17 secrets that should be detected:
             <ul>
                 <li>1 GitHub token in external secrets-ep4.js file</li>
                 <li>2 AWS keys (1 in comment, 1 in HTML text)</li>
@@ -372,14 +372,14 @@ const ENDPOINT_SECRET = "ep6-static-{static_github_token}";
         <div class="config-section">
             <h2>AWS Configuration</h2>
             <p>Region: us-east-1</p>
-            <p>Secret Access Key: ep6-{aws_key}</p>
+            <p>Secret Access Key: {aws_key}</p>
         </div>
         
         <script>
             // GitHub token used in JavaScript function
             function authenticateWithGitHub() {{
                 const headers = {{
-                    'Authorization': 'token ep6-{github_token}'
+                    'Authorization': 'token {github_token}'
                 }};
                 
                 fetch('https://api.github.com/user', {{
@@ -391,21 +391,21 @@ const ENDPOINT_SECRET = "ep6-static-{static_github_token}";
             }}
             
             // JSON string formats
-            const awsData = `{{"aws_access_key":"ep6-{aws_key_2}"}}`;
-            const githubData = `{{"github_token":"ep6-{github_token_2}"}}`;
+            const awsData = `{{"aws_access_key":"{aws_key_2}"}}`;
+            const githubData = `{{"github_token":"{github_token_2}"}}`;
             
             // Escaped JSON formats
-            const escapedAwsJson = "\\"aws_secret\\":\\"ep6-{aws_key}\\"";
-            const escapedGithubJson = "\\"token\\":\\"ep6-{github_token_2}\\"";
+            const escapedAwsJson = "\\"aws_secret\\":\\"{aws_key}\\"";
+            const escapedGithubJson = "\\"token\\":\\"{github_token_2}\\"";
             
             // Full URLs with secrets
-            const awsConsoleURL = "https://console.aws.amazon.com/iam?access_key=ep6-{aws_key}&secret_key=ep6-{aws_key_2}";
-            const githubApiURL = "https://api.github.com/user/repos?token=ep6-{github_token}&access_token=ep6-{github_token_2}";
+            const awsConsoleURL = "https://console.aws.amazon.com/iam?access_key={aws_key}&secret_key={aws_key_2}";
+            const githubApiURL = "https://api.github.com/user/repos?token={github_token}&access_token={github_token_2}";
         </script>
         
         <div style="margin-top: 50px; padding: 20px; background-color: #f0f0f0; border: 1px solid #ccc;">
             <h3>Total Secrets: 11</h3>
-            <p>This endpoint contains 11 secrets that should be detected (all prefixed with 'ep6-'):
+            <p>This endpoint contains 11 secrets that should be detected:
             <ul>
                 <li>1 GitHub token in external secrets-ep6.js file</li>
                 <li>2 AWS keys (1 in HTML text, 1 in JavaScript function)</li>
@@ -450,41 +450,41 @@ def endpoint_seven_fixed_patterns():
         <div class="config-section">
             <h2>AWS Configuration</h2>
             <p>Region: us-east-1</p>
-            <p>AWS Access Key: ep7-{aws_key}</p>
+            <p>AWS Access Key: {aws_key}</p>
         </div>
         
         <div class="config-section">
             <h2>GCP Configuration</h2>
-            <p>GCP API Key: ep7-{gcp_key}</p>
+            <p>GCP API Key: {gcp_key}</p>
         </div>
         
         <div class="config-section">
             <h2>GitHub Configuration</h2>
-            <p>GitHub PAT: ep7-{github_token}</p>
+            <p>GitHub PAT: {github_token}</p>
         </div>
         
         <script>
             // JSON string formats
-            const awsConfig = `{{"aws_access_key":"ep7-{aws_key_2}","region":"us-west-2"}}`;
-            const gcpConfig = `{{"gcp_api_key":"ep7-{gcp_key_2}","project":"test-project"}}`;
-            const githubConfig = `{{"github_token":"ep7-{github_token_2}","username":"testuser"}}`;
+            const awsConfig = `{{"aws_access_key":"{aws_key_2}","region":"us-west-2"}}`;
+            const gcpConfig = `{{"gcp_api_key":"{gcp_key_2}","project":"test-project"}}`;
+            const githubConfig = `{{"github_token":"{github_token_2}","username":"testuser"}}`;
             
             // Escaped JSON formats
-            const escapedAws = "\\"aws_key\\":\\"ep7-{aws_key}\\"";
-            const escapedGcp = "\\"gcp_key\\":\\"ep7-{gcp_key_2}\\"";
-            const escapedGithub = "\\"github_token\\":\\"ep7-{github_token_2}\\"";
+            const escapedAws = "\\"aws_key\\":\\"{aws_key}\\"";
+            const escapedGcp = "\\"gcp_key\\":\\"{gcp_key_2}\\"";
+            const escapedGithub = "\\"github_token\\":\\"{github_token_2}\\"";
             
             // Full URLs with secrets
-            const awsURL = "https://s3.amazonaws.com/bucket?AWSAccessKeyId=ep7-{aws_key}&SecretKey=ep7-{aws_key_2}";
-            const gcpURL = "https://googleapis.com/storage/v1/b/bucket?key=ep7-{gcp_key}&api_key=ep7-{gcp_key_2}";
-            const githubURL = "https://api.github.com/user?token=ep7-{github_token}&access_token=ep7-{github_token_2}";
+            const awsURL = "https://s3.amazonaws.com/bucket?AWSAccessKeyId={aws_key}&SecretKey={aws_key_2}";
+            const gcpURL = "https://googleapis.com/storage/v1/b/bucket?key={gcp_key}&api_key={gcp_key_2}";
+            const githubURL = "https://api.github.com/user?token={github_token}&access_token={github_token_2}";
             
             console.log("All cloud service tokens loaded for endpoint 7");
         </script>
         
         <div style="margin-top: 50px; padding: 20px; background-color: #f0f0f0; border: 1px solid #ccc;">
             <h3>Total Secrets: 16</h3>
-            <p>This endpoint contains 16 secrets that should be detected (all prefixed with 'ep7-'):
+            <p>This endpoint contains 16 secrets that should be detected:
             <ul>
                 <li>1 GitHub token in external secrets-ep7.js file</li>
                 <li>3 secrets in HTML text (1 AWS, 1 GCP, 1 GitHub)</li>
@@ -517,25 +517,25 @@ def endpoint_eight_fixed_patterns_no_groups():
         
         <div class="config-section">
             <h2>NPM Configuration</h2>
-            <p>NPM Token: ep8-{npm_token}</p>
+            <p>NPM Token: {npm_token}</p>
         </div>
         
         <script>
             // JSON string format
-            const npmConfig = `{{"npm_token":"ep8-{npm_token_2}","registry":"https://registry.npmjs.org"}}`;
+            const npmConfig = `{{"npm_token":"{npm_token_2}","registry":"https://registry.npmjs.org"}}`;
             
             // Escaped JSON format
-            const escapedNpmJson = "\\"npm_token\\":\\"ep8-{npm_token}\\"";
+            const escapedNpmJson = "\\"npm_token\\":\\"{npm_token}\\"";
             
             // Full URL with NPM token
-            const npmURL = "https://registry.npmjs.org/package?token=ep8-{npm_token}&auth_token=ep8-{npm_token_2}";
+            const npmURL = "https://registry.npmjs.org/package?token={npm_token}&auth_token={npm_token_2}";
             
             console.log("NPM configuration loaded for endpoint 8");
         </script>
         
         <div style="margin-top: 50px; padding: 20px; background-color: #f0f0f0; border: 1px solid #ccc;">
             <h3>Total Secrets: 5</h3>
-            <p>This endpoint contains 5 secrets that should be detected (all prefixed with 'ep8-'):
+            <p>This endpoint contains 5 secrets that should be detected:
             <ul>
                 <li>1 NPM token in HTML text</li>
                 <li>1 NPM token in JSON string</li>
