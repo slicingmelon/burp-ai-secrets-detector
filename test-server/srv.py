@@ -2,9 +2,35 @@ from flask import Flask, jsonify, render_template_string
 import random
 import string
 import os
+import json
+from datetime import datetime
 
 app = Flask(__name__)
 
+# Secret tracking for testing purposes
+SECRET_REGISTRY = {
+    "generated_at": None,
+    "endpoints": {}
+}
+
+def log_secret(endpoint, secret_type, secret_value, location):
+    """Log a secret and its source for testing identification"""
+    if SECRET_REGISTRY["generated_at"] is None:
+        SECRET_REGISTRY["generated_at"] = datetime.now().isoformat()
+    
+    if endpoint not in SECRET_REGISTRY["endpoints"]:
+        SECRET_REGISTRY["endpoints"][endpoint] = []
+    
+    SECRET_REGISTRY["endpoints"][endpoint].append({
+        "type": secret_type,
+        "value": secret_value,
+        "location": location,
+        "logged_at": datetime.now().isoformat()
+    })
+    
+    # Save to file for testing reference
+    with open('static/secret_registry.json', 'w') as f:
+        json.dump(SECRET_REGISTRY, f, indent=2)
 
 def generate_aws_key():
     # Use fixed prefix that matches the regex
@@ -25,8 +51,13 @@ def create_endpoint_secrets_js(endpoint_name):
     filename = f'static/secrets-{endpoint_name}.js'
     github_token = generate_github_token()
     
+    # Log the secret for testing identification
+    log_secret(endpoint_name, "github_token", github_token, f"secrets-{endpoint_name}.js")
+    
     with open(filename, 'w') as f:
         f.write(f'''// Configuration file for endpoint {endpoint_name}
+// SECRET_SOURCE: endpoint-{endpoint_name}
+// SECRET_TYPE: github_token
 const API_SETTINGS = {{
     timeout: 30000,
     retries: 3,
@@ -34,8 +65,8 @@ const API_SETTINGS = {{
     endpoint_id: "{endpoint_name}"
 }};
 
-// Endpoint-specific identifier in secret
-const ENDPOINT_SECRET = "endpoint-{endpoint_name}-{github_token}";
+// Pure secret for pattern matching (source: endpoint-{endpoint_name})
+const ENDPOINT_SECRET = "{github_token}";
 ''')
     return github_token
 
@@ -48,7 +79,12 @@ def endpoint_one():
     api_key_2 = generate_api_key()
     api_key_3 = generate_api_key()
     
-    # Create endpoint-specific secrets file
+    # Log all secrets for testing identification
+    log_secret("ep1", "api_key", api_key, "JavaScript config")
+    log_secret("ep1", "api_key", api_key_2, "JSON string")
+    log_secret("ep1", "api_key", api_key_3, "Escaped JSON")
+    
+    # Create endpoint-specific secrets file (also logs its own secret)
     endpoint_github_token = create_endpoint_secrets_js("ep1")
     
     html_content = f'''
@@ -513,6 +549,11 @@ def endpoint_eight_fixed_patterns_no_groups():
     '''
     return render_template_string(html_content)
 
+@app.route('/secret-registry')
+def secret_registry():
+    """Show all generated secrets and their sources for testing"""
+    return jsonify(SECRET_REGISTRY)
+
 @app.route('/')
 def index():
     """Show an index of all available endpoints"""
@@ -523,7 +564,8 @@ def index():
         {"path": "/4-all", "name": "Multiple Secrets Example", "secrets": 17},
         {"path": "/6-static-aws-github", "name": "Static AWS and GitHub Secrets", "secrets": 11},
         {"path": "/7-fixed-patterns-aws-github-gcp", "name": "Fixed Pattern Secrets (AWS, GitHub, GCP)", "secrets": 16},
-        {"path": "/8-fixed-patterns-no-groups-npm", "name": "Fixed Pattern Secrets - No Groups (NPM)", "secrets": 5}
+        {"path": "/8-fixed-patterns-no-groups-npm", "name": "Fixed Pattern Secrets - No Groups (NPM)", "secrets": 5},
+        {"path": "/secret-registry", "name": "📋 Secret Registry (for testing identification)", "secrets": "All"}
     ]
     
     html_content = '''

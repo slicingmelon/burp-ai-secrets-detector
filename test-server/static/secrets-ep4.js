@@ -7,4 +7,4 @@ const API_SETTINGS = {
 };
 
 // Endpoint-specific identifier in secret
-const ENDPOINT_SECRET = "endpoint-ep4-ghp_iU80uksduv1E73T2wF0T0BmLGgwriAbGCd2a";
+const ENDPOINT_SECRET = "ghp_iU80uksduv1E73T2wF0T0BmLGgwriAbGCd2a";
