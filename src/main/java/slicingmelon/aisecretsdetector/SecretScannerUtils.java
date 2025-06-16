@@ -48,11 +48,12 @@ public class SecretScannerUtils {
     /**
      * Helper function to create suffix boundary patterns for secret detection
      * Creates a non-capturing group that matches common secret terminators including escaped JSON scenarios
+     * Inspired by gitleaks patterns with additional web/JSON-specific boundaries
      * @return Regex string for suffix boundary matching
      */
     public static String buildSuffixRegex() {
-        // Match common terminators: tabs, newlines, spaces, quotes, backticks, escaped quotes, HTML/XML tags, end of string
-        return "(?:[\\t\\r\\n \"'`\\\\\"]|</|$)";
+        // Match common terminators: whitespace, quotes, backticks, semicolons, escaped newlines, escaped quotes, HTML/XML tags, end of string
+        return "(?:[\\x60'\"\\s;]|\\\\[nr]|\\\\\"|</|$)";
     }
     
     private static int genericSecretMinLength = 15;
