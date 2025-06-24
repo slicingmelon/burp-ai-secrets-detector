@@ -80,11 +80,17 @@ public class SecretScanner {
         if (matchStart == -1) {
             return null;
         }
+
+        // Adjust buffer size for known long patterns like private keys
+        int bufferSize = 300; // Default buffer
+        if (pattern.pattern().contains("PRIVATE KEY")) {
+            bufferSize = 4096; // Use a larger buffer for private keys
+        }
         
         // To find the end position, we need to apply the regex to a small portion
         // Extract a reasonable chunk around the match (but not too much to avoid overflow)
         int extractStart = Math.max(0, matchStart - 10); // Small buffer before
-        int extractEnd = Math.min(data.length(), matchStart + 300); // Reasonable buffer after
+        int extractEnd = Math.min(data.length(), matchStart + bufferSize); // Reasonable buffer after
         
         try {
             ByteArray matchRegion = data.subArray(extractStart, extractEnd);
