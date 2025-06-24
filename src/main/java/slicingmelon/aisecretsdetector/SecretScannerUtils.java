@@ -249,7 +249,7 @@ public class SecretScannerUtils {
             "\\b((?:sk|rk)_(?:test|live|prod)_[a-zA-Z0-9]{10,99})\\b");
         
         addPattern("Square Access Token", 
-            "\\b((?:EAAA|sq0atp-)[\\w-]{22,60})\\b");
+            "\\b((?:EAAA|sq0atp-)[\\w-]{22,60})" + buildSuffixRegex());
         
         addPattern("Squarespace Access Token", 
             "(?i)[\\w.-]{0,50}?(?:squarespace)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\\b");
@@ -259,7 +259,7 @@ public class SecretScannerUtils {
         
         // Shopify Access Tokens
         addPattern("Shopify Access Token", 
-            "shpat_[a-fA-F0-9]{32}");
+            "shpat_[a-fA-F0-9]{32}"); 
             
         addPattern("Shopify Custom Access Token", 
             "shpca_[a-fA-F0-9]{32}");
