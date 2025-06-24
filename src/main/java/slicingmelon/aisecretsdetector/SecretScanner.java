@@ -18,6 +18,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.HashMap;
 
 public class SecretScanner {
     private final UIConfig config;
@@ -183,7 +185,7 @@ public class SecretScanner {
     
     public SecretScanResult scanResponse(HttpResponse response) {
         List<Secret> foundSecrets = new ArrayList<>();
-        Set<String> uniqueSecretValues = new HashSet<>();
+        Map<String, Set<String>> uniqueSecretsPerPattern = new HashMap<>();
         
         // Get max highlights setting once outside all loops for efficiency
         int maxHighlights = config.getConfigSettings().getMaxHighlightsPerSecret();
@@ -258,14 +260,17 @@ public class SecretScanner {
                                 config.appendToLog("Extracted secret value for " + pattern.getName() + ": " + secretValue.substring(0, Math.min(10, secretValue.length())) + "...");
                             }
                             
-                            // Skip duplicates (but still add to set for tracking)
-                            if (uniqueSecretValues.contains(secretValue)) {
-                                config.appendToLog("Skipping duplicate secret value");
+                            // Skip duplicates for this specific pattern
+                            String patternName = pattern.getName();
+                            Set<String> foundValuesForPattern = uniqueSecretsPerPattern.computeIfAbsent(patternName, k -> new HashSet<>());
+
+                            if (foundValuesForPattern.contains(secretValue)) {
+                                config.appendToLog("Skipping duplicate secret value for pattern " + patternName);
                                 // Continue searching from after this match
                                 searchFrom = matchResult.endPos;
                                 continue;
                             }
-                            uniqueSecretValues.add(secretValue);
+                            foundValuesForPattern.add(secretValue);
                             
                             // Find all occurrences of this secret in the response using ByteArray methods
                             searchStart = 0;
