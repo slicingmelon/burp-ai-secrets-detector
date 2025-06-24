@@ -262,7 +262,7 @@ public class SecretScanner {
                             
                             // Skip duplicates for this specific pattern
                             String patternName = pattern.getName();
-                            Set<String> foundValuesForPattern = uniqueSecretsPerPattern.computeIfAbsent(patternName, k -> new HashSet<>());
+                            Set<String> foundValuesForPattern = uniqueSecretsPerPattern.computeIfAbsent(patternName, _ -> new HashSet<>());
 
                             if (foundValuesForPattern.contains(secretValue)) {
                                 config.appendToLog("Skipping duplicate secret value for pattern " + patternName);
