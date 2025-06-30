@@ -191,18 +191,17 @@ public class SecretScanner {
         int maxHighlights = config.getConfigSettings().getMaxHighlightsPerSecret();
         
         try {
-            // Use String for reliable regex matching, but get byte offsets for accurate highlighting
-            String responseBody = response.bodyToString();
-            int bodyOffset = response.bodyOffset();
-            config.appendToLog("Scanning response body of " + responseBody.length() + " chars with " + secretPatterns.size() + " patterns");
+            // Use String for reliable regex matching
+            String responseString = response.toString();
+            // Use ByteArray for fast, byte-accurate searching of found secrets
+            ByteArray responseBytes = response.toByteArray();
+            config.appendToLog("Scanning response of " + responseBytes.length() + " bytes with " + secretPatterns.size() + " patterns");
             
             // Declare variables outside loops for efficiency
             String secretValue;
             Secret secret;
             
             for (SecretPattern pattern : secretPatterns) {
-                Map<String, Integer> highlightsPerSecretValue = new HashMap<>();
-
                 try {
                     config.appendToLog("Testing pattern: " + pattern.getName());
                     
@@ -211,10 +210,10 @@ public class SecretScanner {
                         continue;
                     }
 
-                    Matcher matcher = pattern.getPattern().matcher(responseBody);
+                    Matcher matcher = pattern.getPattern().matcher(responseString);
                     
                     while (matcher.find()) {
-                        // Extract group info
+                        // STEP 1: IDENTIFY secret value using Java's powerful regex engine
                         if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2")) && matcher.groupCount() >= 1) {
                             secretValue = matcher.group(1);
                             config.appendToLog("Extracted potential secret for " + pattern.getName() + ": " + secretValue.substring(0, Math.min(10, secretValue.length())) + "...");
@@ -240,37 +239,37 @@ public class SecretScanner {
                             config.appendToLog("Extracted secret value for " + pattern.getName() + ": " + secretValue.substring(0, Math.min(10, secretValue.length())) + "...");
                         }
 
-                        // Check if we have already hit the highlight limit for this specific secret value
-                        if (highlightsPerSecretValue.getOrDefault(secretValue, 0) >= maxHighlights) {
-                            continue; // Already found max highlights for this value
-                        }
-
-                        // Use computeIfAbsent for cleaner unique tracking per pattern
+                        // STEP 2: CHECK FOR UNIQUENESS for this pattern
+                        // If we have already found and highlighted this exact secret value for this pattern, skip to the next match.
                         Set<String> foundValuesForPattern = uniqueSecretsPerPattern.computeIfAbsent(pattern.getName(), k -> new HashSet<>());
-                        
-                        // Add the secret if it's the first time we're seeing this value for this pattern
-                        if (foundValuesForPattern.add(secretValue)) {
-                            config.appendToLog("Found new unique secret for pattern " + pattern.getName());
+                        if (!foundValuesForPattern.add(secretValue)) {
+                            continue;
                         }
+                        
+                        config.appendToLog("Found new unique secret for pattern " + pattern.getName());
 
-                        // SECRET POSITION CALCULATION
-                        // The matcher gives us character offsets (start/end) in the response body string.
-                        // We need to convert these to byte offsets relative to the full response for accurate highlighting.
-                        int charStart = matcher.start();
-                        int charEnd = matcher.end();
-                        
-                        // To get byte offsets, convert the preceding part of the string to bytes and check length
-                        int byteStartInBody = responseBody.substring(0, charStart).getBytes(StandardCharsets.UTF_8).length;
-                        int byteEndInBody = responseBody.substring(0, charEnd).getBytes(StandardCharsets.UTF_8).length;
+                        // STEP 3: LOCATE all occurrences using ByteArray.indexOf for performance and API usage
+                        int searchStart = 0;
+                        int highlightsCreated = 0;
+                        byte[] secretValueBytes = secretValue.getBytes(StandardCharsets.UTF_8);
 
-                        int fullStartPos = bodyOffset + byteStartInBody;
-                        int fullEndPos = bodyOffset + byteEndInBody;
-                        
-                        secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
-                        foundSecrets.add(secret);
-                        
-                        int currentHighlights = highlightsPerSecretValue.getOrDefault(secretValue, 0);
-                        highlightsPerSecretValue.put(secretValue, currentHighlights + 1);
+                        while (highlightsCreated < maxHighlights) {
+                            int exactPos = responseBytes.indexOf(secretValue, true, searchStart, responseBytes.length());
+
+                            if (exactPos == -1) {
+                                break; // No more occurrences
+                            }
+
+                            // Create a secret for this occurrence
+                            int fullStartPos = exactPos;
+                            int fullEndPos = fullStartPos + secretValueBytes.length; // Use byte length for accuracy
+                            secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
+                            foundSecrets.add(secret);
+                            highlightsCreated++;
+
+                            // Move search start past this occurrence
+                            searchStart = fullEndPos;
+                        }
                     }
                 } catch (Exception e) {
                     config.appendToLog("Error with pattern " + pattern.getName() + ": " + e.getMessage());
