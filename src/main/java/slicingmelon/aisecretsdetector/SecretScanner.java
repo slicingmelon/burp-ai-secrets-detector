@@ -213,18 +213,16 @@ public class SecretScanner {
                     Matcher matcher = pattern.getPattern().matcher(responseString);
                     
                     while (matcher.find()) {
-                        // STEP 1: IDENTIFY secret value using Java's powerful regex engine
+                        // STEP 1: IDENTIFY secret value using Java's regex engine (Burp's API indexOf pattern not working properly)
                         if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2")) && matcher.groupCount() >= 1) {
                             secretValue = matcher.group(1);
                             config.appendToLog("Extracted potential secret for " + pattern.getName() + ": " + secretValue.substring(0, Math.min(10, secretValue.length())) + "...");
                             
-                            // Skip non-random strings etc.
                             if (!RandomnessAlgorithm.isRandom(ByteArray.byteArray(secretValue))) {
                                 config.appendToLog("Skipping non-random string for " + pattern.getName());
                                 continue;
                             }
                             
-                            // Skip if the Generic Secret matches reCAPTCHA Site Key pattern
                             if (isRecaptchaSecret(secretValue)) {
                                 config.appendToLog("Skipping reCAPTCHA secret for " + pattern.getName());
                                 continue;
@@ -248,7 +246,7 @@ public class SecretScanner {
                         
                         config.appendToLog("Found new unique secret for pattern " + pattern.getName());
 
-                        // STEP 3: LOCATE all occurrences using ByteArray.indexOf for performance and API usage
+                        // STEP 3: LOCATE all occurrences using ByteArray.indexOf, as it's supposedly faster.
                         int searchStart = 0;
                         int highlightsCreated = 0;
                         ByteArray secretValueBytes = ByteArray.byteArray(secretValue);
@@ -262,7 +260,7 @@ public class SecretScanner {
 
                             // Create a secret for this occurrence
                             int fullStartPos = exactPos;
-                            int fullEndPos = fullStartPos + secretValueBytes.length(); // Use byte length for accuracy
+                            int fullEndPos = fullStartPos + secretValueBytes.length();
                             secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
                             foundSecrets.add(secret);
                             highlightsCreated++;
