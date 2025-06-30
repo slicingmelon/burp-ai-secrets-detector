@@ -196,7 +196,7 @@ public class UIConfig {
                 try {
                     enabledTools.add(ToolType.valueOf(tool));
                 } catch (IllegalArgumentException e) {
-                    api.logging().logToError("Invalid tool type in config: " + tool);
+                    AISecretsDetector.getInstance().logMsgError("Invalid tool type in config: " + tool);
                 }
             }
         }
@@ -279,7 +279,7 @@ public class UIConfig {
         workersSpinner.addChangeListener(_ -> {
             configSettings.setWorkers((Integer) workersSpinner.getValue());
             saveConfigSettings();
-            api.logging().logToOutput("Configuration updated - Workers: " + configSettings.getWorkers());
+            AISecretsDetector.getInstance().logMsg("Configuration updated - Workers: " + configSettings.getWorkers());
         });
         
         leftConstraints.gridx = 1;
@@ -292,7 +292,7 @@ public class UIConfig {
         inScopeCheckbox.addActionListener(_ -> {
             configSettings.setInScopeOnly(inScopeCheckbox.isSelected());
             saveConfigSettings();
-            api.logging().logToOutput("Configuration updated - In-Scope Only: " + configSettings.isInScopeOnly());
+            AISecretsDetector.getInstance().logMsg("Configuration updated - In-Scope Only: " + configSettings.isInScopeOnly());
         });
         
         leftConstraints.gridx = 0;
@@ -314,8 +314,8 @@ public class UIConfig {
         randomnessCheckbox.addActionListener(_ -> {
             configSettings.setRandomnessAlgorithmEnabled(randomnessCheckbox.isSelected());
             saveConfigSettings();
-            api.logging().logToOutput("Configuration updated - Randomness Algorithm: " + 
-                                     configSettings.isRandomnessAlgorithmEnabled());
+                        AISecretsDetector.getInstance().logMsg("Configuration updated - Randomness Algorithm: " +
+                    configSettings.isRandomnessAlgorithmEnabled());
         });
         
         rightConstraints.gridx = 0;
@@ -341,8 +341,8 @@ public class UIConfig {
         minLengthSpinner.addChangeListener(_ -> {
             configSettings.setGenericSecretMinLength((Integer) minLengthSpinner.getValue());
             saveConfigSettings();
-            api.logging().logToOutput("Configuration updated - Min Secret Length: " + 
-                                     configSettings.getGenericSecretMinLength());
+                        AISecretsDetector.getInstance().logMsg("Configuration updated - Min Secret Length: " +
+                    configSettings.getGenericSecretMinLength());
         });
         
         // Set a reasonable fixed width for the spinner
@@ -372,8 +372,8 @@ public class UIConfig {
         maxLengthSpinner.addChangeListener(_ -> {
             configSettings.setGenericSecretMaxLength((Integer) maxLengthSpinner.getValue());
             saveConfigSettings();
-            api.logging().logToOutput("Configuration updated - Max Secret Length: " + 
-                                     configSettings.getGenericSecretMaxLength());
+                        AISecretsDetector.getInstance().logMsg("Configuration updated - Max Secret Length: " +
+                    configSettings.getGenericSecretMaxLength());
         });
         
         // Set a reasonable fixed width for the spinner
@@ -403,8 +403,8 @@ public class UIConfig {
         duplicateThresholdSpinner.addChangeListener(_ -> {
             configSettings.setDuplicateThreshold((Integer) duplicateThresholdSpinner.getValue());
             saveConfigSettings();
-            api.logging().logToOutput("Configuration updated - Duplicate Threshold: " + 
-                                     configSettings.getDuplicateThreshold());
+                        AISecretsDetector.getInstance().logMsg("Configuration updated - Duplicate Threshold: " +
+                    configSettings.getDuplicateThreshold());
         });
         
         // Set a reasonable fixed width for the spinner
@@ -434,8 +434,8 @@ public class UIConfig {
         maxHighlightsSpinner.addChangeListener(_ -> {
             configSettings.setMaxHighlightsPerSecret((Integer) maxHighlightsSpinner.getValue());
             saveConfigSettings();
-            api.logging().logToOutput("Configuration updated - Max Highlights Per Secret: " + 
-                                     configSettings.getMaxHighlightsPerSecret());
+                        AISecretsDetector.getInstance().logMsg("Configuration updated - Max Highlights Per Secret: " +
+                    configSettings.getMaxHighlightsPerSecret());
         });
         
         // Set a reasonable fixed width for the spinner
@@ -470,7 +470,7 @@ public class UIConfig {
             checkbox.addActionListener(_ -> {
                 configSettings.setToolEnabled(tool, checkbox.isSelected());
                 saveConfigSettings();
-                api.logging().logToOutput("Configuration updated - Tool " + tool.name() + 
+                AISecretsDetector.getInstance().logMsg("Configuration updated - Tool " + tool.name() + 
                                         ": " + checkbox.isSelected());
             });
             toolsPanel.add(checkbox);
@@ -485,7 +485,7 @@ public class UIConfig {
         loggingCheckbox.addActionListener(_ -> {
             configSettings.setLoggingEnabled(loggingCheckbox.isSelected());
             saveConfigSettings();
-            api.logging().logToOutput("Configuration updated - Logging: " + configSettings.isLoggingEnabled());
+            AISecretsDetector.getInstance().logMsg("Configuration updated - Logging: " + configSettings.isLoggingEnabled());
             
             if (configSettings.isLoggingEnabled()) {
                 appendToLog("Logging enabled");
@@ -575,7 +575,7 @@ public class UIConfig {
         AISecretsDetector detector = AISecretsDetector.getInstance();
         if (detector != null) {
             detector.clearSecretCounters();
-            api.logging().logToOutput("Secret counters reset");
+            AISecretsDetector.getInstance().logMsg("Secret counters reset");
         }
     }
 }

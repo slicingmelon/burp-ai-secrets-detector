@@ -9,6 +9,7 @@ package slicingmelon.aisecretsdetector;
 
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.responses.HttpResponse;
+import burp.api.montoya.core.ByteArray;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,7 +17,9 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.nio.charset.StandardCharsets;
+//import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.HashMap;
 
 public class SecretScanner {
     private final UIConfig config;
@@ -54,6 +57,64 @@ public class SecretScanner {
             return endIndex;
         }
     }
+    
+    // Helper class for returning both start and end positions
+    // public static class MatchResult {
+    //     public final int startPos;
+    //     public final int endPos;
+        
+    //     public MatchResult(int startPos, int endPos) {
+    //         this.startPos = startPos;
+    //         this.endPos = endPos;
+    //     }
+    // }
+    
+    /**
+     * Find pattern match bounds in ByteArray and return both start and end positions
+     * @param data ByteArray to search in
+     * @param pattern Pattern to search for
+     * @param startIndex Where to start searching
+     * @return MatchResult with start and end positions, or null if no match found
+     */
+    // private static MatchResult findPatternBounds(ByteArray data, Pattern pattern, int startIndex) {
+    //     // First, find the match position using ByteArray's indexOf
+    //     int matchStart = data.indexOf(pattern, startIndex, data.length());
+    //     if (matchStart == -1) {
+    //         return null;
+    //     }
+
+    //     // Adjust buffer size for known long patterns like private keys
+    //     int bufferSize = 300; // Default buffer
+    //     if (pattern.pattern().contains("PRIVATE KEY")) {
+    //         bufferSize = 4096; // Use a larger buffer for private keys
+    //     }
+        
+    //     // To find the end position, we need to apply the regex to a small portion
+    //     // Extract a reasonable chunk around the match (but not too much to avoid overflow)
+    //     int extractStart = Math.max(0, matchStart - 10); // Small buffer before
+    //     int extractEnd = Math.min(data.length(), matchStart + bufferSize); // Reasonable buffer after
+        
+    //     try {
+    //         ByteArray matchRegion = data.subArray(extractStart, extractEnd);
+    //         String matchRegionString = matchRegion.toString();
+            
+    //         Matcher matcher = pattern.matcher(matchRegionString);
+            
+    //         // Find the match in the extracted region
+    //         int regionMatchPos = matchStart - extractStart;
+    //         if (matcher.find(regionMatchPos)) {
+    //             // Calculate actual positions in the original ByteArray
+    //             int actualStart = extractStart + matcher.start();
+    //             int actualEnd = extractStart + matcher.end();
+    //             return new MatchResult(actualStart, actualEnd);
+    //         }
+    //     } catch (Exception e) {
+    //         // Fallback: assume the match is at least 1 character
+    //         return new MatchResult(matchStart, matchStart + 1);
+    //     }
+        
+    //     return null;
+    // }
     
     public static class SecretPattern {
         private final String name;
@@ -101,52 +162,68 @@ public class SecretScanner {
     }
     
     public SecretScanner(MontoyaApi api) {
-        //this.api = api;
-        this.secretPatterns = SecretScannerUtils.getAllPatterns();
-        this.config = UIConfig.getInstance();
+
+        List<SecretPattern> patterns;
+        UIConfig configInstance;
+        
+        try {
+            //this.api = api;
+            patterns = SecretScannerUtils.getAllPatterns();
+            configInstance = UIConfig.getInstance();
+            
+            AISecretsDetector.getInstance().logMsg("SecretScanner initialized with " + patterns.size() + " patterns");
+        } catch (Exception e) {
+            AISecretsDetector.getInstance().logMsgError("Error initializing SecretScanner: " + e.getMessage());
+            e.printStackTrace();
+            patterns = new ArrayList<>(); // fallback to empty list
+            configInstance = UIConfig.getInstance();
+        }
+        
+        this.secretPatterns = patterns;
+        this.config = configInstance;
     }
     
     public SecretScanResult scanResponse(HttpResponse response) {
         List<Secret> foundSecrets = new ArrayList<>();
-        Set<String> uniqueSecretValues = new HashSet<>();
+        Map<String, Set<String>> uniqueSecretsPerPattern = new HashMap<>();
         
-        // Get max highlights setting once outside all loops for efficiency
         int maxHighlights = config.getConfigSettings().getMaxHighlightsPerSecret();
         
         try {
-            String responseString = response.toString(); // Convert once upfront since we can't use fast check
+            // Use String for reliable regex matching
+            String responseString = response.toString();
+            // Use ByteArray for fast, byte-accurate searching of found secrets
+            ByteArray responseBytes = response.toByteArray();
+            config.appendToLog("Scanning response of " + responseBytes.length() + " bytes with " + secretPatterns.size() + " patterns");
             
             // Declare variables outside loops for efficiency
             String secretValue;
-            int searchStart;
-            int highlightsCreated;
-            int exactPos;
-            int fullStartPos;
-            int fullEndPos;
             Secret secret;
             
             for (SecretPattern pattern : secretPatterns) {
                 try {
-                    if (pattern.getName().equals("Generic Secret") && !SecretScannerUtils.isRandomnessAlgorithmEnabled()) {
+                    config.appendToLog("Testing pattern: " + pattern.getName());
+                    
+                    if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2")) && !SecretScannerUtils.isRandomnessAlgorithmEnabled()) {
+                        config.appendToLog("Skipping " + pattern.getName() + " - randomness algorithm disabled");
                         continue;
                     }
 
-                    // Use regex on full response string for position calculation
                     Matcher matcher = pattern.getPattern().matcher(responseString);
                     
                     while (matcher.find()) {
-                        
-                        // Extract group info
-                        if (pattern.getName().equals("Generic Secret") && matcher.groupCount() >= 1) {
+                        // STEP 1: IDENTIFY secret value using Java's regex engine (Burp's API indexOf pattern not working properly)
+                        if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2")) && matcher.groupCount() >= 1) {
                             secretValue = matcher.group(1);
+                            config.appendToLog("Extracted potential secret for " + pattern.getName() + ": " + secretValue.substring(0, Math.min(10, secretValue.length())) + "...");
                             
-                            // Skip non-random strings etc.
-                            if (!RandomnessAlgorithm.isRandom(secretValue.getBytes(StandardCharsets.UTF_8))) {
+                            if (!RandomnessAlgorithm.isRandom(ByteArray.byteArray(secretValue))) {
+                                config.appendToLog("Skipping non-random string for " + pattern.getName());
                                 continue;
                             }
                             
-                            // Skip if the Generic Secret matches reCAPTCHA Site Key pattern
                             if (isRecaptchaSecret(secretValue)) {
+                                config.appendToLog("Skipping reCAPTCHA secret for " + pattern.getName());
                                 continue;
                             }
                         } else {
@@ -154,55 +231,54 @@ public class SecretScanner {
                             if (matcher.groupCount() >= 1) {
                                 secretValue = matcher.group(1);
                             } else {
-                                secretValue = matcher.group(0);
+                                secretValue = matcher.group(0); // Whole match
                             }
+                            config.appendToLog("Extracted secret value for " + pattern.getName() + ": " + secretValue.substring(0, Math.min(10, secretValue.length())) + "...");
                         }
-                        
-                        // Skip duplicates
-                        if (uniqueSecretValues.contains(secretValue)) {
+
+                        // STEP 2: CHECK FOR UNIQUENESS for this pattern
+                        // If we have already found and highlighted this exact secret value for this pattern, skip to the next match.
+                        Set<String> foundValuesForPattern = uniqueSecretsPerPattern.computeIfAbsent(pattern.getName(), _ -> new HashSet<>());
+                        if (!foundValuesForPattern.add(secretValue)) {
                             continue;
                         }
-                        uniqueSecretValues.add(secretValue);
                         
-                        // Find all occurrences of this secret in the response (like Burp Montoya API example)
-                        searchStart = 0;
-                        highlightsCreated = 0;
-                        
-                        while (searchStart < responseString.length() && highlightsCreated < maxHighlights) {
-                            exactPos = responseString.indexOf(secretValue, searchStart);
-                            
+                        config.appendToLog("Found new unique secret for pattern " + pattern.getName());
+
+                        // STEP 3: LOCATE all occurrences using ByteArray.indexOf, as it's supposedly faster.
+                        int searchStart = 0;
+                        int highlightsCreated = 0;
+                        ByteArray secretValueBytes = ByteArray.byteArray(secretValue);
+
+                        while (highlightsCreated < maxHighlights) {
+                            int exactPos = responseBytes.indexOf(secretValueBytes, true, searchStart, responseBytes.length());
+
                             if (exactPos == -1) {
-                                break; // No more occurrences
+                                break;
                             }
-                            
-                            // *** STEP 1: SECRET POSITION CALCULATION ***
-                            // Found an occurrence - calculate exact start/end positions in response
-                            // These positions will later be used to create RED response markers/highlights in Burp
-                            fullStartPos = exactPos;
-                            fullEndPos = fullStartPos + secretValue.length();
+
+                            // Create a secret for this occurrence
+                            int fullStartPos = exactPos;
+                            int fullEndPos = fullStartPos + secretValueBytes.length();
                             secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
                             foundSecrets.add(secret);
                             highlightsCreated++;
-                            
+
                             // Move search start past this occurrence
-                            searchStart = exactPos + secretValue.length();
-                        }
-                        
-                        // Log if we hit the limit and there might be more occurrences
-                        if (highlightsCreated >= maxHighlights && searchStart < responseString.length()) {
-                            int remainingPos = responseString.indexOf(secretValue, searchStart);
-                            if (remainingPos != -1) {
-                                config.appendToLog(String.format("Limited highlights for secret '%s' to %d (more occurrences exist but not highlighted for performance)", 
-                                    secretValue, maxHighlights));
-                            }
+                            searchStart = fullEndPos;
                         }
                     }
                 } catch (Exception e) {
                     config.appendToLog("Error with pattern " + pattern.getName() + ": " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
+            
+            config.appendToLog("Scan completed. Found " + foundSecrets.size() + " total secrets");
+            
         } catch (Exception e) {
             config.appendToLog("Error scanning response: " + e.getMessage());
+            e.printStackTrace();
         }
         
         return new SecretScanResult(response, foundSecrets);

@@ -7,11 +7,12 @@
  */
 package slicingmelon.aisecretsdetector;
 
+import burp.api.montoya.core.ByteArray;
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.nio.charset.StandardCharsets;
 
 /**
  * Randomness detection algorithm ported from RipSecrets
@@ -26,9 +27,9 @@ public class RandomnessAlgorithm {
      * Determines if a byte sequence is likely to be a random string (secret)
      * Ported from RipSecrets p_random.rs
      */
-    public static boolean isRandom(byte[] data) {
+    public static boolean isRandom(ByteArray data) {
         // Check if the data is valid
-        if (data == null || data.length < SecretScannerUtils.getGenericSecretMinLength()) {
+        if (data == null || data.length() < SecretScannerUtils.getGenericSecretMinLength()) {
             return false;
         }
         
@@ -56,7 +57,7 @@ public class RandomnessAlgorithm {
      * Calculates the probability that a byte sequence is random
      * Ported from RipSecrets
      */
-    private static double pRandom(byte[] data) {
+    private static double pRandom(ByteArray data) {
         double base;
         if (isHex(data)) {
             base = 16.0;
@@ -80,8 +81,8 @@ public class RandomnessAlgorithm {
      * Checks if a byte sequence consists only of hex characters (0-9, a-f, A-F)
      * and is at least 16 bytes long
      */
-    private static boolean isHex(byte[] data) {
-        if (data.length < 16) {
+    private static boolean isHex(ByteArray data) {
+        if (data.length() < 16) {
             return false;
         }
         
@@ -97,8 +98,8 @@ public class RandomnessAlgorithm {
      * Checks if a byte sequence consists only of capital letters and numbers (0-9, A-Z)
      * and is at least 16 bytes long
      */
-    private static boolean isCapAndNumbers(byte[] data) {
-        if (data.length < 16) {
+    private static boolean isCapAndNumbers(ByteArray data) {
+        if (data.length() < 16) {
             return false;
         }
         
@@ -113,7 +114,7 @@ public class RandomnessAlgorithm {
     /**
      * Analyzes character classes to determine randomness
      */
-    private static double pRandomCharClass(byte[] data, double base) {
+    private static double pRandomCharClass(ByteArray data, double base) {
         if (base == 16.0) {
             return pRandomCharClassAux(data, (byte)'0', (byte)'9', 16.0);
         } else {
@@ -142,7 +143,7 @@ public class RandomnessAlgorithm {
     /**
      * Calculates randomness probability for a specific character class
      */
-    private static double pRandomCharClassAux(byte[] data, byte min, byte max, double base) {
+    private static double pRandomCharClassAux(ByteArray data, byte min, byte max, double base) {
         int count = 0;
         for (byte b : data) {
             if (b >= min && b <= max) {
@@ -151,7 +152,7 @@ public class RandomnessAlgorithm {
         }
         
         double numChars = (max - min + 1);
-        return pBinomial(data.length, count, numChars / base);
+        return pBinomial(data.length(), count, numChars / base);
     }
     
     /**
@@ -186,7 +187,7 @@ public class RandomnessAlgorithm {
     /**
      * Calculates randomness based on bigram frequencies
      */
-    private static double pRandomBigrams(byte[] data) {
+    private static double pRandomBigrams(ByteArray data) {
         // Common bigrams from ripsecrets code (a subset for Java version)
         String[] commonBigrams = {
             "er", "te", "an", "en", "ma", "ke", "10", "at", "/m", "on", 
@@ -201,26 +202,26 @@ public class RandomnessAlgorithm {
         }
         
         int numBigrams = 0;
-        for (int i = 0; i < data.length - 1; i++) {
-            String bigram = new String(data, i, 2, StandardCharsets.UTF_8);
+        for (int i = 0; i < data.length() - 1; i++) {
+            String bigram = data.subArray(i, i + 2).toString();
             if (bigramSet.contains(bigram)) {
                 numBigrams++;
             }
         }
         
-        return pBinomial(data.length - 1, numBigrams, (double) bigramSet.size() / (64.0 * 64.0));
+        return pBinomial(data.length() - 1, numBigrams, (double) bigramSet.size() / (64.0 * 64.0));
     }
     
     /**
      * Calculates randomness probability based on distinct values
      */
-    private static double pRandomDistinctValues(byte[] data, double base) {
-        double totalPossible = Math.pow(base, data.length);
+    private static double pRandomDistinctValues(ByteArray data, double base) {
+        double totalPossible = Math.pow(base, data.length());
         int numDistinctValues = countDistinctValues(data);
         
         double numMoreExtremeOutcomes = 0.0;
         for (int i = 1; i <= numDistinctValues; i++) {
-            numMoreExtremeOutcomes += numPossibleOutcomes(data.length, i, (int) base);
+            numMoreExtremeOutcomes += numPossibleOutcomes(data.length(), i, (int) base);
         }
         
         return numMoreExtremeOutcomes / totalPossible;
@@ -229,7 +230,7 @@ public class RandomnessAlgorithm {
     /**
      * Counts distinct values in a byte array
      */
-    private static int countDistinctValues(byte[] data) {
+    private static int countDistinctValues(ByteArray data) {
         Set<Byte> values = new HashSet<>();
         for (byte b : data) {
             values.add(b);

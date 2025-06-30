@@ -11,14 +11,51 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.regex.Pattern;
 
+
 /**
 * Utility class for SecretScanner
 */
 public class SecretScannerUtils {
-    // Random string pattern
+    // Random string pattern (original)
     public static final String RANDOM_STRING_REGEX_TEMPLATE = "(?i:auth|credential|key|token|secret|pass|passwd|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-|>)\\s*[\\t \"'`]?([\\w+./=~\\-\\\\`^]{%d,%d})(?=\\\\[\"']|[\\t\\n \"'`]|</|$)";
 
     private static final List<SecretScanner.SecretPattern> SECRET_PATTERNS = new ArrayList<>();
+    
+    /**
+     * Helper function similar to TruffleHog's PrefixRegex
+     * Creates a case-insensitive prefix pattern that allows up to 40 characters between keyword and secret
+     * @param keywords Array of keywords to match (e.g., ["cloudflare", "cf"])
+     * @return Regex string for prefix matching
+     */
+    public static String buildPrefixRegex(String[] keywords) {
+        return buildPrefixRegex(keywords, 40);
+    }
+    
+    /**
+     * Helper function similar to TruffleHog's PrefixRegex with configurable max prefix length
+     * Creates a case-insensitive prefix pattern that allows up to maxPrefixLen characters between keyword and secret
+     * @param keywords Array of keywords to match (e.g., ["cloudflare", "cf"])
+     * @param maxPrefixLen Maximum number of characters allowed between keyword and secret
+     * @return Regex string for prefix matching
+     */
+    public static String buildPrefixRegex(String[] keywords, int maxPrefixLen) {
+        String pre = "(?i:";
+        String middle = String.join("|", keywords);
+        String post = ")(?:.|[\\n\\r\\t]){0," + maxPrefixLen + "}?";
+        return pre + middle + post;
+    }
+    
+    /**
+     * Helper function to create suffix boundary patterns for secret detection
+     * Creates a non-capturing group that matches common secret terminators including escaped JSON scenarios
+     * Inspired by gitleaks patterns with additional web/JSON-specific boundaries
+     * @return Regex string for suffix boundary matching
+     */
+    public static String buildSuffixRegex() {
+        // Match common terminators: whitespace, quotes, backticks, semicolons, escaped whitespace chars, escaped quotes, HTML/XML tags, end of string
+        return "(?:[\\x60'\"\\s;]|\\\\[nrt]|\\\\\"|</|$)";
+    }
+    
     private static int genericSecretMinLength = 15;
     private static int genericSecretMaxLength = 80;
     private static boolean randomnessAlgorithmEnabled = true;
@@ -97,8 +134,11 @@ public class SecretScannerUtils {
         addPattern("Age Secret Key", 
             "AGE-SECRET-KEY-1[\\dA-Z]{58}");
 
-        addPattern("Algolia API Key", 
-            "(?i)[\\w.-]{0,50}?(?:algolia)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-z0-9]{32})\\b");
+        addPattern("Algolia ID", 
+            buildPrefixRegex(new String[]{"algolia", "docsearch", "appId"}) + "\\b([A-Z0-9]{10})\\b");
+        
+        addPattern("Algolia Key", 
+            buildPrefixRegex(new String[]{"algolia", "docsearch", "apiKey"}) + "\\b([a-zA-Z0-9]{32})\\b");
         
         addPattern("Azure Storage Account Key", 
             "(?i)(?:account)?key\\s*[:=]\\s*[\"']?([\\d+/=A-Za-z]{88})[\"']?(?:[^\\w]|$)");
@@ -122,20 +162,23 @@ public class SecretScannerUtils {
         addPattern("GitLab Token", 
             "glpat-[\\dA-Za-z_=-]{20,22}");
         
-        addPattern("Cloudflare API Key", 
-            "(?i)[\\w.-]{0,50}?(?:cloudflare)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-z0-9_-]{40})(?:[^\\w]|$)");
+        addPattern("Cloudflare API Token", 
+            buildPrefixRegex(new String[]{"cloudflare"}) + "\\b([A-Za-z0-9_-]{40})\\b");
         
         addPattern("Cloudflare Global API Key", 
-            "(?i)[\\w.-]{0,50}?(?:cloudflare)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([a-f0-9]{37})(?:[^\\w]|$)");
+            buildPrefixRegex(new String[]{"cloudflare"}) + "\\b([A-Za-z0-9_-]{37})\\b");
 
         addPattern("Cloudflare Origin CA Key", 
-            "\\b(v1\\.0-[a-f0-9]{24}-[a-f0-9]{146})(?:[^\\w]|$)");
+            "\\b(v1\\.0-[A-Za-z0-9-]{171})\\b");
         
         addPattern("DigitalOcean Personal Access Token", 
         "\\b((?:dop|doo|dor)_v1_[a-f0-9]{64})\\b");
         
         addPattern("Google Cloud Platform (GCP) API Key", 
         "\\b(AIza[\\w-]{35})\\b");
+
+        addPattern("Heroku API Key v2", 
+            "\\b(HRKU-AA[0-9a-zA-Z_-]{58})\\b");
 
         // Disabled for now.. too many "findings"
         // addPattern("JWT/JWE Token", 
@@ -206,17 +249,17 @@ public class SecretScannerUtils {
             "\\b((?:sk|rk)_(?:test|live|prod)_[a-zA-Z0-9]{10,99})\\b");
         
         addPattern("Square Access Token", 
-            "\\b((?:EAAA|sq0atp-)[\\w-]{22,60})\\b");
+            "\\b((?:EAAA|sq0atp-)[\\w-]{22,60})" + buildSuffixRegex());
         
         addPattern("Squarespace Access Token", 
             "(?i)[\\w.-]{0,50}?(?:squarespace)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\\b");
         
         addPattern("Telegram Bot API Token", 
-            "(?i)[\\w.-]{0,50}?(?:telegr)(?:[ \\t\\w.-]{0,20})[\\s'\"]{0,3}(?:=|>|:{1,3}=|\\|\\||:|=>|\\?=|,)[\\x60'\"\\s=]{0,5}([0-9]{5,16}:(?-i:A)[a-z0-9_\\-]{34})\\b");
+            buildPrefixRegex(new String[]{"telegram", "tgram://"}) + "\\b([0-9]{8,10}:[a-zA-Z0-9_-]{35})\\b");
         
         // Shopify Access Tokens
         addPattern("Shopify Access Token", 
-            "shpat_[a-fA-F0-9]{32}");
+            "shpat_[a-fA-F0-9]{32}"); 
             
         addPattern("Shopify Custom Access Token", 
             "shpca_[a-fA-F0-9]{32}");
@@ -242,17 +285,43 @@ public class SecretScannerUtils {
         addPattern("Generic Private Key", 
             "(?i)-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\\s\\S-]{64,}?KEY(?: BLOCK)?-----");
         
-        // Generic Secret pattern
+        // Generic Secret pattern (original)
         String randomStringRegex = String.format(RANDOM_STRING_REGEX_TEMPLATE, genericSecretMinLength, genericSecretMaxLength);
         addPattern("Generic Secret", randomStringRegex);
+        
+        // Generic Secret pattern v2 (TruffleHog-style) - built directly like other patterns
+        String randomStringRegex2 = buildPrefixRegex(new String[]{"auth", "credential", "key", "token", "secret", "pass", "passwd", "password"}, 15) + "\\b([\\w+./=~\\-\\\\`\\^!@#$%&\\*_<>;]{" + genericSecretMinLength + "," + genericSecretMaxLength + "})" + buildSuffixRegex();
+        addPattern("Generic Secret v2", randomStringRegex2);
+    }
+    
+    /**
+    * Helper method to log error messages
+    */
+    private static void logToError(String message) {
+        try {
+            AISecretsDetector detector = AISecretsDetector.getInstance();
+            if (detector != null) {
+                detector.logMsgError(message);
+            } else {
+                System.err.println(message);
+            }
+        } catch (Exception e) {
+            // Fallback to System.err if anything goes wrong
+            System.err.println(message);
+        }
     }
     
     /**
     * Helper method to compile and store a pattern with its metadataa
     */
     private static void addPattern(String name, String regex) {
-        SECRET_PATTERNS.add(new SecretScanner.SecretPattern(
-            name, Pattern.compile(regex)));
+        try {
+            SECRET_PATTERNS.add(new SecretScanner.SecretPattern(
+                name, Pattern.compile(regex)));
+        } catch (Exception e) {
+            String errorMsg = "Failed to compile pattern '" + name + "': " + e.getMessage() + " | Regex: " + regex;
+            logToError(errorMsg);
+        }
     }
     
     /**
