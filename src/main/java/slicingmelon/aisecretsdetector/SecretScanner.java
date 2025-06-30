@@ -219,7 +219,7 @@ public class SecretScanner {
                             config.appendToLog("Extracted potential secret for " + pattern.getName() + ": " + secretValue.substring(0, Math.min(10, secretValue.length())) + "...");
                             
                             // Skip non-random strings etc.
-                            if (!RandomnessAlgorithm.isRandom(secretValue.getBytes(StandardCharsets.UTF_8))) {
+                            if (!RandomnessAlgorithm.isRandom(ByteArray.byteArray(secretValue))) {
                                 config.appendToLog("Skipping non-random string for " + pattern.getName());
                                 continue;
                             }
@@ -251,10 +251,10 @@ public class SecretScanner {
                         // STEP 3: LOCATE all occurrences using ByteArray.indexOf for performance and API usage
                         int searchStart = 0;
                         int highlightsCreated = 0;
-                        byte[] secretValueBytes = secretValue.getBytes(StandardCharsets.UTF_8);
+                        ByteArray secretValueBytes = ByteArray.byteArray(secretValue);
 
                         while (highlightsCreated < maxHighlights) {
-                            int exactPos = responseBytes.indexOf(secretValue, true, searchStart, responseBytes.length());
+                            int exactPos = responseBytes.indexOf(secretValueBytes, true, searchStart, responseBytes.length());
 
                             if (exactPos == -1) {
                                 break;
@@ -262,7 +262,7 @@ public class SecretScanner {
 
                             // Create a secret for this occurrence
                             int fullStartPos = exactPos;
-                            int fullEndPos = fullStartPos + secretValueBytes.length; // Use byte length for accuracy
+                            int fullEndPos = fullStartPos + secretValueBytes.length(); // Use byte length for accuracy
                             secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
                             foundSecrets.add(secret);
                             highlightsCreated++;
