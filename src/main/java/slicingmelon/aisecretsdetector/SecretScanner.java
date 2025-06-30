@@ -187,7 +187,6 @@ public class SecretScanner {
         List<Secret> foundSecrets = new ArrayList<>();
         Map<String, Set<String>> uniqueSecretsPerPattern = new HashMap<>();
         
-        // Get max highlights setting once outside all loops for efficiency
         int maxHighlights = config.getConfigSettings().getMaxHighlightsPerSecret();
         
         try {
