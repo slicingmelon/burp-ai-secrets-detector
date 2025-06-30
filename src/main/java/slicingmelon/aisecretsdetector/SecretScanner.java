@@ -241,7 +241,7 @@ public class SecretScanner {
 
                         // STEP 2: CHECK FOR UNIQUENESS for this pattern
                         // If we have already found and highlighted this exact secret value for this pattern, skip to the next match.
-                        Set<String> foundValuesForPattern = uniqueSecretsPerPattern.computeIfAbsent(pattern.getName(), k -> new HashSet<>());
+                        Set<String> foundValuesForPattern = uniqueSecretsPerPattern.computeIfAbsent(pattern.getName(), _ -> new HashSet<>());
                         if (!foundValuesForPattern.add(secretValue)) {
                             continue;
                         }
@@ -257,7 +257,7 @@ public class SecretScanner {
                             int exactPos = responseBytes.indexOf(secretValue, true, searchStart, responseBytes.length());
 
                             if (exactPos == -1) {
-                                break; // No more occurrences
+                                break;
                             }
 
                             // Create a secret for this occurrence
