@@ -59,15 +59,15 @@ public class SecretScanner {
     }
     
     // Helper class for returning both start and end positions
-    public static class MatchResult {
-        public final int startPos;
-        public final int endPos;
+    // public static class MatchResult {
+    //     public final int startPos;
+    //     public final int endPos;
         
-        public MatchResult(int startPos, int endPos) {
-            this.startPos = startPos;
-            this.endPos = endPos;
-        }
-    }
+    //     public MatchResult(int startPos, int endPos) {
+    //         this.startPos = startPos;
+    //         this.endPos = endPos;
+    //     }
+    // }
     
     /**
      * Find pattern match bounds in ByteArray and return both start and end positions
@@ -76,45 +76,45 @@ public class SecretScanner {
      * @param startIndex Where to start searching
      * @return MatchResult with start and end positions, or null if no match found
      */
-    private static MatchResult findPatternBounds(ByteArray data, Pattern pattern, int startIndex) {
-        // First, find the match position using ByteArray's indexOf
-        int matchStart = data.indexOf(pattern, startIndex, data.length());
-        if (matchStart == -1) {
-            return null;
-        }
+    // private static MatchResult findPatternBounds(ByteArray data, Pattern pattern, int startIndex) {
+    //     // First, find the match position using ByteArray's indexOf
+    //     int matchStart = data.indexOf(pattern, startIndex, data.length());
+    //     if (matchStart == -1) {
+    //         return null;
+    //     }
 
-        // Adjust buffer size for known long patterns like private keys
-        int bufferSize = 300; // Default buffer
-        if (pattern.pattern().contains("PRIVATE KEY")) {
-            bufferSize = 4096; // Use a larger buffer for private keys
-        }
+    //     // Adjust buffer size for known long patterns like private keys
+    //     int bufferSize = 300; // Default buffer
+    //     if (pattern.pattern().contains("PRIVATE KEY")) {
+    //         bufferSize = 4096; // Use a larger buffer for private keys
+    //     }
         
-        // To find the end position, we need to apply the regex to a small portion
-        // Extract a reasonable chunk around the match (but not too much to avoid overflow)
-        int extractStart = Math.max(0, matchStart - 10); // Small buffer before
-        int extractEnd = Math.min(data.length(), matchStart + bufferSize); // Reasonable buffer after
+    //     // To find the end position, we need to apply the regex to a small portion
+    //     // Extract a reasonable chunk around the match (but not too much to avoid overflow)
+    //     int extractStart = Math.max(0, matchStart - 10); // Small buffer before
+    //     int extractEnd = Math.min(data.length(), matchStart + bufferSize); // Reasonable buffer after
         
-        try {
-            ByteArray matchRegion = data.subArray(extractStart, extractEnd);
-            String matchRegionString = matchRegion.toString();
+    //     try {
+    //         ByteArray matchRegion = data.subArray(extractStart, extractEnd);
+    //         String matchRegionString = matchRegion.toString();
             
-            Matcher matcher = pattern.matcher(matchRegionString);
+    //         Matcher matcher = pattern.matcher(matchRegionString);
             
-            // Find the match in the extracted region
-            int regionMatchPos = matchStart - extractStart;
-            if (matcher.find(regionMatchPos)) {
-                // Calculate actual positions in the original ByteArray
-                int actualStart = extractStart + matcher.start();
-                int actualEnd = extractStart + matcher.end();
-                return new MatchResult(actualStart, actualEnd);
-            }
-        } catch (Exception e) {
-            // Fallback: assume the match is at least 1 character
-            return new MatchResult(matchStart, matchStart + 1);
-        }
+    //         // Find the match in the extracted region
+    //         int regionMatchPos = matchStart - extractStart;
+    //         if (matcher.find(regionMatchPos)) {
+    //             // Calculate actual positions in the original ByteArray
+    //             int actualStart = extractStart + matcher.start();
+    //             int actualEnd = extractStart + matcher.end();
+    //             return new MatchResult(actualStart, actualEnd);
+    //         }
+    //     } catch (Exception e) {
+    //         // Fallback: assume the match is at least 1 character
+    //         return new MatchResult(matchStart, matchStart + 1);
+    //     }
         
-        return null;
-    }
+    //     return null;
+    // }
     
     public static class SecretPattern {
         private final String name;
@@ -191,20 +191,18 @@ public class SecretScanner {
         int maxHighlights = config.getConfigSettings().getMaxHighlightsPerSecret();
         
         try {
-            // Use ByteArray instead of String for better performance
-            burp.api.montoya.core.ByteArray responseBytes = response.toByteArray();
-            config.appendToLog("Scanning response of " + responseBytes.length() + " bytes with " + secretPatterns.size() + " patterns");
+            // Use String for reliable regex matching, but get byte offsets for accurate highlighting
+            String responseBody = response.bodyToString();
+            int bodyOffset = response.bodyOffset();
+            config.appendToLog("Scanning response body of " + responseBody.length() + " chars with " + secretPatterns.size() + " patterns");
             
             // Declare variables outside loops for efficiency
             String secretValue;
-            int searchStart;
-            int highlightsCreated;
-            int exactPos;
-            int fullStartPos;
-            int fullEndPos;
             Secret secret;
             
             for (SecretPattern pattern : secretPatterns) {
+                Map<String, Integer> highlightsPerSecretValue = new HashMap<>();
+
                 try {
                     config.appendToLog("Testing pattern: " + pattern.getName());
                     
@@ -213,110 +211,67 @@ public class SecretScanner {
                         continue;
                     }
 
-                    // Use ByteArray's native indexOf method for pattern matching
-                    int searchFrom = 0;
-                    int patternsFound = 0;
+                    Matcher matcher = pattern.getPattern().matcher(responseBody);
                     
-                    MatchResult matchResult;
-                    while ((matchResult = findPatternBounds(responseBytes, pattern.getPattern(), searchFrom)) != null) {
-                        patternsFound++;
-                        config.appendToLog("Pattern '" + pattern.getName() + "' found at position " + matchResult.startPos + "-" + matchResult.endPos);
-                        
-                        // Extract only the matched portion for group extraction
-                        ByteArray matchedBytes = responseBytes.subArray(matchResult.startPos, matchResult.endPos);
-                        String matchedString = matchedBytes.toString();
-                        
-                        java.util.regex.Matcher matcher = pattern.getPattern().matcher(matchedString);
-                        
-                        // The entire string should match since we extracted exactly the match
-                        if (matcher.find()) {
-                            // Extract group info
-                            if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2")) && matcher.groupCount() >= 1) {
-                                secretValue = matcher.group(1);
-                                config.appendToLog("Extracted secret value for " + pattern.getName() + ": " + secretValue.substring(0, Math.min(10, secretValue.length())) + "...");
-                                
-                                // Skip non-random strings etc.
-                                if (!RandomnessAlgorithm.isRandom(secretValue.getBytes(StandardCharsets.UTF_8))) {
-                                    config.appendToLog("Skipping non-random string for " + pattern.getName());
-                                    // Continue searching from after this match
-                                    searchFrom = matchResult.endPos;
-                                    continue;
-                                }
-                                
-                                // Skip if the Generic Secret matches reCAPTCHA Site Key pattern
-                                if (isRecaptchaSecret(secretValue)) {
-                                    config.appendToLog("Skipping reCAPTCHA secret for " + pattern.getName());
-                                    // Continue searching from after this match
-                                    searchFrom = matchResult.endPos;
-                                    continue;
-                                }
-                            } else {
-                                // Use capture group if available to avoid boundary characters
-                                if (matcher.groupCount() >= 1) {
-                                    secretValue = matcher.group(1);
-                                } else {
-                                    secretValue = matcher.group(0);
-                                }
-                                config.appendToLog("Extracted secret value for " + pattern.getName() + ": " + secretValue.substring(0, Math.min(10, secretValue.length())) + "...");
-                            }
+                    while (matcher.find()) {
+                        // Extract group info
+                        if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2")) && matcher.groupCount() >= 1) {
+                            secretValue = matcher.group(1);
+                            config.appendToLog("Extracted potential secret for " + pattern.getName() + ": " + secretValue.substring(0, Math.min(10, secretValue.length())) + "...");
                             
-                            // Skip duplicates for this specific pattern
-                            String patternName = pattern.getName();
-                            Set<String> foundValuesForPattern = uniqueSecretsPerPattern.computeIfAbsent(patternName, _ -> new HashSet<>());
-
-                            if (foundValuesForPattern.contains(secretValue)) {
-                                config.appendToLog("Skipping duplicate secret value for pattern " + patternName);
-                                // Continue searching from after this match
-                                searchFrom = matchResult.endPos;
+                            // Skip non-random strings etc.
+                            if (!RandomnessAlgorithm.isRandom(secretValue.getBytes(StandardCharsets.UTF_8))) {
+                                config.appendToLog("Skipping non-random string for " + pattern.getName());
                                 continue;
                             }
-                            foundValuesForPattern.add(secretValue);
                             
-                            // Find all occurrences of this secret in the response using ByteArray methods
-                            searchStart = 0;
-                            highlightsCreated = 0;
-                            
-                            while (searchStart < responseBytes.length() && highlightsCreated < maxHighlights) {
-                                // Use ByteArray's indexOf for better performance
-                                exactPos = responseBytes.indexOf(secretValue, true, searchStart, responseBytes.length());
-                                
-                                if (exactPos == -1) {
-                                    break; // No more occurrences
-                                }
-                                
-                                config.appendToLog("Found occurrence of secret at position " + exactPos + " (highlight " + (highlightsCreated + 1) + "/" + maxHighlights + ")");
-                                
-                                // *** STEP 1: SECRET POSITION CALCULATION ***
-                                // Found an occurrence - calculate exact start/end positions in response
-                                // These positions will later be used to create RED response markers/highlights in Burp
-                                fullStartPos = exactPos;
-                                fullEndPos = fullStartPos + secretValue.length();
-                                secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
-                                foundSecrets.add(secret);
-                                highlightsCreated++;
-                                
-                                // Move search start past this occurrence
-                                searchStart = exactPos + secretValue.length();
-                            }
-                            
-                            // Log if we hit the limit and there might be more occurrences
-                            if (highlightsCreated >= maxHighlights && searchStart < responseBytes.length()) {
-                                int remainingPos = responseBytes.indexOf(secretValue, true, searchStart, responseBytes.length());
-                                if (remainingPos != -1) {
-                                    config.appendToLog(String.format("Limited highlights for secret '%s' to %d (more occurrences exist but not highlighted for performance)", 
-                                        secretValue.substring(0, Math.min(10, secretValue.length())) + "...", maxHighlights));
-                                }
+                            // Skip if the Generic Secret matches reCAPTCHA Site Key pattern
+                            if (isRecaptchaSecret(secretValue)) {
+                                config.appendToLog("Skipping reCAPTCHA secret for " + pattern.getName());
+                                continue;
                             }
                         } else {
-                            config.appendToLog("Could not find match in extracted string for " + pattern.getName());
+                            // Use capture group if available to avoid boundary characters
+                            if (matcher.groupCount() >= 1) {
+                                secretValue = matcher.group(1);
+                            } else {
+                                secretValue = matcher.group(0); // Whole match
+                            }
+                            config.appendToLog("Extracted secret value for " + pattern.getName() + ": " + secretValue.substring(0, Math.min(10, secretValue.length())) + "...");
                         }
+
+                        // Check if we have already hit the highlight limit for this specific secret value
+                        if (highlightsPerSecretValue.getOrDefault(secretValue, 0) >= maxHighlights) {
+                            continue; // Already found max highlights for this value
+                        }
+
+                        // Use computeIfAbsent for cleaner unique tracking per pattern
+                        Set<String> foundValuesForPattern = uniqueSecretsPerPattern.computeIfAbsent(pattern.getName(), k -> new HashSet<>());
                         
-                        // Continue searching from after this match
-                        searchFrom = matchResult.endPos;
+                        // Add the secret if it's the first time we're seeing this value for this pattern
+                        if (foundValuesForPattern.add(secretValue)) {
+                            config.appendToLog("Found new unique secret for pattern " + pattern.getName());
+                        }
+
+                        // SECRET POSITION CALCULATION
+                        // The matcher gives us character offsets (start/end) in the response body string.
+                        // We need to convert these to byte offsets relative to the full response for accurate highlighting.
+                        int charStart = matcher.start();
+                        int charEnd = matcher.end();
+                        
+                        // To get byte offsets, convert the preceding part of the string to bytes and check length
+                        int byteStartInBody = responseBody.substring(0, charStart).getBytes(StandardCharsets.UTF_8).length;
+                        int byteEndInBody = responseBody.substring(0, charEnd).getBytes(StandardCharsets.UTF_8).length;
+
+                        int fullStartPos = bodyOffset + byteStartInBody;
+                        int fullEndPos = bodyOffset + byteEndInBody;
+                        
+                        secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
+                        foundSecrets.add(secret);
+                        
+                        int currentHighlights = highlightsPerSecretValue.getOrDefault(secretValue, 0);
+                        highlightsPerSecretValue.put(secretValue, currentHighlights + 1);
                     }
-                    
-                    config.appendToLog("Pattern '" + pattern.getName() + "' completed. Found " + patternsFound + " matches");
-                    
                 } catch (Exception e) {
                     config.appendToLog("Error with pattern " + pattern.getName() + ": " + e.getMessage());
                     e.printStackTrace();
