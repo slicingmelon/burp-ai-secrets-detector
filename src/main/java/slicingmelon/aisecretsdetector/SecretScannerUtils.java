@@ -20,7 +20,7 @@ public class SecretScannerUtils {
     // public static final String RANDOM_STRING_REGEX_TEMPLATE = "(?i:auth|credential|key|token|secret|pass|passwd|password)\\w*[\"']?]?\\s*(?:[:=]|:=|=>|<-|>)\\s*[\\t \"'`]?([\\w+./=~\\-\\\\`^]{%d,%d})(?:\\\\[\"']|[\\t\\n \"'`]|</|$)";
     
     // New random string pattern using buildPrefixRegexRIP and buildSuffixRegexRIP
-    public static final String RANDOM_STRING_REGEX_TEMPLATE = buildPrefixRegexRIP(new String[]{"auth", "credential", "key", "token", "secret", "pass", "passwd", "password"}) + "([\\w+./=~\\-\\\\`^]{%d,%d})" + buildSuffixRegexRIP();
+    public static final String RANDOM_STRING_REGEX_TEMPLATE = buildPrefixRegexRIP(new String[]{"auth", "credential", "key", "token", "secret", "pass", "passwd", "password"}) + "([\\w+./=~\\-\\\\`^!]{%d,%d})" + buildSuffixRegexRIP();
 
     private static final List<SecretScanner.SecretPattern> SECRET_PATTERNS = new ArrayList<>();
     
