@@ -45,6 +45,24 @@ public class SecretScannerUtils {
         return pre + middle + post;
     }
     
+    public static String buildPrefixRegexRIP(String[] keywords) {
+        String keywordGroup = String.join("|", keywords);
+    
+        // Build non-capturing, case-insensitive keyword prefix with flexible key tail
+        StringBuilder regex = new StringBuilder();
+    
+        regex.append("(?i:")  // Case-insensitive group
+             .append(keywordGroup)
+             .append(")")     // end non-capturing keyword group
+             .append("\\w*")  // allow keyID, tokenName, etc.
+             .append("[\"']?]?") // optional trailing quote or bracket after key
+             .append("\\s*")  // optional whitespace before separator
+             .append("(?:[:=]|:=|=>|<-|>)")  // assignment operators
+             .append("\\s*")  // optional whitespace after separator
+             .append("(?:\\\\?[\\" + "\"" + "'])?"); // escaped or unescaped quote (\\?["'])
+    
+        return regex.toString();
+    }
     /**
      * Helper function to create suffix boundary patterns for secret detection
      * Creates a non-capturing group that matches common secret terminators including escaped JSON scenarios
@@ -54,6 +72,9 @@ public class SecretScannerUtils {
     public static String buildSuffixRegex() {
         // Match common terminators: whitespace, quotes, backticks, semicolons, escaped whitespace chars, escaped quotes, HTML/XML tags, end of string
         return "(?:[\\x60'\"\\s;]|\\\\[nrt]|\\\\\"|</|$)";
+
+        // posibly better:
+        // "(?:[\\x60'\"\\s;]|\\\\[nrt]|\\\\\"|</|$)"
     }
     
     private static int genericSecretMinLength = 15;
