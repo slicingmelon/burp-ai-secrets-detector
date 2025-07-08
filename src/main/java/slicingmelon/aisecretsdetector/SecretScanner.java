@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.HashMap;
 
 public class SecretScanner {
-    private final UIConfig config;
+    private final Config config;
     private final List<SecretPattern> secretPatterns;
     
     private static Pattern cachedRecaptchaPattern = null;
@@ -164,19 +164,19 @@ public class SecretScanner {
     public SecretScanner(MontoyaApi api) {
 
         List<SecretPattern> patterns;
-        UIConfig configInstance;
+        Config configInstance;
         
         try {
             //this.api = api;
             patterns = SecretScannerUtils.getAllPatterns();
-            configInstance = UIConfig.getInstance();
+            configInstance = Config.getInstance();
             
             AISecretsDetector.getInstance().logMsg("SecretScanner initialized with " + patterns.size() + " patterns");
         } catch (Exception e) {
             AISecretsDetector.getInstance().logMsgError("Error initializing SecretScanner: " + e.getMessage());
             e.printStackTrace();
             patterns = new ArrayList<>(); // fallback to empty list
-            configInstance = UIConfig.getInstance();
+            configInstance = Config.getInstance();
         }
         
         this.secretPatterns = patterns;
@@ -187,14 +187,14 @@ public class SecretScanner {
         List<Secret> foundSecrets = new ArrayList<>();
         Map<String, Set<String>> uniqueSecretsPerPattern = new HashMap<>();
         
-        int maxHighlights = config.getConfigSettings().getMaxHighlightsPerSecret();
+        int maxHighlights = config.getSettings().getMaxHighlightsPerSecret();
         
         try {
             // Use String for reliable regex matching
             String responseString = response.toString();
             // Use ByteArray for fast, byte-accurate searching of found secrets
             ByteArray responseBytes = response.toByteArray();
-            config.appendToLog("Scanning response of " + responseBytes.length() + " bytes with " + secretPatterns.size() + " patterns");
+            // Log through the detector instance
             
             // Declare variables outside loops for efficiency
             String secretValue;
@@ -202,10 +202,10 @@ public class SecretScanner {
             
             for (SecretPattern pattern : secretPatterns) {
                 try {
-                    config.appendToLog("Testing pattern: " + pattern.getName());
+                    // Testing pattern: pattern.getName()
                     
                     if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2")) && !SecretScannerUtils.isRandomnessAlgorithmEnabled()) {
-                        config.appendToLog("Skipping " + pattern.getName() + " - randomness algorithm disabled");
+                        // Skipping pattern - randomness algorithm disabled
                         continue;
                     }
 
@@ -215,15 +215,15 @@ public class SecretScanner {
                         // STEP 1: IDENTIFY secret value using Java's regex engine (Burp's API indexOf pattern not working properly)
                         if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2")) && matcher.groupCount() >= 1) {
                             secretValue = matcher.group(1);
-                            config.appendToLog("Extracted potential secret for " + pattern.getName() + ": " + secretValue.substring(0, Math.min(10, secretValue.length())) + "...");
+                            // Extracted potential secret for pattern
                             
                             if (!RandomnessAlgorithm.isRandom(ByteArray.byteArray(secretValue))) {
-                                config.appendToLog("Skipping non-random string for " + pattern.getName());
+                                // Skipping non-random string
                                 continue;
                             }
                             
                             if (isRecaptchaSecret(secretValue)) {
-                                config.appendToLog("Skipping reCAPTCHA secret for " + pattern.getName());
+                                // Skipping reCAPTCHA secret
                                 continue;
                             }
                         } else {
@@ -233,7 +233,7 @@ public class SecretScanner {
                             } else {
                                 secretValue = matcher.group(0); // Whole match
                             }
-                            config.appendToLog("Extracted secret value for " + pattern.getName() + ": " + secretValue.substring(0, Math.min(10, secretValue.length())) + "...");
+                            // Extracted secret value for pattern
                         }
 
                         // STEP 2: CHECK FOR UNIQUENESS for this pattern
@@ -243,7 +243,7 @@ public class SecretScanner {
                             continue;
                         }
                         
-                        config.appendToLog("Found new unique secret for pattern " + pattern.getName());
+                        // Found new unique secret for pattern
 
                         // STEP 3: LOCATE all occurrences using ByteArray.indexOf, as it's supposedly faster.
                         int searchStart = 0;
@@ -269,15 +269,15 @@ public class SecretScanner {
                         }
                     }
                 } catch (Exception e) {
-                    config.appendToLog("Error with pattern " + pattern.getName() + ": " + e.getMessage());
+                    // Error with pattern
                     e.printStackTrace();
                 }
             }
             
-            config.appendToLog("Scan completed. Found " + foundSecrets.size() + " total secrets");
+            // Scan completed with foundSecrets.size() total secrets
             
         } catch (Exception e) {
-            config.appendToLog("Error scanning response: " + e.getMessage());
+            // Error scanning response
             e.printStackTrace();
         }
         

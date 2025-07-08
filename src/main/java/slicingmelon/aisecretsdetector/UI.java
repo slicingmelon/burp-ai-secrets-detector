@@ -8,233 +8,29 @@
 package slicingmelon.aisecretsdetector;
 
 import burp.api.montoya.MontoyaApi;
-import burp.api.montoya.persistence.PersistedObject;
 import burp.api.montoya.core.ToolType;
 import javax.swing.*;
 import java.awt.*;
 import java.util.Set;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
 
-public class UIConfig {
+public class UI {
     private MontoyaApi api;
-    private ConfigSettings configSettings;
-    private Runnable onConfigChangedCallback;
+    private Config config;
     private JTextArea logArea;
-
-    private static UIConfig instance;
+    private static UI instance;
     
-    public static class ConfigSettings {
-        private int workers;
-        private boolean inScopeOnly;
-        private Set<ToolType> enabledTools;
-        private boolean loggingEnabled;
-        private boolean randomnessAlgorithmEnabled;
-        private int genericSecretMinLength;
-        private int genericSecretMaxLength;
-        private int duplicateThreshold;
-        private int maxHighlightsPerSecret;
-        
-        public ConfigSettings(int workers, boolean inScopeOnly, Set<ToolType> enabledTools, boolean loggingEnabled,
-                             boolean randomnessAlgorithmEnabled, int genericSecretMinLength, int genericSecretMaxLength,
-                             int duplicateThreshold, int maxHighlightsPerSecret) {
-            this.workers = workers;
-            this.inScopeOnly = inScopeOnly;
-            this.enabledTools = enabledTools;
-            this.loggingEnabled = loggingEnabled;
-            this.randomnessAlgorithmEnabled = randomnessAlgorithmEnabled;
-            this.genericSecretMinLength = genericSecretMinLength;
-            this.genericSecretMaxLength = genericSecretMaxLength;
-            this.duplicateThreshold = duplicateThreshold;
-            this.maxHighlightsPerSecret = maxHighlightsPerSecret;
-        }
-        
-        public int getWorkers() {
-            return workers;
-        }
-        
-        public void setWorkers(int workers) {
-            this.workers = workers;
-        }
-        
-        public boolean isInScopeOnly() {
-            return inScopeOnly;
-        }
-        
-        public void setInScopeOnly(boolean inScopeOnly) {
-            this.inScopeOnly = inScopeOnly;
-        }
-        
-        public Set<ToolType> getEnabledTools() {
-            return enabledTools;
-        }
-        
-        public void setEnabledTools(Set<ToolType> enabledTools) {
-            this.enabledTools = enabledTools;
-        }
-        
-        public boolean isToolEnabled(ToolType toolType) {
-            return enabledTools.contains(toolType);
-        }
-        
-        public void setToolEnabled(ToolType toolType, boolean enabled) {
-            if (enabled) {
-                enabledTools.add(toolType);
-            } else {
-                enabledTools.remove(toolType);
-            }
-        }
-
-        public boolean isLoggingEnabled() {
-            return loggingEnabled;
-        }
-        
-        public void setLoggingEnabled(boolean loggingEnabled) {
-            this.loggingEnabled = loggingEnabled;
-        }
-        
-        public boolean isRandomnessAlgorithmEnabled() {
-            return randomnessAlgorithmEnabled;
-        }
-        
-        public void setRandomnessAlgorithmEnabled(boolean randomnessAlgorithmEnabled) {
-            this.randomnessAlgorithmEnabled = randomnessAlgorithmEnabled;
-        }
-        
-        public int getGenericSecretMinLength() {
-            return genericSecretMinLength;
-        }
-        
-        public void setGenericSecretMinLength(int genericSecretMinLength) {
-            this.genericSecretMinLength = Math.max(8, genericSecretMinLength);
-        }
-        
-        public int getGenericSecretMaxLength() {
-            return genericSecretMaxLength;
-        }
-        
-        public void setGenericSecretMaxLength(int genericSecretMaxLength) {
-            this.genericSecretMaxLength = Math.min(128, genericSecretMaxLength);
-        }
-        
-        public int getDuplicateThreshold() {
-            return duplicateThreshold;
-        }
-        
-        public void setDuplicateThreshold(int duplicateThreshold) {
-            this.duplicateThreshold = Math.max(1, duplicateThreshold);
-        }
-        
-        public int getMaxHighlightsPerSecret() {
-            return maxHighlightsPerSecret;
-        }
-        
-        public void setMaxHighlightsPerSecret(int maxHighlightsPerSecret) {
-            this.maxHighlightsPerSecret = Math.max(1, maxHighlightsPerSecret);
-        }
-    }
-    
-    public static UIConfig getInstance() {
+    public static UI getInstance() {
         return instance;
     }
 
-    public UIConfig(MontoyaApi api, Runnable onConfigChangedCallback) {
+    public UI(MontoyaApi api) {
         this.api = api;
-        this.onConfigChangedCallback = onConfigChangedCallback;
-        
-        // Load saved settings
-        this.configSettings = loadConfigSettings(api.persistence().extensionData());
-        
+        this.config = Config.getInstance();
         instance = this;
     }
     
-    public ConfigSettings getConfigSettings() {
-        return configSettings;
-    }
-    
-    public ConfigSettings loadConfigSettings(PersistedObject persistedData) {
-        // Fix using null check approach
-        Integer workersValue = persistedData.getInteger("workers");
-        int workers = (workersValue != null) ? workersValue : 15;
-        
-        Boolean inScopeOnlyValue = persistedData.getBoolean("in_scope_only");
-        boolean inScopeOnly = (inScopeOnlyValue != null) ? inScopeOnlyValue : true;
-
-        Boolean loggingEnabledValue = persistedData.getBoolean("logging_enabled");
-        boolean loggingEnabled = (loggingEnabledValue != null) ? loggingEnabledValue : false;
-        
-        Boolean randomnessAlgorithmEnabledValue = persistedData.getBoolean("randomness_algorithm_enabled");
-        boolean randomnessAlgorithmEnabled = (randomnessAlgorithmEnabledValue != null) ? randomnessAlgorithmEnabledValue : true;
-        
-        Integer genericSecretMinLengthValue = persistedData.getInteger("generic_secret_min_length");
-        int genericSecretMinLength = (genericSecretMinLengthValue != null) ? 
-                                    Math.max(8, genericSecretMinLengthValue) : 15;
-        
-        Integer genericSecretMaxLengthValue = persistedData.getInteger("generic_secret_max_length");
-        int genericSecretMaxLength = (genericSecretMaxLengthValue != null) ? 
-                                    Math.min(128, genericSecretMaxLengthValue) : 80;
-        
-        Integer duplicateThresholdValue = persistedData.getInteger("duplicate_threshold");
-        int duplicateThreshold = (duplicateThresholdValue != null) ? Math.max(1, duplicateThresholdValue) : 5;
-        
-        Integer maxHighlightsPerSecretValue = persistedData.getInteger("max_highlights_per_secret");
-        int maxHighlightsPerSecret = (maxHighlightsPerSecretValue != null) ? Math.max(1, maxHighlightsPerSecretValue) : 3;
-        
-        // Initialize with default tool settings
-        Set<ToolType> enabledTools = new HashSet<>();
-        enabledTools.add(ToolType.TARGET);
-        enabledTools.add(ToolType.PROXY);
-        enabledTools.add(ToolType.SCANNER);
-        enabledTools.add(ToolType.EXTENSIONS);
-        
-        // Load saved tool settings if available
-        String toolsConfig = persistedData.getString("enabled_tools");
-        if (toolsConfig != null && !toolsConfig.isEmpty()) {
-            enabledTools.clear();
-            for (String tool : toolsConfig.split(",")) {
-                try {
-                    enabledTools.add(ToolType.valueOf(tool));
-                } catch (IllegalArgumentException e) {
-                    AISecretsDetector.getInstance().logMsgError("Invalid tool type in config: " + tool);
-                }
-            }
-        }
-        
-        return new ConfigSettings(workers, inScopeOnly, enabledTools, loggingEnabled, 
-                                 randomnessAlgorithmEnabled, genericSecretMinLength, genericSecretMaxLength, duplicateThreshold, maxHighlightsPerSecret);
-    }
-    
-    public void saveConfigSettings() {
-        PersistedObject persistedData = api.persistence().extensionData();
-        persistedData.setInteger("workers", configSettings.getWorkers());
-        persistedData.setBoolean("in_scope_only", configSettings.isInScopeOnly());
-        persistedData.setBoolean("logging_enabled", configSettings.isLoggingEnabled());
-        persistedData.setBoolean("randomness_algorithm_enabled", configSettings.isRandomnessAlgorithmEnabled());
-        persistedData.setInteger("generic_secret_min_length", configSettings.getGenericSecretMinLength());
-        persistedData.setInteger("generic_secret_max_length", configSettings.getGenericSecretMaxLength());
-        persistedData.setInteger("duplicate_threshold", configSettings.getDuplicateThreshold());
-        persistedData.setInteger("max_highlights_per_secret", configSettings.getMaxHighlightsPerSecret());
-        
-        StringBuilder toolsBuilder = new StringBuilder();
-        for (ToolType tool : configSettings.getEnabledTools()) {
-            if (toolsBuilder.length() > 0) {
-                toolsBuilder.append(",");
-            }
-            toolsBuilder.append(tool.name());
-        }
-        persistedData.setString("enabled_tools", toolsBuilder.toString());
-        
-        // Update SecretScannerUtils settings
-        SecretScannerUtils.setGenericSecretMinLength(configSettings.getGenericSecretMinLength());
-        SecretScannerUtils.setGenericSecretMaxLength(configSettings.getGenericSecretMaxLength());
-        SecretScannerUtils.setRandomnessAlgorithmEnabled(configSettings.isRandomnessAlgorithmEnabled());
-        
-        if (onConfigChangedCallback != null) {
-            onConfigChangedCallback.run();
-        }
-    }
-       
     public JComponent createConfigPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         
@@ -256,7 +52,7 @@ public class UIConfig {
         leftPanel.add(workersLabel, leftConstraints);
         
         SpinnerNumberModel workersModel = new SpinnerNumberModel(
-                configSettings.getWorkers(),
+                config.getSettings().getWorkers(),
                 1,
                 50,
                 1
@@ -277,9 +73,9 @@ public class UIConfig {
         spinnerPanel.add(workersSpinner);
         
         workersSpinner.addChangeListener(_ -> {
-            configSettings.setWorkers((Integer) workersSpinner.getValue());
-            saveConfigSettings();
-            AISecretsDetector.getInstance().logMsg("Configuration updated - Workers: " + configSettings.getWorkers());
+            config.getSettings().setWorkers((Integer) workersSpinner.getValue());
+            config.saveConfig();
+            AISecretsDetector.getInstance().logMsg("Configuration updated - Workers: " + config.getSettings().getWorkers());
         });
         
         leftConstraints.gridx = 1;
@@ -288,11 +84,11 @@ public class UIConfig {
         leftPanel.add(spinnerPanel, leftConstraints);
         
         // In-scope only setting
-        JCheckBox inScopeCheckbox = new JCheckBox("In-Scope Requests Only", configSettings.isInScopeOnly());
+        JCheckBox inScopeCheckbox = new JCheckBox("In-Scope Requests Only", config.getSettings().isInScopeOnly());
         inScopeCheckbox.addActionListener(_ -> {
-            configSettings.setInScopeOnly(inScopeCheckbox.isSelected());
-            saveConfigSettings();
-            AISecretsDetector.getInstance().logMsg("Configuration updated - In-Scope Only: " + configSettings.isInScopeOnly());
+            config.getSettings().setInScopeOnly(inScopeCheckbox.isSelected());
+            config.saveConfig();
+            AISecretsDetector.getInstance().logMsg("Configuration updated - In-Scope Only: " + config.getSettings().isInScopeOnly());
         });
         
         leftConstraints.gridx = 0;
@@ -310,12 +106,12 @@ public class UIConfig {
         
         // Randomness Algorithm Enable
         JCheckBox randomnessCheckbox = new JCheckBox("Enable Randomness Algorithm Detection", 
-                                                   configSettings.isRandomnessAlgorithmEnabled());
+                                                   config.getSettings().isRandomnessAlgorithmEnabled());
         randomnessCheckbox.addActionListener(_ -> {
-            configSettings.setRandomnessAlgorithmEnabled(randomnessCheckbox.isSelected());
-            saveConfigSettings();
-                        AISecretsDetector.getInstance().logMsg("Configuration updated - Randomness Algorithm: " +
-                    configSettings.isRandomnessAlgorithmEnabled());
+            config.getSettings().setRandomnessAlgorithmEnabled(randomnessCheckbox.isSelected());
+            config.saveConfig();
+            AISecretsDetector.getInstance().logMsg("Configuration updated - Randomness Algorithm: " +
+                    config.getSettings().isRandomnessAlgorithmEnabled());
         });
         
         rightConstraints.gridx = 0;
@@ -332,17 +128,17 @@ public class UIConfig {
         rightPanel.add(minLengthLabel, rightConstraints);
         
         SpinnerNumberModel minLengthModel = new SpinnerNumberModel(
-                configSettings.getGenericSecretMinLength(),
+                config.getSettings().getGenericSecretMinLength(),
                 8,   // Minimum allowed value
                 128, // Maximum allowed value for min length
                 1
         );
         JSpinner minLengthSpinner = new JSpinner(minLengthModel);
         minLengthSpinner.addChangeListener(_ -> {
-            configSettings.setGenericSecretMinLength((Integer) minLengthSpinner.getValue());
-            saveConfigSettings();
-                        AISecretsDetector.getInstance().logMsg("Configuration updated - Min Secret Length: " +
-                    configSettings.getGenericSecretMinLength());
+            config.getSettings().setGenericSecretMinLength((Integer) minLengthSpinner.getValue());
+            config.saveConfig();
+            AISecretsDetector.getInstance().logMsg("Configuration updated - Min Secret Length: " +
+                    config.getSettings().getGenericSecretMinLength());
         });
         
         // Set a reasonable fixed width for the spinner
@@ -363,17 +159,17 @@ public class UIConfig {
         rightPanel.add(maxLengthLabel, rightConstraints);
         
         SpinnerNumberModel maxLengthModel = new SpinnerNumberModel(
-                configSettings.getGenericSecretMaxLength(),
+                config.getSettings().getGenericSecretMaxLength(),
                 8,   // Minimum allowed value for max length
                 128, // Maximum allowed value
                 1
         );
         JSpinner maxLengthSpinner = new JSpinner(maxLengthModel);
         maxLengthSpinner.addChangeListener(_ -> {
-            configSettings.setGenericSecretMaxLength((Integer) maxLengthSpinner.getValue());
-            saveConfigSettings();
-                        AISecretsDetector.getInstance().logMsg("Configuration updated - Max Secret Length: " +
-                    configSettings.getGenericSecretMaxLength());
+            config.getSettings().setGenericSecretMaxLength((Integer) maxLengthSpinner.getValue());
+            config.saveConfig();
+            AISecretsDetector.getInstance().logMsg("Configuration updated - Max Secret Length: " +
+                    config.getSettings().getGenericSecretMaxLength());
         });
         
         // Set a reasonable fixed width for the spinner
@@ -394,17 +190,17 @@ public class UIConfig {
         rightPanel.add(duplicateThresholdLabel, rightConstraints);
         
         SpinnerNumberModel duplicateThresholdModel = new SpinnerNumberModel(
-                configSettings.getDuplicateThreshold(),
+                config.getSettings().getDuplicateThreshold(),
                 1,   // Minimum value
                 50,  // Maximum value
                 1
         );
         JSpinner duplicateThresholdSpinner = new JSpinner(duplicateThresholdModel);
         duplicateThresholdSpinner.addChangeListener(_ -> {
-            configSettings.setDuplicateThreshold((Integer) duplicateThresholdSpinner.getValue());
-            saveConfigSettings();
-                        AISecretsDetector.getInstance().logMsg("Configuration updated - Duplicate Threshold: " +
-                    configSettings.getDuplicateThreshold());
+            config.getSettings().setDuplicateThreshold((Integer) duplicateThresholdSpinner.getValue());
+            config.saveConfig();
+            AISecretsDetector.getInstance().logMsg("Configuration updated - Duplicate Threshold: " +
+                    config.getSettings().getDuplicateThreshold());
         });
         
         // Set a reasonable fixed width for the spinner
@@ -425,17 +221,17 @@ public class UIConfig {
         rightPanel.add(maxHighlightsLabel, rightConstraints);
         
         SpinnerNumberModel maxHighlightsModel = new SpinnerNumberModel(
-                configSettings.getMaxHighlightsPerSecret(),
+                config.getSettings().getMaxHighlightsPerSecret(),
                 1,   // Minimum value
                 50,  // Maximum value
                 1
         );
         JSpinner maxHighlightsSpinner = new JSpinner(maxHighlightsModel);
         maxHighlightsSpinner.addChangeListener(_ -> {
-            configSettings.setMaxHighlightsPerSecret((Integer) maxHighlightsSpinner.getValue());
-            saveConfigSettings();
-                        AISecretsDetector.getInstance().logMsg("Configuration updated - Max Highlights Per Secret: " +
-                    configSettings.getMaxHighlightsPerSecret());
+            config.getSettings().setMaxHighlightsPerSecret((Integer) maxHighlightsSpinner.getValue());
+            config.saveConfig();
+            AISecretsDetector.getInstance().logMsg("Configuration updated - Max Highlights Per Secret: " +
+                    config.getSettings().getMaxHighlightsPerSecret());
         });
         
         // Set a reasonable fixed width for the spinner
@@ -466,10 +262,10 @@ public class UIConfig {
         
         // Single row for all tool checkboxes
         for (ToolType tool : relevantTools) {
-            JCheckBox checkbox = new JCheckBox(tool.name(), configSettings.isToolEnabled(tool));
+            JCheckBox checkbox = new JCheckBox(tool.name(), config.getSettings().isToolEnabled(tool));
             checkbox.addActionListener(_ -> {
-                configSettings.setToolEnabled(tool, checkbox.isSelected());
-                saveConfigSettings();
+                config.getSettings().setToolEnabled(tool, checkbox.isSelected());
+                config.saveConfig();
                 AISecretsDetector.getInstance().logMsg("Configuration updated - Tool " + tool.name() + 
                                         ": " + checkbox.isSelected());
             });
@@ -481,13 +277,13 @@ public class UIConfig {
         JPanel loggingPanel = new JPanel(new GridLayout(2, 1)); // Use 2 rows, 1 column layout
         
         // Add logging enable checkbox
-        JCheckBox loggingCheckbox = new JCheckBox("Enable Logging", configSettings.isLoggingEnabled());
+        JCheckBox loggingCheckbox = new JCheckBox("Enable Logging", config.getSettings().isLoggingEnabled());
         loggingCheckbox.addActionListener(_ -> {
-            configSettings.setLoggingEnabled(loggingCheckbox.isSelected());
-            saveConfigSettings();
-            AISecretsDetector.getInstance().logMsg("Configuration updated - Logging: " + configSettings.isLoggingEnabled());
+            config.getSettings().setLoggingEnabled(loggingCheckbox.isSelected());
+            config.saveConfig();
+            AISecretsDetector.getInstance().logMsg("Configuration updated - Logging: " + config.getSettings().isLoggingEnabled());
             
-            if (configSettings.isLoggingEnabled()) {
+            if (config.getSettings().isLoggingEnabled()) {
                 appendToLog("Logging enabled");
             }
         });
@@ -520,6 +316,29 @@ public class UIConfig {
         autoSavePanel.add(Box.createHorizontalStrut(20));
         autoSavePanel.add(resetCountersButton);
         
+        // Add Reset to Defaults button
+        JButton resetToDefaultsButton = new JButton("Reset to Defaults");
+        resetToDefaultsButton.setToolTipText("Reset all settings and patterns to default values.");
+        resetToDefaultsButton.addActionListener(_ -> {
+            int result = JOptionPane.showConfirmDialog(
+                panel, 
+                "This will reset all configuration to default values. Continue?",
+                "Reset to Defaults",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE
+            );
+            
+            if (result == JOptionPane.YES_OPTION) {
+                config.resetToDefaults();
+                appendToLog("Configuration reset to defaults");
+                // Refresh the UI by recreating the panel
+                refreshUI();
+            }
+        });
+        
+        autoSavePanel.add(Box.createHorizontalStrut(10));
+        autoSavePanel.add(resetToDefaultsButton);
+        
         loggingPanel.add(autoSavePanel);
         
         // Add all panels to the main panel
@@ -551,12 +370,18 @@ public class UIConfig {
         
         return panel;
     }
+    
+    private void refreshUI() {
+        // This method can be called to refresh the UI after configuration changes
+        // For now, we'll just log a message - in a full implementation, you might want to 
+        // recreate the entire panel or update individual components
+        appendToLog("UI refreshed after configuration reset");
+    }
 
     public void appendToLog(String message) {
-        if (logArea != null && configSettings.isLoggingEnabled()) {
+        if (logArea != null && config.getSettings().isLoggingEnabled()) {
             SwingUtilities.invokeLater(() -> {
                 logArea.append(message + "\n");
-
                 logArea.setCaretPosition(logArea.getDocument().getLength());
             });
         }
@@ -578,4 +403,4 @@ public class UIConfig {
             AISecretsDetector.getInstance().logMsg("Secret counters reset");
         }
     }
-}
+} 

@@ -42,7 +42,8 @@ public class AISecretsDetector implements BurpExtension {
     
     private MontoyaApi api;
     private ExecutorService executorService;
-    private UIConfig config;
+    private Config config;
+    private UI ui;
     
     // Persistent secret counter map stored as JSON in Burp's extension data
     private Map<String, Map<String, Integer>> secretCounters = new ConcurrentHashMap<>();
@@ -86,7 +87,8 @@ public class AISecretsDetector implements BurpExtension {
         // Set instance for Config access
         instance = this;
         
-        config = new UIConfig(api, this::updateWorkers);
+        config = Config.initialize(api, this::updateWorkers);
+        ui = new UI(api);
         
         // Load persistent secret counters
         loadSecretCounters();
@@ -117,7 +119,7 @@ public class AISecretsDetector implements BurpExtension {
                 }
                 
                 // Check if in scope only
-                if (config.getConfigSettings().isInScopeOnly() && !responseReceived.initiatingRequest().isInScope()) {
+                if (config.getSettings().isInScopeOnly() && !responseReceived.initiatingRequest().isInScope()) {
                     return ResponseReceivedAction.continueWith(responseReceived);
                 }
                 
@@ -129,7 +131,7 @@ public class AISecretsDetector implements BurpExtension {
         });
         
         SwingUtilities.invokeLater(() -> {
-            JComponent configPanel = config.createConfigPanel();
+            JComponent configPanel = ui.createConfigPanel();
             api.userInterface().registerSuiteTab("AI Secrets Detector", configPanel);
         });
         
@@ -137,14 +139,14 @@ public class AISecretsDetector implements BurpExtension {
             logMsg("AI Secrets Detector extension unloading...");
             saveSecretCounters();
             shutdownWorkers();
-            config.clearLogs();
+            ui.clearLogs();
         });
         
         logMsg("AI Secrets Detector extension loaded successfully");
     }
     
     private void initializeWorkers() {
-        executorService = Executors.newFixedThreadPool(config.getConfigSettings().getWorkers());
+        executorService = Executors.newFixedThreadPool(config.getSettings().getWorkers());
     }
     
     private void shutdownWorkers() {
@@ -223,7 +225,7 @@ public class AISecretsDetector implements BurpExtension {
                             secret, existingCount, persistedCount, finalCount));
                 }
                 
-                int duplicateThreshold = config.getConfigSettings().getDuplicateThreshold();
+                int duplicateThreshold = config.getSettings().getDuplicateThreshold();
                 logMsg("Current duplicate threshold: " + duplicateThreshold);
                 
                 // Filter out secrets that appear too frequently
@@ -588,7 +590,7 @@ public class AISecretsDetector implements BurpExtension {
      * @return true if the response is from an enabled tool, false otherwise
      */
     private boolean isToolEnabled(HttpResponseReceived responseReceived) {
-        for (ToolType tool : config.getConfigSettings().getEnabledTools()) {
+        for (ToolType tool : config.getSettings().getEnabledTools()) {
             if (responseReceived.toolSource().isFromTool(tool)) {
                 return true;
             }
@@ -650,8 +652,8 @@ public class AISecretsDetector implements BurpExtension {
         //api.logging().logToOutput(message);
         
         // Also log to UI if enabled
-        if (config != null && config.getConfigSettings().isLoggingEnabled()) {
-            config.appendToLog(message);
+        if (config != null && config.getSettings().isLoggingEnabled() && ui != null) {
+            ui.appendToLog(message);
         }
     }
 
@@ -661,8 +663,8 @@ public class AISecretsDetector implements BurpExtension {
         api.logging().logToError(message);
         
         // Also log to UI if enabled
-        if (config != null && config.getConfigSettings().isLoggingEnabled()) {
-            config.appendToLog(message);
+        if (config != null && config.getSettings().isLoggingEnabled() && ui != null) {
+            ui.appendToLog(message);
         }
     }
 
