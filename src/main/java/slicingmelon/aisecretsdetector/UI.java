@@ -33,6 +33,13 @@ public class UI {
     public UI(MontoyaApi api) {
         this.api = api;
         this.config = Config.getInstance();
+        
+        // Ensure config is never null
+        if (this.config == null) {
+            // This should not happen with the improved Config.getInstance(), but just in case
+            this.config = Config.initialize(api, null);
+        }
+        
         instance = this;
     }
     
@@ -76,7 +83,7 @@ public class UI {
         leftPanel.add(workersLabel, leftConstraints);
         
         SpinnerNumberModel workersModel = new SpinnerNumberModel(
-                config.getSettings().getWorkers(),
+                config != null ? config.getSettings().getWorkers() : 15,
                 1,
                 50,
                 1
@@ -93,9 +100,11 @@ public class UI {
         spinnerPanel.add(workersSpinner);
         
         workersSpinner.addChangeListener(e -> {
-            config.getSettings().setWorkers((Integer) workersSpinner.getValue());
-            config.saveConfig();
-            AISecretsDetector.getInstance().logMsg("Configuration updated - Workers: " + config.getSettings().getWorkers());
+            if (config != null) {
+                config.getSettings().setWorkers((Integer) workersSpinner.getValue());
+                config.saveConfig();
+                AISecretsDetector.getInstance().logMsg("Configuration updated - Workers: " + config.getSettings().getWorkers());
+            }
         });
         
         leftConstraints.gridx = 1;
@@ -104,11 +113,14 @@ public class UI {
         leftPanel.add(spinnerPanel, leftConstraints);
         
         // In-scope only setting
-        JCheckBox inScopeCheckbox = new JCheckBox("In-Scope Requests Only", config.getSettings().isInScopeOnly());
+        JCheckBox inScopeCheckbox = new JCheckBox("In-Scope Requests Only", 
+                config != null ? config.getSettings().isInScopeOnly() : true);
         inScopeCheckbox.addActionListener(e -> {
-            config.getSettings().setInScopeOnly(inScopeCheckbox.isSelected());
-            config.saveConfig();
-            AISecretsDetector.getInstance().logMsg("Configuration updated - In-Scope Only: " + config.getSettings().isInScopeOnly());
+            if (config != null) {
+                config.getSettings().setInScopeOnly(inScopeCheckbox.isSelected());
+                config.saveConfig();
+                AISecretsDetector.getInstance().logMsg("Configuration updated - In-Scope Only: " + config.getSettings().isInScopeOnly());
+            }
         });
         
         leftConstraints.gridx = 0;
@@ -118,11 +130,14 @@ public class UI {
         leftPanel.add(inScopeCheckbox, leftConstraints);
         
         // Enable logging setting
-        JCheckBox loggingCheckbox = new JCheckBox("Enable Logging", config.getSettings().isLoggingEnabled());
+        JCheckBox loggingCheckbox = new JCheckBox("Enable Logging", 
+                config != null ? config.getSettings().isLoggingEnabled() : false);
         loggingCheckbox.addActionListener(e -> {
-            config.getSettings().setLoggingEnabled(loggingCheckbox.isSelected());
-            config.saveConfig();
-            AISecretsDetector.getInstance().logMsg("Configuration updated - Logging: " + config.getSettings().isLoggingEnabled());
+            if (config != null) {
+                config.getSettings().setLoggingEnabled(loggingCheckbox.isSelected());
+                config.saveConfig();
+                AISecretsDetector.getInstance().logMsg("Configuration updated - Logging: " + config.getSettings().isLoggingEnabled());
+            }
         });
         
         leftConstraints.gridx = 0;
@@ -140,12 +155,14 @@ public class UI {
         
         // Randomness Algorithm Enable
         JCheckBox randomnessCheckbox = new JCheckBox("Enable Randomness Algorithm Detection", 
-                                                   config.getSettings().isRandomnessAlgorithmEnabled());
+                config != null ? config.getSettings().isRandomnessAlgorithmEnabled() : true);
         randomnessCheckbox.addActionListener(e -> {
-            config.getSettings().setRandomnessAlgorithmEnabled(randomnessCheckbox.isSelected());
-            config.saveConfig();
-            AISecretsDetector.getInstance().logMsg("Configuration updated - Randomness Algorithm: " +
-                    config.getSettings().isRandomnessAlgorithmEnabled());
+            if (config != null) {
+                config.getSettings().setRandomnessAlgorithmEnabled(randomnessCheckbox.isSelected());
+                config.saveConfig();
+                AISecretsDetector.getInstance().logMsg("Configuration updated - Randomness Algorithm: " +
+                        config.getSettings().isRandomnessAlgorithmEnabled());
+            }
         });
         
         rightConstraints.gridx = 0;
@@ -162,17 +179,19 @@ public class UI {
         rightPanel.add(minLengthLabel, rightConstraints);
         
         SpinnerNumberModel minLengthModel = new SpinnerNumberModel(
-                config.getSettings().getGenericSecretMinLength(),
+                config != null ? config.getSettings().getGenericSecretMinLength() : 15,
                 8,
                 128,
                 1
         );
         JSpinner minLengthSpinner = new JSpinner(minLengthModel);
         minLengthSpinner.addChangeListener(e -> {
-            config.getSettings().setGenericSecretMinLength((Integer) minLengthSpinner.getValue());
-            config.saveConfig();
-            AISecretsDetector.getInstance().logMsg("Configuration updated - Min Secret Length: " +
-                    config.getSettings().getGenericSecretMinLength());
+            if (config != null) {
+                config.getSettings().setGenericSecretMinLength((Integer) minLengthSpinner.getValue());
+                config.saveConfig();
+                AISecretsDetector.getInstance().logMsg("Configuration updated - Min Secret Length: " +
+                        config.getSettings().getGenericSecretMinLength());
+            }
         });
         
         JComponent minEditor = minLengthSpinner.getEditor();
@@ -192,17 +211,19 @@ public class UI {
         rightPanel.add(maxLengthLabel, rightConstraints);
         
         SpinnerNumberModel maxLengthModel = new SpinnerNumberModel(
-                config.getSettings().getGenericSecretMaxLength(),
+                config != null ? config.getSettings().getGenericSecretMaxLength() : 80,
                 8,
                 128,
                 1
         );
         JSpinner maxLengthSpinner = new JSpinner(maxLengthModel);
         maxLengthSpinner.addChangeListener(e -> {
-            config.getSettings().setGenericSecretMaxLength((Integer) maxLengthSpinner.getValue());
-            config.saveConfig();
-            AISecretsDetector.getInstance().logMsg("Configuration updated - Max Secret Length: " +
-                    config.getSettings().getGenericSecretMaxLength());
+            if (config != null) {
+                config.getSettings().setGenericSecretMaxLength((Integer) maxLengthSpinner.getValue());
+                config.saveConfig();
+                AISecretsDetector.getInstance().logMsg("Configuration updated - Max Secret Length: " +
+                        config.getSettings().getGenericSecretMaxLength());
+            }
         });
         
         JComponent maxEditor = maxLengthSpinner.getEditor();
@@ -222,17 +243,19 @@ public class UI {
         rightPanel.add(duplicateThresholdLabel, rightConstraints);
         
         SpinnerNumberModel duplicateThresholdModel = new SpinnerNumberModel(
-                config.getSettings().getDuplicateThreshold(),
+                config != null ? config.getSettings().getDuplicateThreshold() : 5,
                 1,
                 50,
                 1
         );
         JSpinner duplicateThresholdSpinner = new JSpinner(duplicateThresholdModel);
         duplicateThresholdSpinner.addChangeListener(e -> {
-            config.getSettings().setDuplicateThreshold((Integer) duplicateThresholdSpinner.getValue());
-            config.saveConfig();
-            AISecretsDetector.getInstance().logMsg("Configuration updated - Duplicate Threshold: " +
-                    config.getSettings().getDuplicateThreshold());
+            if (config != null) {
+                config.getSettings().setDuplicateThreshold((Integer) duplicateThresholdSpinner.getValue());
+                config.saveConfig();
+                AISecretsDetector.getInstance().logMsg("Configuration updated - Duplicate Threshold: " +
+                        config.getSettings().getDuplicateThreshold());
+            }
         });
         
         JComponent duplicateEditor = duplicateThresholdSpinner.getEditor();
@@ -257,11 +280,14 @@ public class UI {
         ToolType[] tools = {ToolType.TARGET, ToolType.PROXY, ToolType.SCANNER, ToolType.EXTENSIONS, ToolType.REPEATER, ToolType.INTRUDER};
         
         for (ToolType tool : tools) {
-            JCheckBox toolCheckbox = new JCheckBox(tool.name(), config.getSettings().isToolEnabled(tool));
+            JCheckBox toolCheckbox = new JCheckBox(tool.name(), 
+                    config != null ? config.getSettings().isToolEnabled(tool) : false);
             toolCheckbox.addActionListener(e -> {
-                config.getSettings().setToolEnabled(tool, toolCheckbox.isSelected());
-                config.saveConfig();
-                AISecretsDetector.getInstance().logMsg("Configuration updated - Tool " + tool.name() + ": " + toolCheckbox.isSelected());
+                if (config != null) {
+                    config.getSettings().setToolEnabled(tool, toolCheckbox.isSelected());
+                    config.saveConfig();
+                    AISecretsDetector.getInstance().logMsg("Configuration updated - Tool " + tool.name() + ": " + toolCheckbox.isSelected());
+                }
             });
             toolCheckboxes.put(tool, toolCheckbox);
             toolPanel.add(toolCheckbox);

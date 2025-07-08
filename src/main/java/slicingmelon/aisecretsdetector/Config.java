@@ -29,7 +29,7 @@ public class Config {
     private static final String CONFIG_KEY = "config_toml";
     private static final String DEFAULT_CONFIG_PATH = "/default-config.toml";
     
-    private final MontoyaApi api;
+    private MontoyaApi api;
     private static Config instance;
     private Toml config;
     private List<PatternConfig> patterns;
@@ -222,23 +222,81 @@ public class Config {
         this.patterns = new ArrayList<>();
         this.settings = new Settings();
         
-        loadConfig();
+        // Only load config if we have an API instance
+        if (api != null) {
+            loadConfig();
+        } else {
+            // Initialize with empty config for minimal instance
+            this.config = new Toml();
+        }
     }
     
     public static Config getInstance() {
+        if (instance == null) {
+            // Create a minimal Config instance with default settings if none exists
+            // This prevents null pointer exceptions
+            try {
+                instance = new Config(null, null);
+            } catch (Exception e) {
+                // If even that fails, create a truly minimal instance
+                instance = createMinimalInstance();
+            }
+        }
         return instance;
     }
     
     public static Config initialize(MontoyaApi api, Runnable onConfigChangedCallback) {
-        if (instance == null) {
-            instance = new Config(api, onConfigChangedCallback);
+        try {
+            if (instance == null) {
+                instance = new Config(api, onConfigChangedCallback);
+            } else {
+                // Update existing instance with new API and callback
+                instance.api = api;
+                instance.onConfigChangedCallback = onConfigChangedCallback;
+                // Reload config with the new API
+                instance.loadConfig();
+            }
+            return instance;
+        } catch (Exception e) {
+            // If initialization fails, create a minimal working instance
+            if (api != null) {
+                api.logging().logToError("Failed to initialize Config properly: " + e.getMessage());
+            }
+            if (instance == null) {
+                instance = createMinimalInstance();
+                instance.api = api;
+                instance.onConfigChangedCallback = onConfigChangedCallback;
+            }
+            return instance;
         }
-        return instance;
+    }
+    
+    /**
+     * Creates a minimal Config instance with default settings to prevent null pointer exceptions
+     */
+    private static Config createMinimalInstance() {
+        Config minimalConfig = new Config();
+        minimalConfig.patterns = new ArrayList<>();
+        minimalConfig.settings = new Settings();
+        minimalConfig.config = new Toml();
+        return minimalConfig;
+    }
+    
+    /**
+     * Private constructor for creating minimal instances
+     */
+    private Config() {
+        // Minimal constructor for fallback instances
     }
     
     private void loadConfig() {
         try {
             // First, try to load from persistence
+            if (api == null) {
+                loadDefaultConfig();
+                return;
+            }
+            
             PersistedObject persistedData = api.persistence().extensionData();
             String savedConfig = persistedData.getString(CONFIG_KEY);
             
@@ -400,6 +458,10 @@ public class Config {
     
     public void saveConfig() {
         try {
+            // Can't save config without API
+            if (api == null) {
+                return;
+            }
             // Convert current configuration to TOML format
             Map<String, Object> configMap = new HashMap<>();
             

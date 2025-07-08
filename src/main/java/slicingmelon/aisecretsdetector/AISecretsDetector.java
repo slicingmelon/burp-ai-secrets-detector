@@ -88,7 +88,10 @@ public class AISecretsDetector implements BurpExtension {
         // Set instance for Config access
         instance = this;
         
+        // Initialize config first and ensure it's fully loaded
         config = Config.initialize(api, this::updateWorkers);
+        
+        // Now create UI after config is ready
         ui = new UI(api);
         
         // Initialize secret scanner

@@ -170,20 +170,24 @@ public class SecretScanner {
             configInstance = Config.getInstance();
             patterns = new ArrayList<>();
             
-            // Convert Config.PatternConfig to SecretPattern
-            for (Config.PatternConfig patternConfig : configInstance.getPatterns()) {
-                try {
-                    SecretPattern secretPattern = new SecretPattern(
-                        patternConfig.getName(), 
-                        patternConfig.getCompiledPattern()
-                    );
-                    patterns.add(secretPattern);
-                } catch (Exception e) {
-                    AISecretsDetector.getInstance().logMsgError("Failed to load pattern '" + patternConfig.getName() + "': " + e.getMessage());
+            if (configInstance != null) {
+                // Convert Config.PatternConfig to SecretPattern
+                for (Config.PatternConfig patternConfig : configInstance.getPatterns()) {
+                    try {
+                        SecretPattern secretPattern = new SecretPattern(
+                            patternConfig.getName(), 
+                            patternConfig.getCompiledPattern()
+                        );
+                        patterns.add(secretPattern);
+                    } catch (Exception e) {
+                        AISecretsDetector.getInstance().logMsgError("Failed to load pattern '" + patternConfig.getName() + "': " + e.getMessage());
+                    }
                 }
+                
+                AISecretsDetector.getInstance().logMsg("SecretScanner initialized with " + patterns.size() + " patterns from config");
+            } else {
+                AISecretsDetector.getInstance().logMsgError("Config instance is null during SecretScanner initialization");
             }
-            
-            AISecretsDetector.getInstance().logMsg("SecretScanner initialized with " + patterns.size() + " patterns from config");
         } catch (Exception e) {
             AISecretsDetector.getInstance().logMsgError("Error initializing SecretScanner: " + e.getMessage());
             e.printStackTrace();
