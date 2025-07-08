@@ -226,14 +226,17 @@ public class Config {
         this.api = api;
         this.onConfigChangedCallback = onConfigChangedCallback;
         this.patterns = new ArrayList<>();
-        this.settings = new Settings();
+        this.settings = new Settings(); // Always initialize settings first
+        this.config = new Toml(); // Always initialize config to prevent null
         
         // Only load config if we have an API instance
         if (api != null) {
-            loadConfig();
-        } else {
-            // Initialize with empty config for minimal instance
-            this.config = new Toml();
+            try {
+                loadConfig();
+            } catch (Exception e) {
+                logError("Error during config loading, using defaults: " + e.getMessage());
+                // Keep the default settings and empty config we already initialized
+            }
         }
     }
     
@@ -281,11 +284,22 @@ public class Config {
      * Creates a minimal Config instance with default settings to prevent null pointer exceptions
      */
     private static Config createMinimalInstance() {
-        Config minimalConfig = new Config();
-        minimalConfig.patterns = new ArrayList<>();
-        minimalConfig.settings = new Settings();
-        minimalConfig.config = new Toml();
-        return minimalConfig;
+        try {
+            Config minimalConfig = new Config();
+            minimalConfig.patterns = new ArrayList<>();
+            minimalConfig.settings = new Settings();
+            minimalConfig.config = new Toml();
+            minimalConfig.api = null;
+            minimalConfig.onConfigChangedCallback = null;
+            return minimalConfig;
+        } catch (Exception e) {
+            // If even minimal creation fails, create an absolutely basic instance
+            Config emergency = new Config();
+            emergency.patterns = new ArrayList<>();
+            emergency.settings = new Settings();
+            emergency.config = new Toml();
+            return emergency;
+        }
     }
     
     /**
@@ -464,8 +478,9 @@ public class Config {
     
     public void saveConfig() {
         try {
-            // Can't save config without API
-            if (api == null) {
+            // Can't save config without API or settings
+            if (api == null || settings == null) {
+                logError("Cannot save config: API or settings is null");
                 return;
             }
             // Convert current configuration to TOML format
@@ -491,15 +506,19 @@ public class Config {
             
             configMap.put("settings", settingsMap);
             
-            // Add patterns
+            // Add patterns (ensure patterns is not null)
             List<Map<String, Object>> patternsList = new ArrayList<>();
-            for (PatternConfig pattern : patterns) {
-                Map<String, Object> patternMap = new HashMap<>();
-                patternMap.put("name", pattern.getName());
-                patternMap.put("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
-                patternMap.put("pattern", pattern.getPattern());
-                patternMap.put("suffix", pattern.getSuffix() != null ? pattern.getSuffix() : "");
-                patternsList.add(patternMap);
+            if (patterns != null) {
+                for (PatternConfig pattern : patterns) {
+                    if (pattern != null) {
+                        Map<String, Object> patternMap = new HashMap<>();
+                        patternMap.put("name", pattern.getName());
+                        patternMap.put("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
+                        patternMap.put("pattern", pattern.getPattern());
+                        patternMap.put("suffix", pattern.getSuffix() != null ? pattern.getSuffix() : "");
+                        patternsList.add(patternMap);
+                    }
+                }
             }
             configMap.put("patterns", patternsList);
             
@@ -642,12 +661,31 @@ public class Config {
     
     /**
      * Get the default config file path for export/import
+     * Following HaE extension pattern for cross-platform compatibility
      * @return The recommended file path for config export
      */
     public String getDefaultConfigFilePath() {
-        // Use user's home directory
         String userHome = System.getProperty("user.home");
-        return Paths.get(userHome, "burp-ai-secrets-detector-config.toml").toString();
+        String configDir;
+        
+        // Cross-platform config directory (following HaE pattern)
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            // Windows: %USERPROFILE%/burp-ai-secrets-detector/
+            configDir = Paths.get(userHome, "burp-ai-secrets-detector").toString();
+        } else {
+            // Linux/Mac: ~/burp-ai-secrets-detector/
+            configDir = Paths.get(userHome, "burp-ai-secrets-detector").toString();
+        }
+        
+        // Ensure directory exists
+        try {
+            Files.createDirectories(Paths.get(configDir));
+        } catch (IOException e) {
+            logError("Failed to create config directory: " + e.getMessage());
+        }
+        
+        return Paths.get(configDir, "config.toml").toString();
     }
     
     /**

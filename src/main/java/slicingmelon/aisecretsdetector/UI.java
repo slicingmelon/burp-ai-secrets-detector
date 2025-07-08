@@ -485,23 +485,40 @@ public class UI {
             
             // Check if we have persisted config
             if (api != null) {
-                String savedConfig = api.persistence().extensionData().getString("config_toml");
-                if (savedConfig != null && !savedConfig.isEmpty()) {
-                    info.append(" [ACTIVE]");
-                } else {
-                    info.append(" [EMPTY - using defaults]");
+                try {
+                    String savedConfig = api.persistence().extensionData().getString("config_toml");
+                    if (savedConfig != null && !savedConfig.isEmpty()) {
+                        info.append(" [ACTIVE]");
+                    } else {
+                        info.append(" [EMPTY - using defaults]");
+                    }
+                } catch (Exception e) {
+                    info.append(" [ERROR]");
                 }
+            } else {
+                info.append(" [NO API]");
             }
             
             // External config file path
             if (config != null) {
-                info.append(" | External File: ");
-                info.append(config.getDefaultConfigFilePath());
-                if (config.hasExportedConfigFile()) {
-                    info.append(" [EXISTS]");
-                } else {
-                    info.append(" [NOT FOUND]");
+                try {
+                    String configPath = config.getDefaultConfigFilePath();
+                    // Truncate long paths for display
+                    String displayPath = configPath.length() > 60 ? 
+                        "..." + configPath.substring(configPath.length() - 57) : configPath;
+                    
+                    info.append(" | External: ");
+                    info.append(displayPath);
+                    if (config.hasExportedConfigFile()) {
+                        info.append(" [EXISTS]");
+                    } else {
+                        info.append(" [NOT FOUND]");
+                    }
+                } catch (Exception e) {
+                    info.append(" | External: [ERROR: " + e.getMessage() + "]");
                 }
+            } else {
+                info.append(" | External: [CONFIG NOT AVAILABLE]");
             }
             
             return info.toString();
@@ -520,7 +537,7 @@ public class UI {
             String defaultPath = config.getDefaultConfigFilePath();
             String filePath = JOptionPane.showInputDialog(
                 null,
-                "Enter the path to save the config file:",
+                "Enter the path to save the config file:\n\nDefault location: " + defaultPath + "\n\n(Leave empty to use default)",
                 "Export Config to File",
                 JOptionPane.QUESTION_MESSAGE
             );
@@ -566,7 +583,7 @@ public class UI {
             String defaultPath = config.getDefaultConfigFilePath();
             String filePath = JOptionPane.showInputDialog(
                 null,
-                "Enter the path to the config file to import:",
+                "Enter the path to the config file to import:\n\nDefault location: " + defaultPath + "\n\n(Leave empty to use default)",
                 "Import Config from File",
                 JOptionPane.QUESTION_MESSAGE
             );
