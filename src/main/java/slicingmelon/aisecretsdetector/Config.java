@@ -260,6 +260,11 @@ public class Config {
             // Fallback to default config
             loadDefaultConfig();
         }
+        
+        // Ensure config is never null
+        if (this.config == null) {
+            this.config = new Toml();
+        }
     }
     
     private void loadDefaultConfig() {
@@ -272,9 +277,13 @@ public class Config {
                 saveConfig();
             } else {
                 logError("Default config file not found in resources");
+                // Create empty config to avoid null pointer exceptions
+                this.config = new Toml();
             }
         } catch (Exception e) {
             logError("Failed to load default configuration: " + e.getMessage());
+            // Create empty config to avoid null pointer exceptions
+            this.config = new Toml();
         }
     }
     
@@ -287,6 +296,11 @@ public class Config {
     }
     
     private void parseSettings() {
+        if (config == null) {
+            logError("Cannot parse settings: config is null");
+            return;
+        }
+        
         if (config.contains("settings")) {
             Toml settingsToml = config.getTable("settings");
             
@@ -346,6 +360,11 @@ public class Config {
     
     private void parsePatterns() {
         patterns.clear();
+        
+        if (config == null) {
+            logError("Cannot parse patterns: config is null");
+            return;
+        }
         
         List<Map<String, Object>> patternMaps = config.getList("patterns");
         if (patternMaps != null) {
