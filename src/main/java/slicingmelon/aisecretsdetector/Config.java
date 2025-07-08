@@ -114,6 +114,12 @@ public class Config {
             this.maxHighlightsPerSecret = 3;
             this.excludedFileExtensions = new HashSet<>();
             this.enabledTools = new HashSet<>();
+            
+            // Set default enabled tools
+            this.enabledTools.add(ToolType.TARGET);
+            this.enabledTools.add(ToolType.PROXY);
+            this.enabledTools.add(ToolType.SCANNER);
+            this.enabledTools.add(ToolType.EXTENSIONS);
         }
         
         // Getters and setters

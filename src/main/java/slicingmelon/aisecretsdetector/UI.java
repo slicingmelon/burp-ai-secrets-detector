@@ -10,16 +10,21 @@ package slicingmelon.aisecretsdetector;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.core.ToolType;
 import javax.swing.*;
+import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.util.Set;
 import java.util.Map;
 import java.util.HashMap;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class UI {
     private MontoyaApi api;
     private Config config;
     private JTextArea logArea;
+    private JTextArea errorLogArea;
     private static UI instance;
+    private static final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
     
     public static UI getInstance() {
         return instance;
@@ -32,23 +37,42 @@ public class UI {
     }
     
     public JComponent createConfigPanel() {
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        
+        // Create tabbed pane
+        JTabbedPane tabbedPane = new JTabbedPane();
+        
+        // Config tab
+        JPanel configPanel = createConfigTab();
+        tabbedPane.addTab("Config", configPanel);
+        
+        // Log tab
+        JPanel logPanel = createLogTab();
+        tabbedPane.addTab("Log", logPanel);
+        
+        mainPanel.add(tabbedPane, BorderLayout.CENTER);
+        
+        return mainPanel;
+    }
+    
+    private JPanel createConfigTab() {
         JPanel panel = new JPanel(new BorderLayout());
         
         // Settings panel - now uses a split layout
         JPanel settingsPanel = new JPanel(new GridLayout(1, 2, 10, 0));
         
-        // Left panel - for worker settings and in-scope only
+        // Left panel - for worker settings and basic configuration
         JPanel leftPanel = new JPanel(new GridBagLayout());
         GridBagConstraints leftConstraints = new GridBagConstraints();
         leftConstraints.fill = GridBagConstraints.HORIZONTAL;
         leftConstraints.insets = new Insets(5, 5, 5, 5);
-        leftConstraints.anchor = GridBagConstraints.WEST; // Anchor to the west (left)
+        leftConstraints.anchor = GridBagConstraints.WEST;
         
         // Worker setting
         JLabel workersLabel = new JLabel("Number of Workers:");
         leftConstraints.gridx = 0;
         leftConstraints.gridy = 0;
-        leftConstraints.weightx = 0.0; // Don't resize the label
+        leftConstraints.weightx = 0.0;
         leftPanel.add(workersLabel, leftConstraints);
         
         SpinnerNumberModel workersModel = new SpinnerNumberModel(
@@ -59,20 +83,16 @@ public class UI {
         );
         JSpinner workersSpinner = new JSpinner(workersModel);
         
-        // Fix the spinner width using a more direct approach
         JComponent editor = workersSpinner.getEditor();
         Dimension prefSize = new Dimension(60, editor.getPreferredSize().height);
         editor.setPreferredSize(prefSize);
-        
-        // Set the spinner's maximum size to ensure it doesn't grow beyond our desired size
         workersSpinner.setMaximumSize(new Dimension(60, workersSpinner.getPreferredSize().height));
         
-        // Additionally, add the spinner to a panel with FlowLayout to prevent stretching
         JPanel spinnerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        spinnerPanel.setOpaque(false); // Make panel transparent
+        spinnerPanel.setOpaque(false);
         spinnerPanel.add(workersSpinner);
         
-        workersSpinner.addChangeListener(_ -> {
+        workersSpinner.addChangeListener(e -> {
             config.getSettings().setWorkers((Integer) workersSpinner.getValue());
             config.saveConfig();
             AISecretsDetector.getInstance().logMsg("Configuration updated - Workers: " + config.getSettings().getWorkers());
@@ -80,12 +100,12 @@ public class UI {
         
         leftConstraints.gridx = 1;
         leftConstraints.gridy = 0;
-        leftConstraints.weightx = 0.0; // Don't stretch
+        leftConstraints.weightx = 0.0;
         leftPanel.add(spinnerPanel, leftConstraints);
         
         // In-scope only setting
         JCheckBox inScopeCheckbox = new JCheckBox("In-Scope Requests Only", config.getSettings().isInScopeOnly());
-        inScopeCheckbox.addActionListener(_ -> {
+        inScopeCheckbox.addActionListener(e -> {
             config.getSettings().setInScopeOnly(inScopeCheckbox.isSelected());
             config.saveConfig();
             AISecretsDetector.getInstance().logMsg("Configuration updated - In-Scope Only: " + config.getSettings().isInScopeOnly());
@@ -97,17 +117,31 @@ public class UI {
         leftConstraints.weightx = 1.0;
         leftPanel.add(inScopeCheckbox, leftConstraints);
         
+        // Enable logging setting
+        JCheckBox loggingCheckbox = new JCheckBox("Enable Logging", config.getSettings().isLoggingEnabled());
+        loggingCheckbox.addActionListener(e -> {
+            config.getSettings().setLoggingEnabled(loggingCheckbox.isSelected());
+            config.saveConfig();
+            AISecretsDetector.getInstance().logMsg("Configuration updated - Logging: " + config.getSettings().isLoggingEnabled());
+        });
+        
+        leftConstraints.gridx = 0;
+        leftConstraints.gridy = 2;
+        leftConstraints.gridwidth = 2;
+        leftConstraints.weightx = 1.0;
+        leftPanel.add(loggingCheckbox, leftConstraints);
+        
         // Right panel - for randomness algorithm settings
         JPanel rightPanel = new JPanel(new GridBagLayout());
         GridBagConstraints rightConstraints = new GridBagConstraints();
         rightConstraints.fill = GridBagConstraints.HORIZONTAL;
         rightConstraints.insets = new Insets(5, 5, 5, 5);
-        rightConstraints.anchor = GridBagConstraints.WEST; // Anchor to the west (left)
+        rightConstraints.anchor = GridBagConstraints.WEST;
         
         // Randomness Algorithm Enable
         JCheckBox randomnessCheckbox = new JCheckBox("Enable Randomness Algorithm Detection", 
                                                    config.getSettings().isRandomnessAlgorithmEnabled());
-        randomnessCheckbox.addActionListener(_ -> {
+        randomnessCheckbox.addActionListener(e -> {
             config.getSettings().setRandomnessAlgorithmEnabled(randomnessCheckbox.isSelected());
             config.saveConfig();
             AISecretsDetector.getInstance().logMsg("Configuration updated - Randomness Algorithm: " +
@@ -124,55 +158,53 @@ public class UI {
         rightConstraints.gridx = 0;
         rightConstraints.gridy = 1;
         rightConstraints.gridwidth = 1;
-        rightConstraints.weightx = 0.0; // Don't resize the label
+        rightConstraints.weightx = 0.0;
         rightPanel.add(minLengthLabel, rightConstraints);
         
         SpinnerNumberModel minLengthModel = new SpinnerNumberModel(
                 config.getSettings().getGenericSecretMinLength(),
-                8,   // Minimum allowed value
-                128, // Maximum allowed value for min length
+                8,
+                128,
                 1
         );
         JSpinner minLengthSpinner = new JSpinner(minLengthModel);
-        minLengthSpinner.addChangeListener(_ -> {
+        minLengthSpinner.addChangeListener(e -> {
             config.getSettings().setGenericSecretMinLength((Integer) minLengthSpinner.getValue());
             config.saveConfig();
             AISecretsDetector.getInstance().logMsg("Configuration updated - Min Secret Length: " +
                     config.getSettings().getGenericSecretMinLength());
         });
         
-        // Set a reasonable fixed width for the spinner
         JComponent minEditor = minLengthSpinner.getEditor();
         Dimension minPrefSize = new Dimension(60, minEditor.getPreferredSize().height);
         minEditor.setPreferredSize(minPrefSize);
         
         rightConstraints.gridx = 1;
         rightConstraints.gridy = 1;
-        rightConstraints.weightx = 0.0; // Don't stretch the spinner
+        rightConstraints.weightx = 0.0;
         rightPanel.add(minLengthSpinner, rightConstraints);
         
         // Max Length setting
         JLabel maxLengthLabel = new JLabel("Generic Secret Max Length (Randomness Algorithm):");
         rightConstraints.gridx = 0;
         rightConstraints.gridy = 2;
-        rightConstraints.weightx = 0.0; // Don't resize the label
+        rightConstraints.weightx = 0.0;
         rightPanel.add(maxLengthLabel, rightConstraints);
         
         SpinnerNumberModel maxLengthModel = new SpinnerNumberModel(
                 config.getSettings().getGenericSecretMaxLength(),
-                8,   // Minimum allowed value for max length
-                128, // Maximum allowed value
+                8,
+                128,
                 1
         );
         JSpinner maxLengthSpinner = new JSpinner(maxLengthModel);
-        maxLengthSpinner.addChangeListener(_ -> {
+        maxLengthSpinner.addChangeListener(e -> {
             config.getSettings().setGenericSecretMaxLength((Integer) maxLengthSpinner.getValue());
             config.saveConfig();
             AISecretsDetector.getInstance().logMsg("Configuration updated - Max Secret Length: " +
                     config.getSettings().getGenericSecretMaxLength());
         });
         
-        // Set a reasonable fixed width for the spinner
         JComponent maxEditor = maxLengthSpinner.getEditor();
         Dimension maxPrefSize = new Dimension(60, maxEditor.getPreferredSize().height);
         maxEditor.setPreferredSize(maxPrefSize);
@@ -191,216 +223,194 @@ public class UI {
         
         SpinnerNumberModel duplicateThresholdModel = new SpinnerNumberModel(
                 config.getSettings().getDuplicateThreshold(),
-                1,   // Minimum value
-                50,  // Maximum value
+                1,
+                50,
                 1
         );
         JSpinner duplicateThresholdSpinner = new JSpinner(duplicateThresholdModel);
-        duplicateThresholdSpinner.addChangeListener(_ -> {
+        duplicateThresholdSpinner.addChangeListener(e -> {
             config.getSettings().setDuplicateThreshold((Integer) duplicateThresholdSpinner.getValue());
             config.saveConfig();
             AISecretsDetector.getInstance().logMsg("Configuration updated - Duplicate Threshold: " +
                     config.getSettings().getDuplicateThreshold());
         });
         
-        // Set a reasonable fixed width for the spinner
-        JComponent thresholdEditor = duplicateThresholdSpinner.getEditor();
-        Dimension thresholdPrefSize = new Dimension(60, thresholdEditor.getPreferredSize().height);
-        thresholdEditor.setPreferredSize(thresholdPrefSize);
+        JComponent duplicateEditor = duplicateThresholdSpinner.getEditor();
+        Dimension duplicatePrefSize = new Dimension(60, duplicateEditor.getPreferredSize().height);
+        duplicateEditor.setPreferredSize(duplicatePrefSize);
         
         rightConstraints.gridx = 1;
         rightConstraints.gridy = 3;
         rightConstraints.weightx = 0.0;
         rightPanel.add(duplicateThresholdSpinner, rightConstraints);
         
-        // Max Highlights Per Secret setting
-        JLabel maxHighlightsLabel = new JLabel("Max Highlights Per Unique Secret In Response:");
-        rightConstraints.gridx = 0;
-        rightConstraints.gridy = 4;
-        rightConstraints.weightx = 0.0;
-        rightPanel.add(maxHighlightsLabel, rightConstraints);
-        
-        SpinnerNumberModel maxHighlightsModel = new SpinnerNumberModel(
-                config.getSettings().getMaxHighlightsPerSecret(),
-                1,   // Minimum value
-                50,  // Maximum value
-                1
-        );
-        JSpinner maxHighlightsSpinner = new JSpinner(maxHighlightsModel);
-        maxHighlightsSpinner.addChangeListener(_ -> {
-            config.getSettings().setMaxHighlightsPerSecret((Integer) maxHighlightsSpinner.getValue());
-            config.saveConfig();
-            AISecretsDetector.getInstance().logMsg("Configuration updated - Max Highlights Per Secret: " +
-                    config.getSettings().getMaxHighlightsPerSecret());
-        });
-        
-        // Set a reasonable fixed width for the spinner
-        JComponent highlightsEditor = maxHighlightsSpinner.getEditor();
-        Dimension highlightsPrefSize = new Dimension(60, highlightsEditor.getPreferredSize().height);
-        highlightsEditor.setPreferredSize(highlightsPrefSize);
-        
-        rightConstraints.gridx = 1;
-        rightConstraints.gridy = 4;
-        rightConstraints.weightx = 0.0;
-        rightPanel.add(maxHighlightsSpinner, rightConstraints);
-        
-        // Setting panel - left and right panels
+        // Add left and right panels to settings panel
         settingsPanel.add(leftPanel);
         settingsPanel.add(rightPanel);
         
-        // Tool source settings
-        JPanel toolsPanel = new JPanel();
-        toolsPanel.setBorder(BorderFactory.createTitledBorder("Process Messages from Tools:"));
-        toolsPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 0)); // Use FlowLayout with LEFT alignment and horizontal gap
+        // Tool selection panel
+        JPanel toolPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        toolPanel.setBorder(new TitledBorder("Process Messages from Tools:"));
         
+        // Tool checkboxes
         Map<ToolType, JCheckBox> toolCheckboxes = new HashMap<>();
+        ToolType[] tools = {ToolType.TARGET, ToolType.PROXY, ToolType.SCANNER, ToolType.EXTENSIONS, ToolType.REPEATER, ToolType.INTRUDER};
         
-        ToolType[] relevantTools = {
-            ToolType.TARGET, ToolType.PROXY, ToolType.SCANNER, 
-            ToolType.EXTENSIONS, ToolType.REPEATER, ToolType.INTRUDER
-        };
-        
-        // Single row for all tool checkboxes
-        for (ToolType tool : relevantTools) {
-            JCheckBox checkbox = new JCheckBox(tool.name(), config.getSettings().isToolEnabled(tool));
-            checkbox.addActionListener(_ -> {
-                config.getSettings().setToolEnabled(tool, checkbox.isSelected());
+        for (ToolType tool : tools) {
+            JCheckBox toolCheckbox = new JCheckBox(tool.name(), config.getSettings().isToolEnabled(tool));
+            toolCheckbox.addActionListener(e -> {
+                config.getSettings().setToolEnabled(tool, toolCheckbox.isSelected());
                 config.saveConfig();
-                AISecretsDetector.getInstance().logMsg("Configuration updated - Tool " + tool.name() + 
-                                        ": " + checkbox.isSelected());
+                AISecretsDetector.getInstance().logMsg("Configuration updated - Tool " + tool.name() + ": " + toolCheckbox.isSelected());
             });
-            toolsPanel.add(checkbox);
-            toolCheckboxes.put(tool, checkbox);
+            toolCheckboxes.put(tool, toolCheckbox);
+            toolPanel.add(toolCheckbox);
         }
         
-        // Logging panel
-        JPanel loggingPanel = new JPanel(new GridLayout(2, 1)); // Use 2 rows, 1 column layout
+        // Button panel
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        buttonPanel.setBorder(new TitledBorder("Actions:"));
         
-        // Add logging enable checkbox
-        JCheckBox loggingCheckbox = new JCheckBox("Enable Logging", config.getSettings().isLoggingEnabled());
-        loggingCheckbox.addActionListener(_ -> {
-            config.getSettings().setLoggingEnabled(loggingCheckbox.isSelected());
-            config.saveConfig();
-            AISecretsDetector.getInstance().logMsg("Configuration updated - Logging: " + config.getSettings().isLoggingEnabled());
-            
-            if (config.getSettings().isLoggingEnabled()) {
-                appendToLog("Logging enabled");
-            }
-        });
-        
-        loggingPanel.add(loggingCheckbox);
-        
-        // Auto-save message (left alignment)
-        JPanel autoSavePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JLabel autoSaveLabel = new JLabel("Settings are saved automatically when changed");
-        autoSavePanel.add(autoSaveLabel);
-        
-        // Add Reset Counters button
         JButton resetCountersButton = new JButton("Reset Secret Counters");
-        resetCountersButton.setToolTipText("Reset all duplicate detection counters. Use this if too many secrets are being skipped.");
-        resetCountersButton.addActionListener(_ -> {
-            int result = JOptionPane.showConfirmDialog(
-                panel, 
-                "This will reset all duplicate secret counters. After reset, you may see duplicate issues reported again. Continue?",
-                "Reset Secret Counters",
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.WARNING_MESSAGE
-            );
-            
-            if (result == JOptionPane.YES_OPTION) {
-                resetSecretCounters();
-                appendToLog("Secret counters reset successfully");
-            }
-        });
+        resetCountersButton.addActionListener(e -> resetSecretCounters());
+        buttonPanel.add(resetCountersButton);
         
-        autoSavePanel.add(Box.createHorizontalStrut(20));
-        autoSavePanel.add(resetCountersButton);
+        JButton resetDefaultsButton = new JButton("Reset to Defaults");
+        resetDefaultsButton.addActionListener(e -> resetToDefaults());
+        buttonPanel.add(resetDefaultsButton);
         
-        // Add Reset to Defaults button
-        JButton resetToDefaultsButton = new JButton("Reset to Defaults");
-        resetToDefaultsButton.setToolTipText("Reset all settings and patterns to default values.");
-        resetToDefaultsButton.addActionListener(_ -> {
-            int result = JOptionPane.showConfirmDialog(
-                panel, 
-                "This will reset all configuration to default values. Continue?",
-                "Reset to Defaults",
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.WARNING_MESSAGE
-            );
-            
-            if (result == JOptionPane.YES_OPTION) {
-                config.resetToDefaults();
-                appendToLog("Configuration reset to defaults");
-                // Refresh the UI by recreating the panel
-                refreshUI();
-            }
-        });
+        // Add all panels to main config panel
+        panel.add(settingsPanel, BorderLayout.NORTH);
+        panel.add(toolPanel, BorderLayout.CENTER);
+        panel.add(buttonPanel, BorderLayout.SOUTH);
         
-        autoSavePanel.add(Box.createHorizontalStrut(10));
-        autoSavePanel.add(resetToDefaultsButton);
+        return panel;
+    }
+    
+    private JPanel createLogTab() {
+        JPanel panel = new JPanel(new BorderLayout());
         
-        loggingPanel.add(autoSavePanel);
+        // Create split pane for normal and error logs
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        splitPane.setResizeWeight(0.5); // Equal distribution
         
-        // Add all panels to the main panel
-        JPanel topPanel = new JPanel(new BorderLayout());
-        topPanel.add(settingsPanel, BorderLayout.NORTH);
-        topPanel.add(toolsPanel, BorderLayout.CENTER);
-        topPanel.add(loggingPanel, BorderLayout.SOUTH);
+        // Left panel - Normal logs
+        JPanel normalLogPanel = new JPanel(new BorderLayout());
+        normalLogPanel.setBorder(new TitledBorder("Normal Logs"));
         
-        panel.add(topPanel, BorderLayout.NORTH);
-                
-        // log text area
         logArea = new JTextArea();
         logArea.setEditable(false);
-        logArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
+        logArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        logArea.setBackground(Color.BLACK);
+        logArea.setForeground(Color.WHITE);
+        
         JScrollPane logScrollPane = new JScrollPane(logArea);
+        logScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        logScrollPane.setPreferredSize(new Dimension(400, 300));
         
-        JButton clearButton = new JButton("Clear Log");
-        clearButton.addActionListener(_ -> clearLogs());
+        normalLogPanel.add(logScrollPane, BorderLayout.CENTER);
         
-        JPanel logPanel = new JPanel(new BorderLayout());
-        logPanel.setBorder(BorderFactory.createTitledBorder("Log"));
-        logPanel.add(logScrollPane, BorderLayout.CENTER);
+        // Right panel - Error logs
+        JPanel errorLogPanel = new JPanel(new BorderLayout());
+        errorLogPanel.setBorder(new TitledBorder("Error Logs"));
         
-        JPanel logControlPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        logControlPanel.add(clearButton);
-        logPanel.add(logControlPanel, BorderLayout.NORTH);
+        errorLogArea = new JTextArea();
+        errorLogArea.setEditable(false);
+        errorLogArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        errorLogArea.setBackground(Color.BLACK);
+        errorLogArea.setForeground(Color.RED);
         
-        panel.add(logPanel, BorderLayout.CENTER);
+        JScrollPane errorLogScrollPane = new JScrollPane(errorLogArea);
+        errorLogScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        errorLogScrollPane.setPreferredSize(new Dimension(400, 300));
+        
+        errorLogPanel.add(errorLogScrollPane, BorderLayout.CENTER);
+        
+        // Add panels to split pane
+        splitPane.setLeftComponent(normalLogPanel);
+        splitPane.setRightComponent(errorLogPanel);
+        
+        // Button panel for log actions
+        JPanel logButtonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        
+        JButton clearLogButton = new JButton("Clear Normal Log");
+        clearLogButton.addActionListener(e -> clearLogs());
+        logButtonPanel.add(clearLogButton);
+        
+        JButton clearErrorLogButton = new JButton("Clear Error Log");
+        clearErrorLogButton.addActionListener(e -> clearErrorLogs());
+        logButtonPanel.add(clearErrorLogButton);
+        
+        JButton clearAllLogsButton = new JButton("Clear All Logs");
+        clearAllLogsButton.addActionListener(e -> {
+            clearLogs();
+            clearErrorLogs();
+        });
+        logButtonPanel.add(clearAllLogsButton);
+        
+        // Add components to main panel
+        panel.add(splitPane, BorderLayout.CENTER);
+        panel.add(logButtonPanel, BorderLayout.SOUTH);
         
         return panel;
     }
     
     private void refreshUI() {
-        // This method can be called to refresh the UI after configuration changes
-        // For now, we'll just log a message - in a full implementation, you might want to 
-        // recreate the entire panel or update individual components
-        appendToLog("UI refreshed after configuration reset");
+        // This method can be used to refresh UI components if needed
+        SwingUtilities.invokeLater(() -> {
+            // Update any UI components that need refreshing
+        });
     }
-
+    
     public void appendToLog(String message) {
-        if (logArea != null && config.getSettings().isLoggingEnabled()) {
+        if (logArea != null) {
             SwingUtilities.invokeLater(() -> {
-                logArea.append(message + "\n");
+                String timestamp = LocalDateTime.now().format(timeFormatter);
+                logArea.append("[" + timestamp + "] " + message + "\n");
                 logArea.setCaretPosition(logArea.getDocument().getLength());
             });
         }
     }
-
-    public void clearLogs() {
-        if (logArea != null) {
-            SwingUtilities.invokeLater(() -> logArea.setText(""));
+    
+    public void appendToErrorLog(String message) {
+        if (errorLogArea != null) {
+            SwingUtilities.invokeLater(() -> {
+                String timestamp = LocalDateTime.now().format(timeFormatter);
+                errorLogArea.append("[" + timestamp + "] " + message + "\n");
+                errorLogArea.setCaretPosition(errorLogArea.getDocument().getLength());
+            });
         }
     }
     
-    /**
-     * Reset all secret counters in the extension
-     */
+    public void clearLogs() {
+        if (logArea != null) {
+            SwingUtilities.invokeLater(() -> {
+                logArea.setText("");
+                appendToLog("Normal log cleared");
+            });
+        }
+    }
+    
+    public void clearErrorLogs() {
+        if (errorLogArea != null) {
+            SwingUtilities.invokeLater(() -> {
+                errorLogArea.setText("");
+                appendToErrorLog("Error log cleared");
+            });
+        }
+    }
+    
     public void resetSecretCounters() {
-        AISecretsDetector detector = AISecretsDetector.getInstance();
-        if (detector != null) {
-            detector.clearSecretCounters();
-            AISecretsDetector.getInstance().logMsg("Secret counters reset");
+        if (AISecretsDetector.getInstance() != null) {
+            AISecretsDetector.getInstance().clearSecretCounters();
+            appendToLog("Secret counters have been reset");
+        }
+    }
+    
+    private void resetToDefaults() {
+        if (config != null) {
+            config.resetToDefaults();
+            appendToLog("Configuration reset to defaults");
         }
     }
 } 
