@@ -657,8 +657,8 @@ public class AISecretsDetector implements BurpExtension {
 
     // helper function to log normal messages 
     public void logMsg(String message) {
-        // burp's logger
-        //api.logging().logToOutput(message);
+        // Always log to Burp's output
+        api.logging().logToOutput(message);
         
         // Also log to UI if enabled
         if (config != null && config.getSettings().isLoggingEnabled() && ui != null) {
@@ -668,7 +668,7 @@ public class AISecretsDetector implements BurpExtension {
 
     // helper function to log error messages 
     public void logMsgError(String message) {
-        // burp's logger
+        // Always log to Burp's error stream
         api.logging().logToError(message);
         
         // Also log to UI if enabled
