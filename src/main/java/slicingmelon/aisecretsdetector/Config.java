@@ -359,8 +359,9 @@ public class Config {
                     try {
                         // Handle dynamic patterns before compiling
                         if (name.equals("Generic Secret") || name.equals("Generic Secret v2")) {
-                            pattern = String.format(pattern, 
-                                settings.getGenericSecretMinLength(), settings.getGenericSecretMaxLength());
+                            // Use replace() instead of String.format() to avoid issues with literal % characters
+                            pattern = pattern.replace("%d,%d", 
+                                settings.getGenericSecretMinLength() + "," + settings.getGenericSecretMaxLength());
                         }
                         
                         PatternConfig patternConfig = new PatternConfig(name, prefix, pattern, suffix);
