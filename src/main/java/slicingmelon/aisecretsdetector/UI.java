@@ -318,6 +318,14 @@ public class UI {
         resetDefaultsButton.addActionListener(e -> resetToDefaults());
         buttonPanel.add(resetDefaultsButton);
         
+        JButton exportConfigButton = new JButton("Export Config to File");
+        exportConfigButton.addActionListener(e -> exportConfigToFile());
+        buttonPanel.add(exportConfigButton);
+        
+        JButton importConfigButton = new JButton("Import Config from File");
+        importConfigButton.addActionListener(e -> importConfigFromFile());
+        buttonPanel.add(importConfigButton);
+        
         // Create a combined bottom panel for config info and buttons
         JPanel bottomPanel = new JPanel(new BorderLayout());
         bottomPanel.add(configInfoPanel, BorderLayout.NORTH);
@@ -473,7 +481,7 @@ public class UI {
             StringBuilder info = new StringBuilder();
             
             // Primary storage location
-            info.append("Burp Extension Data Storage (persistent)");
+            info.append("Primary: Burp Extension Data Storage (persistent)");
             
             // Check if we have persisted config
             if (api != null) {
@@ -485,12 +493,112 @@ public class UI {
                 }
             }
             
-            // Default config resource path
-            info.append(" | Default: /default-config.toml (in JAR resources)");
+            // External config file path
+            if (config != null) {
+                info.append(" | External File: ");
+                info.append(config.getDefaultConfigFilePath());
+                if (config.hasExportedConfigFile()) {
+                    info.append(" [EXISTS]");
+                } else {
+                    info.append(" [NOT FOUND]");
+                }
+            }
             
             return info.toString();
         } catch (Exception e) {
             return "Config storage information unavailable: " + e.getMessage();
+        }
+    }
+    
+    private void exportConfigToFile() {
+        if (config == null) {
+            appendToErrorLog("Config not available for export");
+            return;
+        }
+        
+        try {
+            String defaultPath = config.getDefaultConfigFilePath();
+            String filePath = JOptionPane.showInputDialog(
+                null,
+                "Enter the path to save the config file:",
+                "Export Config to File",
+                JOptionPane.QUESTION_MESSAGE
+            );
+            
+            if (filePath != null && !filePath.trim().isEmpty()) {
+                // Use default path if user just presses OK with empty input
+                if (filePath.trim().equals("")) {
+                    filePath = defaultPath;
+                }
+                
+                config.exportConfigToFile(filePath);
+                appendToLog("Configuration exported to: " + filePath);
+                
+                // Refresh the UI to show updated status
+                refreshUI();
+                
+                JOptionPane.showMessageDialog(
+                    null,
+                    "Configuration exported successfully!\n\nFile: " + filePath + "\n\nYou can now edit this file with any text editor and use 'Import Config from File' to reload.",
+                    "Export Successful",
+                    JOptionPane.INFORMATION_MESSAGE
+                );
+            }
+        } catch (Exception e) {
+            String errorMsg = "Failed to export config: " + e.getMessage();
+            appendToErrorLog(errorMsg);
+            JOptionPane.showMessageDialog(
+                null,
+                errorMsg,
+                "Export Failed",
+                JOptionPane.ERROR_MESSAGE
+            );
+        }
+    }
+    
+    private void importConfigFromFile() {
+        if (config == null) {
+            appendToErrorLog("Config not available for import");
+            return;
+        }
+        
+        try {
+            String defaultPath = config.getDefaultConfigFilePath();
+            String filePath = JOptionPane.showInputDialog(
+                null,
+                "Enter the path to the config file to import:",
+                "Import Config from File",
+                JOptionPane.QUESTION_MESSAGE
+            );
+            
+            if (filePath != null && !filePath.trim().isEmpty()) {
+                // Use default path if user just presses OK with empty input
+                if (filePath.trim().equals("")) {
+                    filePath = defaultPath;
+                }
+                
+                config.importConfigFromFile(filePath);
+                appendToLog("Configuration imported from: " + filePath);
+                
+                // Refresh the UI to show updated settings
+                refreshUI();
+                
+                JOptionPane.showMessageDialog(
+                    null,
+                    "Configuration imported successfully!\n\nFile: " + filePath + "\n\nSettings have been updated and saved to Burp persistence.",
+                    "Import Successful",
+                    JOptionPane.INFORMATION_MESSAGE
+                );
+            }
+        } catch (Exception e) {
+            String errorMsg = "Failed to import config: " + e.getMessage();
+            appendToErrorLog(errorMsg);
+            JOptionPane.showMessageDialog(
+                null,
+                errorMsg,
+                "Import Failed",
+                JOptionPane.ERROR_MESSAGE
+            );
         }
     }
 } 

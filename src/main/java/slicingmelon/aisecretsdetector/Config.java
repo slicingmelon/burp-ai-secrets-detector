@@ -16,6 +16,12 @@ import com.moandjiezana.toml.TomlWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.FileReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
@@ -548,6 +554,108 @@ public class Config {
         settings.setGenericSecretMaxLength(maxLength);
         applyDynamicPatterns();
         saveConfig();
+    }
+    
+    /**
+     * Export current configuration to a TOML file
+     * @param filePath The path where to save the config file
+     * @throws IOException If file operations fail
+     */
+    public void exportConfigToFile(String filePath) throws IOException {
+        // Generate TOML content (same as saveConfig but to file)
+        Map<String, Object> configMap = new HashMap<>();
+        
+        // Add settings
+        Map<String, Object> settingsMap = new HashMap<>();
+        settingsMap.put("workers", settings.getWorkers());
+        settingsMap.put("in_scope_only", settings.isInScopeOnly());
+        settingsMap.put("logging_enabled", settings.isLoggingEnabled());
+        settingsMap.put("randomness_algorithm_enabled", settings.isRandomnessAlgorithmEnabled());
+        settingsMap.put("generic_secret_min_length", settings.getGenericSecretMinLength());
+        settingsMap.put("generic_secret_max_length", settings.getGenericSecretMaxLength());
+        settingsMap.put("duplicate_threshold", settings.getDuplicateThreshold());
+        settingsMap.put("max_highlights_per_secret", settings.getMaxHighlightsPerSecret());
+        settingsMap.put("excluded_file_extensions", new ArrayList<>(settings.getExcludedFileExtensions()));
+        
+        List<String> enabledToolsStr = new ArrayList<>();
+        for (ToolType tool : settings.getEnabledTools()) {
+            enabledToolsStr.add(tool.name());
+        }
+        settingsMap.put("enabled_tools", enabledToolsStr);
+        
+        configMap.put("settings", settingsMap);
+        
+        // Add patterns
+        List<Map<String, Object>> patternsList = new ArrayList<>();
+        for (PatternConfig pattern : patterns) {
+            Map<String, Object> patternMap = new HashMap<>();
+            patternMap.put("name", pattern.getName());
+            patternMap.put("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
+            patternMap.put("pattern", pattern.getPattern());
+            patternMap.put("suffix", pattern.getSuffix() != null ? pattern.getSuffix() : "");
+            patternsList.add(patternMap);
+        }
+        configMap.put("patterns", patternsList);
+        
+        // Convert to TOML string
+        TomlWriter writer = new TomlWriter();
+        StringWriter stringWriter = new StringWriter();
+        writer.write(configMap, stringWriter);
+        String tomlString = stringWriter.toString();
+        
+        // Write to file
+        try (FileWriter fileWriter = new FileWriter(filePath)) {
+            fileWriter.write(tomlString);
+        }
+    }
+    
+    /**
+     * Import configuration from a TOML file
+     * @param filePath The path to the config file to import
+     * @throws IOException If file operations fail
+     */
+    public void importConfigFromFile(String filePath) throws IOException {
+        File file = new File(filePath);
+        if (!file.exists()) {
+            throw new IOException("Config file not found: " + filePath);
+        }
+        
+        try (FileReader fileReader = new FileReader(file)) {
+            // Parse the TOML file
+            this.config = new Toml().read(fileReader);
+            
+            // Parse the loaded config
+            parseConfig();
+            
+            // Apply dynamic patterns
+            applyDynamicPatterns();
+            
+            // Save to Burp persistence (primary storage)
+            saveConfig();
+            
+            // Notify of config change
+            if (onConfigChangedCallback != null) {
+                onConfigChangedCallback.run();
+            }
+        }
+    }
+    
+    /**
+     * Get the default config file path for export/import
+     * @return The recommended file path for config export
+     */
+    public String getDefaultConfigFilePath() {
+        // Use user's home directory
+        String userHome = System.getProperty("user.home");
+        return Paths.get(userHome, "burp-ai-secrets-detector-config.toml").toString();
+    }
+    
+    /**
+     * Check if a config file exists at the default location
+     * @return true if config file exists at default location
+     */
+    public boolean hasExportedConfigFile() {
+        return Files.exists(Paths.get(getDefaultConfigFilePath()));
     }
     
     private void logError(String message) {
