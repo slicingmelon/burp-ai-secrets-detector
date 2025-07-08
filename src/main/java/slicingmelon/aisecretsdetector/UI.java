@@ -408,4 +408,19 @@ public class UI {
             appendToLog("Configuration reset to defaults");
         }
     }
+    
+    private void reloadConfig() {
+        if (config != null) {
+            try {
+                // Force reload the configuration from persistence
+                config.reloadConfig();
+                appendToLog("Configuration reloaded from persisted settings");
+                
+                // This will trigger the callback to update workers and scanner
+                AISecretsDetector.getInstance().logMsg("Configuration manually reloaded - patterns and workers updated");
+            } catch (Exception e) {
+                appendToErrorLog("Failed to reload configuration: " + e.getMessage());
+            }
+        }
+    }
 } 

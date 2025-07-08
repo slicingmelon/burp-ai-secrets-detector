@@ -44,6 +44,7 @@ public class AISecretsDetector implements BurpExtension {
     private ExecutorService executorService;
     private Config config;
     private UI ui;
+    private SecretScanner secretScanner;
     
     // Persistent secret counter map stored as JSON in Burp's extension data
     private Map<String, Map<String, Integer>> secretCounters = new ConcurrentHashMap<>();
@@ -89,6 +90,9 @@ public class AISecretsDetector implements BurpExtension {
         
         config = Config.initialize(api, this::updateWorkers);
         ui = new UI(api);
+        
+        // Initialize secret scanner
+        secretScanner = new SecretScanner(api);
         
         // Load persistent secret counters
         loadSecretCounters();
@@ -158,6 +162,12 @@ public class AISecretsDetector implements BurpExtension {
     private void updateWorkers() {
         shutdownWorkers();
         initializeWorkers();
+        
+        // Also reinitialize scanner to pick up any pattern changes
+        if (secretScanner != null) {
+            secretScanner = new SecretScanner(api);
+            logMsg("SecretScanner reinitialized due to configuration change");
+        }
     }
 
     /**
@@ -168,8 +178,7 @@ public class AISecretsDetector implements BurpExtension {
             // Save response to temp file first (minimize memory usage)
             HttpResponse tempResponse = responseReceived.copyToTempFile();
             
-            SecretScanner scanner = new SecretScanner(api);
-            SecretScanner.SecretScanResult result = scanner.scanResponse(tempResponse);
+            SecretScanner.SecretScanResult result = secretScanner.scanResponse(tempResponse);
             
             // Process found secrets
             if (result.hasSecrets()) {

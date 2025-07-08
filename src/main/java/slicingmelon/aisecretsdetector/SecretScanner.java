@@ -167,11 +167,23 @@ public class SecretScanner {
         Config configInstance;
         
         try {
-            //this.api = api;
-            patterns = SecretScannerUtils.getAllPatterns();
             configInstance = Config.getInstance();
+            patterns = new ArrayList<>();
             
-            AISecretsDetector.getInstance().logMsg("SecretScanner initialized with " + patterns.size() + " patterns");
+            // Convert Config.PatternConfig to SecretPattern
+            for (Config.PatternConfig patternConfig : configInstance.getPatterns()) {
+                try {
+                    SecretPattern secretPattern = new SecretPattern(
+                        patternConfig.getName(), 
+                        patternConfig.getCompiledPattern()
+                    );
+                    patterns.add(secretPattern);
+                } catch (Exception e) {
+                    AISecretsDetector.getInstance().logMsgError("Failed to load pattern '" + patternConfig.getName() + "': " + e.getMessage());
+                }
+            }
+            
+            AISecretsDetector.getInstance().logMsg("SecretScanner initialized with " + patterns.size() + " patterns from config");
         } catch (Exception e) {
             AISecretsDetector.getInstance().logMsgError("Error initializing SecretScanner: " + e.getMessage());
             e.printStackTrace();

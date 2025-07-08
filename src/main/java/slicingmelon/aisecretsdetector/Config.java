@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
 
 public class Config {
     private static final String CONFIG_KEY = "config_toml";
-    private static final String DEFAULT_CONFIG_PATH = "/config.toml";
+    private static final String DEFAULT_CONFIG_PATH = "/default-config.toml";
     
     private final MontoyaApi api;
     private static Config instance;
@@ -451,6 +451,14 @@ public class Config {
     public void resetToDefaults() {
         loadDefaultConfig();
         applyDynamicPatterns();
+    }
+    
+    public void reloadConfig() {
+        loadConfig();
+        // Notify of config change
+        if (onConfigChangedCallback != null) {
+            onConfigChangedCallback.run();
+        }
     }
     
     public Settings getSettings() {
