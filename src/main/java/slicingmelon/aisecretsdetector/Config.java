@@ -357,6 +357,12 @@ public class Config {
                 
                 if (name != null && !name.isEmpty() && pattern != null && !pattern.isEmpty()) {
                     try {
+                        // Handle dynamic patterns before compiling
+                        if (name.equals("Generic Secret") || name.equals("Generic Secret v2")) {
+                            pattern = String.format(pattern, 
+                                settings.getGenericSecretMinLength(), settings.getGenericSecretMaxLength());
+                        }
+                        
                         PatternConfig patternConfig = new PatternConfig(name, prefix, pattern, suffix);
                         patterns.add(patternConfig);
                     } catch (Exception e) {
@@ -368,26 +374,8 @@ public class Config {
     }
     
     private void applyDynamicPatterns() {
-        // Update generic secret patterns with dynamic length values
-        for (int i = 0; i < patterns.size(); i++) {
-            PatternConfig pattern = patterns.get(i);
-            if (pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2")) {
-                try {
-                    String dynamicPattern = String.format(pattern.getPattern(), 
-                        settings.getGenericSecretMinLength(), settings.getGenericSecretMaxLength());
-                    
-                    PatternConfig updatedPattern = new PatternConfig(
-                        pattern.getName(), 
-                        pattern.getPrefix(), 
-                        dynamicPattern, 
-                        pattern.getSuffix()
-                    );
-                    patterns.set(i, updatedPattern);
-                } catch (Exception e) {
-                    logError("Failed to apply dynamic pattern for " + pattern.getName() + ": " + e.getMessage());
-                }
-            }
-        }
+        // Re-parse patterns to apply updated dynamic values
+        parsePatterns();
     }
     
     public void saveConfig() {
@@ -462,6 +450,10 @@ public class Config {
     }
     
     public Settings getSettings() {
+        if (settings == null) {
+            // Initialize with defaults if not yet loaded
+            settings = new Settings();
+        }
         return settings;
     }
     
@@ -483,10 +475,12 @@ public class Config {
                 if (detector != null) {
                     detector.logMsgError(message);
                 } else {
-                    System.err.println(message);
+                    // Fall back to Burp's logging if detector not ready
+                    api.logging().logToError(message);
                 }
             } catch (Exception e) {
-                System.err.println(message);
+                // Fall back to Burp's logging if there's any error
+                api.logging().logToError(message);
             }
         } else {
             System.err.println(message);
