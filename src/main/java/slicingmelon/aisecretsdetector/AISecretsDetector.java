@@ -73,7 +73,9 @@ public class AISecretsDetector implements BurpExtension {
         // Font files
         "eot", "otf", "ttf", "woff", "woff2",
         // Other truly binary formats
-        "dat", "mdb", "accdb", "o", "obj", "swf", "fla", "xul"
+        "dat", "mdb", "accdb", "o", "obj", "swf", "fla", "xul",
+        // CSS ?
+        "css"
     ));
     
     @Override
@@ -610,6 +612,7 @@ public class AISecretsDetector implements BurpExtension {
             case VIDEO:
             case APPLICATION_FLASH:
             case RTF:
+            case CSS:
             case APPLICATION_UNKNOWN: // risky but burp does not detect enough useless mime types (e.g font/ttf etc)
             case UNRECOGNIZED: // risky but burp does not detect enough useless mime types (e.g font/ttf etc)
                 return true;
