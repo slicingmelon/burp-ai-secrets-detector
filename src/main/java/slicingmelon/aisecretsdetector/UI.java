@@ -293,6 +293,19 @@ public class UI {
             toolPanel.add(toolCheckbox);
         }
         
+        // Config Info panel
+        JPanel configInfoPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        configInfoPanel.setBorder(new TitledBorder("Configuration Information:"));
+        
+        // Config file location info
+        JLabel configLocationLabel = new JLabel("Config Storage: ");
+        configLocationLabel.setFont(configLocationLabel.getFont().deriveFont(Font.BOLD));
+        configInfoPanel.add(configLocationLabel);
+        
+        JLabel configLocationValue = new JLabel(getConfigLocationInfo());
+        configLocationValue.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 11));
+        configInfoPanel.add(configLocationValue);
+        
         // Button panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         buttonPanel.setBorder(new TitledBorder("Actions:"));
@@ -305,10 +318,15 @@ public class UI {
         resetDefaultsButton.addActionListener(e -> resetToDefaults());
         buttonPanel.add(resetDefaultsButton);
         
+        // Create a combined bottom panel for config info and buttons
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        bottomPanel.add(configInfoPanel, BorderLayout.NORTH);
+        bottomPanel.add(buttonPanel, BorderLayout.SOUTH);
+        
         // Add all panels to main config panel
         panel.add(settingsPanel, BorderLayout.NORTH);
         panel.add(toolPanel, BorderLayout.CENTER);
-        panel.add(buttonPanel, BorderLayout.SOUTH);
+        panel.add(bottomPanel, BorderLayout.SOUTH);
         
         return panel;
     }
@@ -447,6 +465,32 @@ public class UI {
             } catch (Exception e) {
                 appendToErrorLog("Failed to reload configuration: " + e.getMessage());
             }
+        }
+    }
+    
+    private String getConfigLocationInfo() {
+        try {
+            StringBuilder info = new StringBuilder();
+            
+            // Primary storage location
+            info.append("Burp Extension Data Storage (persistent)");
+            
+            // Check if we have persisted config
+            if (api != null) {
+                String savedConfig = api.persistence().extensionData().getString("config_toml");
+                if (savedConfig != null && !savedConfig.isEmpty()) {
+                    info.append(" [ACTIVE]");
+                } else {
+                    info.append(" [EMPTY - using defaults]");
+                }
+            }
+            
+            // Default config resource path
+            info.append(" | Default: /default-config.toml (in JAR resources)");
+            
+            return info.toString();
+        } catch (Exception e) {
+            return "Config storage information unavailable: " + e.getMessage();
         }
     }
 } 
