@@ -301,8 +301,6 @@ public class UI {
         logArea = new JTextArea();
         logArea.setEditable(false);
         logArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        logArea.setBackground(Color.BLACK);
-        logArea.setForeground(Color.WHITE);
         
         JScrollPane logScrollPane = new JScrollPane(logArea);
         logScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
@@ -317,7 +315,6 @@ public class UI {
         errorLogArea = new JTextArea();
         errorLogArea.setEditable(false);
         errorLogArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        errorLogArea.setBackground(Color.BLACK);
         errorLogArea.setForeground(Color.RED);
         
         JScrollPane errorLogScrollPane = new JScrollPane(errorLogArea);
@@ -367,7 +364,6 @@ public class UI {
             SwingUtilities.invokeLater(() -> {
                 String timestamp = LocalDateTime.now().format(timeFormatter);
                 logArea.append("[" + timestamp + "] " + message + "\n");
-                logArea.setCaretPosition(logArea.getDocument().getLength());
             });
         }
     }
@@ -377,7 +373,6 @@ public class UI {
             SwingUtilities.invokeLater(() -> {
                 String timestamp = LocalDateTime.now().format(timeFormatter);
                 errorLogArea.append("[" + timestamp + "] " + message + "\n");
-                errorLogArea.setCaretPosition(errorLogArea.getDocument().getLength());
             });
         }
     }
