@@ -279,6 +279,7 @@ public class Config {
     }
 
     private Config(MontoyaApi api, Runnable onConfigChangedCallback) {
+        Logger.logCritical("DEBUG: Creating new Config instance with API");
         this.api = api;
         this.onConfigChangedCallback = onConfigChangedCallback;
         this.patterns = new ArrayList<>();
@@ -333,8 +334,11 @@ public class Config {
     }
 
     private void loadConfig() {
+        Logger.logCritical("DEBUG: loadConfig() called");
+        
         // 1. Try to load from Burp persistence first (primary source of truth)
         if (api != null && loadFromBurpPersistence()) {
+            Logger.logCritical("DEBUG: Loaded from Burp persistence - patterns: " + this.patterns.size());
             // Even if we loaded from persistence, ensure config.toml exists
             saveToConfigFile();
             return;
@@ -346,6 +350,7 @@ public class Config {
             try {
                 TomlRoot tomlRoot = tomlMapper.readValue(configPath.toFile(), TomlRoot.class);
                 parseTomlRoot(tomlRoot);
+                Logger.logCritical("DEBUG: Loaded from config.toml - patterns: " + this.patterns.size());
                 saveToBurpPersistence(); // Save to Burp persistence for future use
                 return;
             } catch (IOException e) {
@@ -354,6 +359,7 @@ public class Config {
         }
 
         // 3. If neither available, load defaults and save to both
+        Logger.logCritical("DEBUG: Loading defaults");
         loadDefaultConfig();
         saveToBurpPersistence();
         saveToConfigFile();
@@ -423,6 +429,11 @@ public class Config {
             this.settings = tomlRoot.settings != null ? tomlRoot.settings : new Settings();
             this.patterns = tomlRoot.patterns != null ? new CopyOnWriteArrayList<>(tomlRoot.patterns) : new CopyOnWriteArrayList<>();
             this.patterns.forEach(PatternConfig::compile);
+            
+            Logger.logCritical("DEBUG: parseTomlRoot completed - patterns: " + this.patterns.size());
+            for (PatternConfig pattern : this.patterns) {
+                Logger.logCritical("DEBUG: Pattern in memory: " + pattern.getName());
+            }
         }
     }
     
@@ -752,7 +763,12 @@ public class Config {
             
             // Notify callback about config changes
             if (onConfigChangedCallback != null) {
+                Logger.logCritical("DEBUG: About to call onConfigChangedCallback");
                 onConfigChangedCallback.run();
+                Logger.logCritical("DEBUG: onConfigChangedCallback completed - patterns now: " + this.patterns.size());
+                for (PatternConfig pattern : this.patterns) {
+                    Logger.logCritical("DEBUG: Pattern after callback: " + pattern.getName());
+                }
             }
         } else {
             throw new IOException("File not found: " + filePath);
