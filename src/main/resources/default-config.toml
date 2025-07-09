@@ -43,13 +43,13 @@ enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
 [[patterns]]
 name = "URL with Credentials"
 prefix = ''''''
-pattern = '''(?i)\b([a-zA-Z]+://(?:[A-Za-z0-9_-]{1,32}):(?:[^@{}|^[\]`]+)@[a-zA-Z0-9.-]+(?:/[^/\s]*)?)\b'''
+pattern = '''(?i)\b([a-zA-Z]+://(?:[A-Za-z0-9_-]{1,32}):(?:[^@{}|^\[\]`]+)@[a-zA-Z0-9.-]+(?:/[^/\s]*)?)\b'''
 suffix = ''''''
 
 [[patterns]]
 name = "Age Secret Key"
 prefix = ''''''
-pattern = '''(AGE-SECRET-KEY-1[\dA-Z]{58})'''
+pattern = '''(AGE-SECRET-KEY-1[0-9A-Z]{58})'''
 suffix = ''''''
 
 [[patterns]]
@@ -67,7 +67,7 @@ suffix = ''''''
 [[patterns]]
 name = "Azure Storage Account Key"
 prefix = '''(?i)(?:account)?key\s*[:=]\s*'''
-pattern = '''([\d+/=A-Za-z]{88})'''
+pattern = '''([0-9+/=A-Za-z]{88})'''
 suffix = '''(?:[^\w]|$)'''
 
 [[patterns]]
@@ -97,13 +97,13 @@ suffix = '''(?:[^\w]|$)'''
 [[patterns]]
 name = "GitHub Personal Access Token"
 prefix = ''''''
-pattern = '''((?:gh[oprsu]|github_pat)_[\dA-Za-z_]{36})'''
+pattern = '''((?:gh[oprsu]|github_pat)_[0-9A-Za-z_]{36})'''
 suffix = ''''''
 
 [[patterns]]
 name = "GitLab Token"
 prefix = ''''''
-pattern = '''(glpat-[\dA-Za-z_=-]{20,22})'''
+pattern = '''(glpat-[0-9A-Za-z_=-]{20,22})'''
 suffix = ''''''
 
 [[patterns]]
@@ -133,7 +133,7 @@ suffix = ''''''
 [[patterns]]
 name = "Google Cloud Platform (GCP) API Key"
 prefix = ''''''
-pattern = '''\b(AIza[\w-]{35})\b'''
+pattern = '''\b(AIza[A-Za-z0-9_-]{35})\b'''
 suffix = ''''''
 
 [[patterns]]
@@ -169,13 +169,13 @@ suffix = ''''''
 [[patterns]]
 name = "NPM Token (modern)"
 prefix = ''''''
-pattern = '''(npm_[\dA-Za-z]{36})'''
+pattern = '''(npm_[0-9A-Za-z]{36})'''
 suffix = ''''''
 
 [[patterns]]
 name = "NPM Token (legacy)"
 prefix = ''''''
-pattern = '''(//.+/:_authToken=[\dA-Za-z_-]+)'''
+pattern = '''(//.+/:_authToken=[0-9A-Za-z_-]+)'''
 suffix = ''''''
 
 [[patterns]]
