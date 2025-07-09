@@ -860,7 +860,7 @@ public class Config {
 
         // To get multiline literal strings ('''), both the literal and multiline
         // predicates must return true for the given string.
-        writer.setWriteStringLiteralPredicate(str -> true);
+        writer.setWriteStringLiteralPredicate(str -> !str.contains("'''"));
         writer.setWriteStringMultilinePredicate(str -> true);
         
         return writer;
