@@ -602,12 +602,13 @@ public class Config {
             updatedLines.add(""); // Empty line before patterns section
         }
         
+        // Write all current patterns with their current content (this ensures updated patterns are saved)
         for (PatternConfig pattern : this.patterns) {
             updatedLines.add("[[patterns]]");
             updatedLines.add("name = \"" + pattern.getName() + "\"");
-            updatedLines.add("prefix = '''" + pattern.getPrefix() + "'''");
-            updatedLines.add("pattern = '''" + pattern.getPattern() + "'''");
-            updatedLines.add("suffix = '''" + pattern.getSuffix() + "'''");
+            updatedLines.add("prefix = '''" + (pattern.getPrefix() != null ? pattern.getPrefix() : "") + "'''");
+            updatedLines.add("pattern = '''" + (pattern.getPattern() != null ? pattern.getPattern() : "") + "'''");
+            updatedLines.add("suffix = '''" + (pattern.getSuffix() != null ? pattern.getSuffix() : "") + "'''");
             updatedLines.add(""); // Empty line after each pattern
         }
         
@@ -924,6 +925,7 @@ public class Config {
     /**
      * Updates the raw TOML content with current settings values to avoid double-escaping
      * This method directly modifies the TOML string instead of serializing Java objects
+     * For patterns, we rebuild them completely to ensure current pattern content is used
      */
     private String updateRawTomlContent(String rawToml) {
         if (rawToml == null || rawToml.isEmpty()) {
@@ -935,6 +937,7 @@ public class Config {
             List<String> updatedLines = new ArrayList<>();
             
             boolean inSettingsSection = false;
+            boolean inPatternsSection = false;
             
             for (String line : lines) {
                 String trimmed = line.trim();
@@ -942,11 +945,23 @@ public class Config {
                 // Detect sections
                 if (trimmed.equals("[settings]")) {
                     inSettingsSection = true;
+                    inPatternsSection = false;
                     updatedLines.add(line);
                     continue;
+                } else if (trimmed.startsWith("[[patterns]]")) {
+                    inSettingsSection = false;
+                    inPatternsSection = true;
+                    // Stop processing here - we'll rebuild all patterns at the end
+                    break;
                 } else if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
                     inSettingsSection = false;
+                    inPatternsSection = false;
                     updatedLines.add(line);
+                    continue;
+                }
+                
+                // Skip pattern content - we'll rebuild it
+                if (inPatternsSection) {
                     continue;
                 }
                 
@@ -984,6 +999,17 @@ public class Config {
                 } else {
                     updatedLines.add(line);
                 }
+            }
+            
+            // Rebuild patterns section completely with current pattern content
+            updatedLines.add("");
+            for (PatternConfig pattern : this.patterns) {
+                updatedLines.add("[[patterns]]");
+                updatedLines.add("name = \"" + (pattern.getName() != null ? pattern.getName() : "") + "\"");
+                updatedLines.add("prefix = '''" + (pattern.getPrefix() != null ? pattern.getPrefix() : "") + "'''");
+                updatedLines.add("pattern = '''" + (pattern.getPattern() != null ? pattern.getPattern() : "") + "'''");
+                updatedLines.add("suffix = '''" + (pattern.getSuffix() != null ? pattern.getSuffix() : "") + "'''");
+                updatedLines.add("");
             }
             
             return String.join("\n", updatedLines);
