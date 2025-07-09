@@ -24,4 +24,4 @@ suffix = ''
 name = "Algolia ID"
 prefix = '''(?i)(?:algolia|docsearch|appId)(?:.|[\n\r\t]){0,40}?'''
 pattern = '''\b([A-Z0-9]{10})\b'''
-suffix = '''
+suffix = ''
