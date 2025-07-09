@@ -35,7 +35,7 @@ public class UI {
     private JSpinner maxLengthSpinner;
     private JSpinner duplicateThresholdSpinner;
     private Map<ToolType, JCheckBox> toolCheckboxes;
-    private JLabel configLocationValue;
+    private JTextField configLocationValue;
     
     public static UI getInstance() {
         return instance;
@@ -313,8 +313,11 @@ public class UI {
         configLocationLabel.setFont(configLocationLabel.getFont().deriveFont(Font.BOLD));
         configInfoPanel.add(configLocationLabel);
         
-        configLocationValue = new JLabel(getConfigLocationInfo());
+        configLocationValue = new JTextField(getConfigLocationInfo());
         configLocationValue.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 11));
+        configLocationValue.setEditable(false);
+        configLocationValue.setBorder(null);
+        configLocationValue.setOpaque(false);
         configInfoPanel.add(configLocationValue);
         
         // Button panel
@@ -561,7 +564,7 @@ public class UI {
                     if (savedConfig != null && !savedConfig.isEmpty()) {
                         info.append(" [ACTIVE]");
                     } else {
-                        info.append(" [EMPTY - using defaults]");
+                        info.append(" [USING DEFAULTS]");
                     }
                 } catch (Exception e) {
                     info.append(" [ERROR]");

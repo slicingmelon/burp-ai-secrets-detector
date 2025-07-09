@@ -35,7 +35,7 @@ enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
 
 # Secret detection patterns
 # Each pattern has:
-# - name: Human-readable name for the secret type
+# - name: The name of the secret type, must be unique
 # - prefix: Regex pattern that is prepended, usually non-capturing groups (use '''regexpattern''' for literal expressions)
 # - pattern: Main regex pattern that captures the secret (use capture groups) (use '''regexpattern''' for literal expressions)
 # - suffix: Regex pattern that is appended, usually non-capturing groups (use '''regexpattern''' for literal expressions)
