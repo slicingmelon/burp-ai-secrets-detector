@@ -30,9 +30,11 @@ import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class Config {
     private static final String CONFIG_KEY = "config_toml";
+    private static final String CONFIG_VERSION_KEY = "config_version";
     private static final String DEFAULT_CONFIG_PATH = "/default-config.toml";
     
     private MontoyaApi api;
@@ -40,6 +42,7 @@ public class Config {
     private Toml config;
     private List<PatternConfig> patterns;
     private Settings settings;
+    private String configVersion; // Version of the current config
     private Runnable onConfigChangedCallback;
     
     // Configuration classes
@@ -329,6 +332,9 @@ public class Config {
                 loadDefaultConfig();
             }
             
+            // Initialize external config file on first install (only if it doesn't exist)
+            initializeExternalConfigFile();
+            
             // Apply dynamic pattern replacement for generic secrets
             applyDynamicPatterns();
             
@@ -366,11 +372,25 @@ public class Config {
     }
     
     private void parseConfig() {
+        // Parse version first
+        parseVersion();
+        
         // Parse settings
         parseSettings();
         
         // Parse patterns
         parsePatterns();
+    }
+    
+    private void parseVersion() {
+        if (config == null) {
+            Logger.logCriticalError("Cannot parse version: config is null");
+            configVersion = "unknown";
+            return;
+        }
+        
+        // Get version from config, fallback to "unknown" if not found
+        configVersion = config.getString("version", "unknown");
     }
     
     private void parseSettings() {
@@ -486,6 +506,9 @@ public class Config {
             // Convert current configuration to TOML format
             Map<String, Object> configMap = new HashMap<>();
             
+            // Add version (use current extension version)
+            configMap.put("version", getCurrentExtensionVersion());
+            
             // Add settings
             Map<String, Object> settingsMap = new HashMap<>();
             settingsMap.put("workers", settings.getWorkers());
@@ -532,6 +555,9 @@ public class Config {
             PersistedObject persistedData = api.persistence().extensionData();
             persistedData.setString(CONFIG_KEY, tomlString);
             
+            // Also auto-sync to external config file
+            autoSyncExternalConfigFile(tomlString);
+            
             // Notify of config change
             if (onConfigChangedCallback != null) {
                 onConfigChangedCallback.run();
@@ -543,9 +569,126 @@ public class Config {
         }
     }
     
+    /**
+     * Automatically sync the external config.toml file when settings change
+     * @param tomlString The TOML content to write
+     */
+    private void autoSyncExternalConfigFile(String tomlString) {
+        try {
+            String configFilePath = getDefaultConfigFilePath();
+            Path configPath = Paths.get(configFilePath);
+            
+            // Create directory if it doesn't exist
+            Files.createDirectories(configPath.getParent());
+            
+            // Write the TOML content to file
+            Files.write(configPath, tomlString.getBytes());
+            
+            Logger.logMsg("Auto-synced configuration to " + configFilePath);
+            
+        } catch (Exception e) {
+            Logger.logErrorMsg("Failed to auto-sync config file: " + e.getMessage());
+        }
+    }
+    
     public void resetToDefaults() {
         loadDefaultConfig();
         applyDynamicPatterns();
+        saveConfig(); // This will also auto-sync to external file
+    }
+    
+    /**
+     * Reset configuration to defaults: default-config -> config.toml -> persistence
+     * Overwrites both persistence and external config file
+     */
+    public void resetToDefaultsComplete() {
+        try {
+            // Load default config
+            loadDefaultConfig();
+            applyDynamicPatterns();
+            
+            // Save to persistence and auto-sync to external file
+            saveConfig();
+            
+            // Also overwrite external config file with fresh default
+            String configFilePath = getDefaultConfigFilePath();
+            copyDefaultConfigToFile(configFilePath);
+            
+            Logger.logCritical("Configuration reset to defaults");
+            
+        } catch (Exception e) {
+            Logger.logCriticalError("Failed to reset configuration to defaults: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Update configuration with new defaults while preserving user customizations
+     * default-config -> config.toml, then merge with existing persistence
+     */
+    public void updateAndMergeWithDefaults() {
+        try {
+            // Save current user settings
+            Settings currentSettings = new Settings();
+            if (settings != null) {
+                // Copy current user settings
+                currentSettings.setWorkers(settings.getWorkers());
+                currentSettings.setInScopeOnly(settings.isInScopeOnly());
+                currentSettings.setLoggingEnabled(settings.isLoggingEnabled());
+                currentSettings.setRandomnessAlgorithmEnabled(settings.isRandomnessAlgorithmEnabled());
+                currentSettings.setGenericSecretMinLength(settings.getGenericSecretMinLength());
+                currentSettings.setGenericSecretMaxLength(settings.getGenericSecretMaxLength());
+                currentSettings.setDuplicateThreshold(settings.getDuplicateThreshold());
+                currentSettings.setMaxHighlightsPerSecret(settings.getMaxHighlightsPerSecret());
+                currentSettings.setExcludedFileExtensions(new HashSet<>(settings.getExcludedFileExtensions()));
+                currentSettings.setEnabledTools(new HashSet<>(settings.getEnabledTools()));
+            }
+            
+            // Save current user patterns (custom ones)
+            List<PatternConfig> currentPatterns = new ArrayList<>();
+            if (patterns != null) {
+                currentPatterns.addAll(patterns);
+            }
+            
+            // Load fresh defaults
+            loadDefaultConfig();
+            applyDynamicPatterns();
+            
+            // Merge user settings back
+            if (currentSettings != null) {
+                settings.setWorkers(currentSettings.getWorkers());
+                settings.setInScopeOnly(currentSettings.isInScopeOnly());
+                settings.setLoggingEnabled(currentSettings.isLoggingEnabled());
+                settings.setRandomnessAlgorithmEnabled(currentSettings.isRandomnessAlgorithmEnabled());
+                settings.setGenericSecretMinLength(currentSettings.getGenericSecretMinLength());
+                settings.setGenericSecretMaxLength(currentSettings.getGenericSecretMaxLength());
+                settings.setDuplicateThreshold(currentSettings.getDuplicateThreshold());
+                settings.setMaxHighlightsPerSecret(currentSettings.getMaxHighlightsPerSecret());
+                settings.setExcludedFileExtensions(currentSettings.getExcludedFileExtensions());
+                settings.setEnabledTools(currentSettings.getEnabledTools());
+            }
+            
+            // Merge patterns: Add user patterns that don't exist in defaults
+            if (currentPatterns != null && patterns != null) {
+                Set<String> defaultPatternNames = patterns.stream()
+                    .map(PatternConfig::getName)
+                    .collect(Collectors.toSet());
+                
+                // Add custom user patterns that are not in defaults
+                for (PatternConfig userPattern : currentPatterns) {
+                    if (!defaultPatternNames.contains(userPattern.getName())) {
+                        patterns.add(userPattern);
+                    }
+                }
+            }
+            
+            // Save merged configuration
+            saveConfig();
+            
+            Logger.logCritical("Configuration updated and merged with defaults");
+            
+        } catch (Exception e) {
+            Logger.logCriticalError("Failed to update and merge configuration: " + e.getMessage());
+        }
     }
     
     public void reloadConfig() {
@@ -568,6 +711,44 @@ public class Config {
         return patterns;
     }
     
+    public String getConfigVersion() {
+        return configVersion != null ? configVersion : "unknown";
+    }
+    
+    public String getCurrentExtensionVersion() {
+        return VersionUtil.getVersion();
+    }
+    
+    public boolean isConfigUpToDate() {
+        String currentVersion = getCurrentExtensionVersion();
+        String configVer = getConfigVersion();
+        return currentVersion.equals(configVer);
+    }
+    
+    public boolean isConfigVersionNewer() {
+        String currentVersion = getCurrentExtensionVersion();
+        String configVer = getConfigVersion();
+        return compareVersions(configVer, currentVersion) > 0;
+    }
+    
+    /**
+     * Compare two version strings (simple string comparison for now)
+     * @param version1 First version string
+     * @param version2 Second version string  
+     * @return negative if version1 < version2, 0 if equal, positive if version1 > version2
+     */
+    private int compareVersions(String version1, String version2) {
+        if (version1 == null) version1 = "unknown";
+        if (version2 == null) version2 = "unknown";
+        
+        if ("unknown".equals(version1) || "unknown".equals(version2)) {
+            return version1.compareTo(version2);
+        }
+        
+        // Simple string comparison for now - could be enhanced with semantic versioning
+        return version1.compareTo(version2);
+    }
+    
     public void updateGenericSecretLengths(int minLength, int maxLength) {
         settings.setGenericSecretMinLength(minLength);
         settings.setGenericSecretMaxLength(maxLength);
@@ -583,6 +764,9 @@ public class Config {
     public void exportConfigToFile(String filePath) throws IOException {
         // Generate TOML content (same as saveConfig but to file)
         Map<String, Object> configMap = new HashMap<>();
+        
+        // Add version (use current extension version)
+        configMap.put("version", getCurrentExtensionVersion());
         
         // Add settings
         Map<String, Object> settingsMap = new HashMap<>();
@@ -694,6 +878,53 @@ public class Config {
      */
     public boolean hasExportedConfigFile() {
         return Files.exists(Paths.get(getDefaultConfigFilePath()));
+    }
+    
+    /**
+     * Initialize external config file on first install
+     * Copies default-config.toml to config.toml only if config.toml doesn't exist
+     */
+    public void initializeExternalConfigFile() {
+        String configFilePath = getDefaultConfigFilePath();
+        
+        // Only create if config.toml doesn't exist (first install)
+        if (!Files.exists(Paths.get(configFilePath))) {
+            try {
+                // Copy default config to external location
+                copyDefaultConfigToFile(configFilePath);
+                Logger.logCritical("First install: Created config file at " + configFilePath);
+            } catch (IOException e) {
+                Logger.logCriticalError("Failed to create initial config file: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Copy the default configuration to the specified file path
+     * @param filePath The destination file path
+     * @throws IOException If file operations fail
+     */
+    private void copyDefaultConfigToFile(String filePath) throws IOException {
+        // Load default config from resources
+        InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH);
+        if (defaultConfigStream == null) {
+            throw new IOException("Default config not found in resources");
+        }
+        
+        try {
+            // Read default config content
+            byte[] configBytes = defaultConfigStream.readAllBytes();
+            
+            // Ensure directory exists
+            Path configPath = Paths.get(filePath);
+            Files.createDirectories(configPath.getParent());
+            
+            // Write to file
+            Files.write(configPath, configBytes);
+            
+        } finally {
+            defaultConfigStream.close();
+        }
     }
     
 } 
