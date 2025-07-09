@@ -571,9 +571,7 @@ public class Config {
             configMap.set("patterns", patternsList);
             
             // Convert to TOML string
-            TomlWriter writer = TomlFormat.instance().createWriter();
-            writer.setHideRedundantLevels(false); // This generates proper TOML sections!
-            writer.setIndent(""); // No indentation - flat TOML format
+            TomlWriter writer = createConfiguredTomlWriter();
             StringWriter stringWriter = new StringWriter();
             writer.write(configMap, stringWriter);
             String tomlString = stringWriter.toString();
@@ -667,9 +665,7 @@ public class Config {
             configMap.set("patterns", patternsList);
             
             // Convert to TOML string using NightConfig
-            TomlWriter writer = TomlFormat.instance().createWriter();
-            writer.setHideRedundantLevels(false); // Generate proper TOML sections!
-            writer.setIndent(""); // No indentation - flat TOML format
+            TomlWriter writer = createConfiguredTomlWriter();
             StringWriter stringWriter = new StringWriter();
             writer.write(configMap, stringWriter);
             return stringWriter.toString();
@@ -898,9 +894,7 @@ public class Config {
         configMap.set("patterns", patternsList);
         
         // Convert to TOML string and write to file
-        TomlWriter writer = TomlFormat.instance().createWriter();
-        writer.setHideRedundantLevels(false); // Generate proper TOML sections!
-        writer.setIndent(""); // No indentation - flat TOML format
+        TomlWriter writer = createConfiguredTomlWriter();
         StringWriter stringWriter = new StringWriter();
         writer.write(configMap, stringWriter);
         String tomlString = stringWriter.toString();
@@ -974,6 +968,24 @@ public class Config {
      */
     public boolean hasExportedConfigFile() {
         return Files.exists(Paths.get(getDefaultConfigFilePath()));
+    }
+    
+    /**
+     * Create and configure a TomlWriter with proper settings for regex patterns
+     * @return Configured TomlWriter instance
+     */
+    private TomlWriter createConfiguredTomlWriter() {
+        TomlWriter writer = TomlFormat.instance().createWriter();
+        writer.setHideRedundantLevels(false); // Generate proper TOML sections!
+        writer.setIndent(""); // No indentation - flat TOML format
+        
+        // Configure writer to use literal strings (triple quotes) for regex patterns
+        writer.setWriteStringLiteralPredicate(str -> {
+            // Use literal strings for regex patterns (strings with backslashes or complex patterns)
+            return str != null && (str.contains("\\") || str.contains("(?") || str.contains("*") || str.contains("+") || str.contains("?") || str.contains("|"));
+        });
+        
+        return writer;
     }
     
     /**
