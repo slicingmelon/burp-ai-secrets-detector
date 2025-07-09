@@ -525,14 +525,14 @@ public class Config {
                 Logger.logCriticalError("Cannot save config: config object is null (still initializing?)");
                 return;
             }
-            // Convert current configuration to TOML format
-            CommentedConfig configMap = TomlFormat.newConfig();
+            // Convert current configuration to TOML format (thread-safe)
+            CommentedConfig configMap = TomlFormat.newConcurrentConfig();
             
             // Add version (use current extension version)
             configMap.set("version", getCurrentExtensionVersion());
             
             // Add settings
-            CommentedConfig settingsMap = TomlFormat.newConfig();
+            CommentedConfig settingsMap = TomlFormat.newConcurrentConfig();
             settingsMap.set("workers", settings.getWorkers());
             settingsMap.set("in_scope_only", settings.isInScopeOnly());
             settingsMap.set("logging_enabled", settings.isLoggingEnabled());
@@ -557,8 +557,8 @@ public class Config {
                 Logger.logCritical("Saving config with " + patterns.size() + " patterns");
                 for (PatternConfig pattern : patterns) {
                     if (pattern != null) {
-                        // Use LinkedHashMap to preserve field order: name, prefix, pattern, suffix
-                        CommentedConfig patternMap = TomlFormat.newConfig(java.util.LinkedHashMap::new);
+                        // Use concurrent config to preserve field order: name, prefix, pattern, suffix
+                        CommentedConfig patternMap = TomlFormat.newConcurrentConfig();
                         patternMap.set("name", pattern.getName());
                         patternMap.set("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
                         patternMap.set("pattern", pattern.getPattern());
@@ -625,14 +625,14 @@ public class Config {
      */
     private String generateProperTomlContent() {
         try {
-            // Create config using NightConfig
-            CommentedConfig configMap = TomlFormat.newConfig();
+            // Create config using NightConfig (thread-safe)
+            CommentedConfig configMap = TomlFormat.newConcurrentConfig();
             
             // Add version
             configMap.set("version", getCurrentExtensionVersion());
             
             // Add settings
-            CommentedConfig settingsMap = TomlFormat.newConfig();
+            CommentedConfig settingsMap = TomlFormat.newConcurrentConfig();
             settingsMap.set("excluded_file_extensions", new ArrayList<>(settings.getExcludedFileExtensions()));
             settingsMap.set("workers", settings.getWorkers());
             settingsMap.set("in_scope_only", settings.isInScopeOnly());
@@ -655,8 +655,8 @@ public class Config {
             List<CommentedConfig> patternsList = new ArrayList<>();
             if (patterns != null) {
                 for (PatternConfig pattern : patterns) {
-                    // Use LinkedHashMap to preserve field order: name, prefix, pattern, suffix
-                    CommentedConfig patternMap = TomlFormat.newConfig(java.util.LinkedHashMap::new);
+                    // Use concurrent config with LinkedHashMap to preserve field order: name, prefix, pattern, suffix
+                    CommentedConfig patternMap = TomlFormat.newConcurrentConfig();
                     patternMap.set("name", pattern.getName());
                     patternMap.set("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
                     patternMap.set("pattern", pattern.getPattern());
@@ -850,14 +850,14 @@ public class Config {
      * @throws IOException If file operations fail
      */
     public void exportConfigToFile(String filePath) throws IOException {
-        // Generate TOML content using NightConfig
-        CommentedConfig configMap = TomlFormat.newConfig();
+        // Generate TOML content using NightConfig (thread-safe)
+        CommentedConfig configMap = TomlFormat.newConcurrentConfig();
         
         // Add version (use current extension version)
         configMap.set("version", getCurrentExtensionVersion());
         
         // Add settings
-        CommentedConfig settingsMap = TomlFormat.newConfig();
+        CommentedConfig settingsMap = TomlFormat.newConcurrentConfig();
         settingsMap.set("workers", settings.getWorkers());
         settingsMap.set("in_scope_only", settings.isInScopeOnly());
         settingsMap.set("logging_enabled", settings.isLoggingEnabled());
@@ -882,7 +882,7 @@ public class Config {
             Logger.logCritical("Exporting config with " + patterns.size() + " patterns");
             for (PatternConfig pattern : patterns) {
                 if (pattern != null) {
-                    CommentedConfig patternMap = TomlFormat.newConfig();
+                    CommentedConfig patternMap = TomlFormat.newConcurrentConfig();
                     patternMap.set("name", pattern.getName());
                     patternMap.set("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
                     patternMap.set("pattern", pattern.getPattern());
