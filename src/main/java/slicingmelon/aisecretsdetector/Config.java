@@ -447,14 +447,9 @@ public class Config {
             Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
             Files.createDirectories(configPath.getParent());
 
-            // If config file exists, try to preserve user patterns and comments
-            if (Files.exists(configPath)) {
-                updateExistingConfigFile(configPath);
-            } else {
-                // First time: copy default config and update values
-                copyDefaultConfigToUserDirectory(configPath);
-                updateConfigValues(configPath);
-            }
+            // Always use the beautiful default format, then update values
+            copyDefaultConfigToUserDirectory(configPath);
+            updateConfigValues(configPath);
             
         } catch (IOException e) {
             Logger.logCriticalError("Error saving config to file: " + e.getMessage());
@@ -462,28 +457,16 @@ public class Config {
     }
 
     /**
-     * Updates an existing config file, preserving user-added patterns and comments
-     */
-    private void updateExistingConfigFile(Path configPath) throws IOException {
-        // Create a complete TOML structure with current settings and patterns
-        TomlRoot tomlRoot = new TomlRoot();
-        tomlRoot.version = this.configVersion;
-        tomlRoot.settings = this.settings;
-        tomlRoot.patterns = this.patterns;
-        
-        // Write the complete structure to the file
-        // This preserves user patterns while using Jackson's consistent formatting
-        tomlMapper.writeValue(configPath.toFile(), tomlRoot);
-    }
-
-    /**
      * Updates only the values in the config file, preserving formatting and structure
+     * Also updates patterns to include any user-added patterns
      */
     private void updateConfigValues(Path configPath) throws IOException {
         List<String> lines = Files.readAllLines(configPath, StandardCharsets.UTF_8);
         List<String> updatedLines = new ArrayList<>();
         
         boolean inSettingsSection = false;
+        boolean inPatternsSection = false;
+        boolean foundPatternsSection = false;
         
         for (String line : lines) {
             String trimmed = line.trim();
@@ -491,10 +474,17 @@ public class Config {
             // Detect sections
             if (trimmed.equals("[settings]")) {
                 inSettingsSection = true;
+                inPatternsSection = false;
                 updatedLines.add(line);
                 continue;
+            } else if (trimmed.startsWith("[[patterns]]")) {
+                inSettingsSection = false;
+                inPatternsSection = true;
+                foundPatternsSection = true;
+                break; // Stop processing here, we'll append our patterns
             } else if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
                 inSettingsSection = false;
+                inPatternsSection = false;
                 updatedLines.add(line);
                 continue;
             }
@@ -533,6 +523,20 @@ public class Config {
             } else {
                 updatedLines.add(line);
             }
+        }
+        
+        // Append all current patterns (preserves user-added ones)
+        if (foundPatternsSection) {
+            updatedLines.add(""); // Empty line before patterns section
+        }
+        
+        for (PatternConfig pattern : this.patterns) {
+            updatedLines.add("[[patterns]]");
+            updatedLines.add("name = \"" + pattern.getName() + "\"");
+            updatedLines.add("prefix = '''" + pattern.getPrefix() + "'''");
+            updatedLines.add("pattern = '''" + pattern.getPattern() + "'''");
+            updatedLines.add("suffix = '''" + pattern.getSuffix() + "'''");
+            updatedLines.add(""); // Empty line after each pattern
         }
         
         // Write the updated content back
