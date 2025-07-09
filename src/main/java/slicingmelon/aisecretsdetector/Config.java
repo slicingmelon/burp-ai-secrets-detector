@@ -635,6 +635,7 @@ public class Config {
      * This method is deprecated. Use resetToDefaults() instead.
      * @deprecated
      */
+    @Deprecated
     public void resetToDefaultsComplete() {
         resetToDefaults();
     }
