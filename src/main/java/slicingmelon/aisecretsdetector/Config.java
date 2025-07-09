@@ -10,6 +10,7 @@ package slicingmelon.aisecretsdetector;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.core.ToolType;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.toml.TomlFactory;
@@ -68,6 +69,8 @@ public class Config {
         private String pattern;
         @JsonProperty("suffix")
         private String suffix;
+        
+        @JsonIgnore
         private Pattern compiledPattern;
 
         public PatternConfig() {}
@@ -445,15 +448,82 @@ public class Config {
             Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
             Files.createDirectories(configPath.getParent());
 
-            TomlRoot tomlRoot = new TomlRoot();
-            tomlRoot.version = this.configVersion;
-            tomlRoot.settings = this.settings;
-            tomlRoot.patterns = this.patterns;
-
-            tomlMapper.writeValue(configPath.toFile(), tomlRoot);
+            // Use custom TOML writer that preserves formatting and comments
+            writeFormattedTomlFile(configPath);
         } catch (IOException e) {
             Logger.logCriticalError("Error saving config to file: " + e.getMessage());
         }
+    }
+
+    private void writeFormattedTomlFile(Path configPath) throws IOException {
+        StringBuilder tomlContent = new StringBuilder();
+        
+        // Header comment
+        tomlContent.append("# AI Secrets Detector Configuration\n");
+        tomlContent.append("# Version of this config file - should match extension version\n");
+        tomlContent.append("version = \"").append(this.configVersion).append("\"\n\n");
+        
+        // Settings section
+        tomlContent.append("[settings]\n");
+        tomlContent.append("excluded_file_extensions = [");
+        
+        // Format file extensions array properly
+        String[] extensions = this.settings.getExcludedFileExtensions().toArray(new String[0]);
+        java.util.Arrays.sort(extensions); // Sort for consistent output
+        for (int i = 0; i < extensions.length; i++) {
+            if (i > 0) tomlContent.append(", ");
+            tomlContent.append("\"").append(extensions[i]).append("\"");
+        }
+        tomlContent.append("]\n");
+        
+        tomlContent.append("workers = ").append(this.settings.getWorkers()).append("\n");
+        tomlContent.append("in_scope_only = ").append(this.settings.isInScopeOnly()).append("\n");
+        tomlContent.append("logging_enabled = ").append(this.settings.isLoggingEnabled()).append("\n");
+        tomlContent.append("randomness_algorithm_enabled = ").append(this.settings.isRandomnessAlgorithmEnabled()).append("\n");
+        tomlContent.append("generic_secret_min_length = ").append(this.settings.getGenericSecretMinLength()).append("\n");
+        tomlContent.append("generic_secret_max_length = ").append(this.settings.getGenericSecretMaxLength()).append("\n");
+        tomlContent.append("duplicate_threshold = ").append(this.settings.getDuplicateThreshold()).append("\n");
+        tomlContent.append("max_highlights_per_secret = ").append(this.settings.getMaxHighlightsPerSecret()).append("\n");
+        
+        // Format enabled tools array
+        tomlContent.append("enabled_tools = [");
+        ToolType[] tools = this.settings.getEnabledTools().toArray(new ToolType[0]);
+        java.util.Arrays.sort(tools, (a, b) -> a.name().compareTo(b.name())); // Sort for consistent output
+        for (int i = 0; i < tools.length; i++) {
+            if (i > 0) tomlContent.append(", ");
+            tomlContent.append("\"").append(tools[i].name()).append("\"");
+        }
+        tomlContent.append("]\n\n");
+        
+        // Patterns section
+        for (PatternConfig pattern : this.patterns) {
+            tomlContent.append("[[patterns]]\n");
+            tomlContent.append("name = \"").append(pattern.getName()).append("\"\n");
+            
+            // Use literal strings for patterns to preserve backslashes
+            if (pattern.getPrefix() != null && !pattern.getPrefix().isEmpty()) {
+                tomlContent.append("prefix = '''").append(pattern.getPrefix()).append("'''\n");
+            } else {
+                tomlContent.append("prefix = ''\n");
+            }
+            
+            if (pattern.getPattern() != null && !pattern.getPattern().isEmpty()) {
+                tomlContent.append("pattern = '''").append(pattern.getPattern()).append("'''\n");
+            } else {
+                tomlContent.append("pattern = ''\n");
+            }
+            
+            if (pattern.getSuffix() != null && !pattern.getSuffix().isEmpty()) {
+                tomlContent.append("suffix = '''").append(pattern.getSuffix()).append("'''\n");
+            } else {
+                tomlContent.append("suffix = ''\n");
+            }
+            
+            tomlContent.append("\n");
+        }
+        
+        // Write the formatted content to file
+        Files.write(configPath, tomlContent.toString().getBytes(StandardCharsets.UTF_8));
     }
     
     public void resetToDefaults() {
@@ -595,11 +665,8 @@ public class Config {
     
     public void exportConfigToFile(String filePath) throws IOException {
         Path destinationPath = Paths.get(filePath);
-        TomlRoot tomlRoot = new TomlRoot();
-        tomlRoot.version = this.configVersion;
-        tomlRoot.settings = this.settings;
-        tomlRoot.patterns = this.patterns;
-        tomlMapper.writeValue(destinationPath.toFile(), tomlRoot);
+        Files.createDirectories(destinationPath.getParent());
+        writeFormattedTomlFile(destinationPath);
     }
     
     public void importConfigFromFile(String filePath) throws IOException {
