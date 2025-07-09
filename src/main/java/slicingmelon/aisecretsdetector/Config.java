@@ -427,6 +427,11 @@ public class Config {
     }
     
     public void saveConfig() {
+        Logger.logCritical("DEBUG: saveConfig() called - current patterns: " + this.patterns.size());
+        for (PatternConfig pattern : this.patterns) {
+            Logger.logCritical("DEBUG: Current pattern: " + pattern.getName());
+        }
+        
         // Update version to current extension version
         this.configVersion = getCurrentExtensionVersion();
         
@@ -530,7 +535,9 @@ public class Config {
             updatedLines.add(""); // Empty line before patterns section
         }
         
+        Logger.logCritical("DEBUG: Writing " + this.patterns.size() + " patterns to config file");
         for (PatternConfig pattern : this.patterns) {
+            Logger.logCritical("DEBUG: Writing pattern: " + pattern.getName());
             updatedLines.add("[[patterns]]");
             updatedLines.add("name = \"" + pattern.getName() + "\"");
             updatedLines.add("prefix = '''" + pattern.getPrefix() + "'''");
@@ -725,7 +732,17 @@ public class Config {
         Path sourcePath = Paths.get(filePath);
         if (Files.exists(sourcePath)) {
             TomlRoot tomlRoot = tomlMapper.readValue(sourcePath.toFile(), TomlRoot.class);
+            
+            Logger.logCritical("DEBUG: Imported " + (tomlRoot.patterns != null ? tomlRoot.patterns.size() : 0) + " patterns from file");
+            if (tomlRoot.patterns != null) {
+                for (PatternConfig pattern : tomlRoot.patterns) {
+                    Logger.logCritical("DEBUG: Imported pattern: " + pattern.getName());
+                }
+            }
+            
             parseTomlRoot(tomlRoot);
+            
+            Logger.logCritical("DEBUG: After parsing, config has " + this.patterns.size() + " patterns");
             
             // Update version to current extension version
             this.configVersion = getCurrentExtensionVersion();
