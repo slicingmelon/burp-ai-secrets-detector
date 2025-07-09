@@ -234,7 +234,7 @@ public class Config {
             try {
                 loadConfig();
             } catch (Exception e) {
-                logError("Error during config loading, using defaults: " + e.getMessage());
+                Logger.logCriticalError("Error during config loading, using defaults: " + e.getMessage());
                 // Keep the default settings and empty config we already initialized
             }
         }
@@ -333,7 +333,7 @@ public class Config {
             applyDynamicPatterns();
             
         } catch (Exception e) {
-            logError("Failed to load configuration: " + e.getMessage());
+            Logger.logCriticalError("Failed to load configuration: " + e.getMessage());
             e.printStackTrace();
             // Fallback to default config
             loadDefaultConfig();
@@ -354,12 +354,12 @@ public class Config {
                 // Save default config to persistence
                 saveConfig();
             } else {
-                logError("Default config file not found in resources");
+                Logger.logCriticalError("Default config file not found in resources");
                 // Create empty config to avoid null pointer exceptions
                 this.config = new Toml();
             }
         } catch (Exception e) {
-            logError("Failed to load default configuration: " + e.getMessage());
+            Logger.logCriticalError("Failed to load default configuration: " + e.getMessage());
             // Create empty config to avoid null pointer exceptions
             this.config = new Toml();
         }
@@ -375,7 +375,7 @@ public class Config {
     
     private void parseSettings() {
         if (config == null) {
-            logError("Cannot parse settings: config is null");
+            Logger.logCriticalError("Cannot parse settings: config is null");
             return;
         }
         
@@ -428,7 +428,7 @@ public class Config {
                     try {
                         enabledTools.add(ToolType.valueOf(toolStr));
                     } catch (IllegalArgumentException e) {
-                        logError("Invalid tool type: " + toolStr);
+                        Logger.logCriticalError("Invalid tool type: " + toolStr);
                     }
                 }
                 settings.setEnabledTools(enabledTools);
@@ -696,22 +696,4 @@ public class Config {
         return Files.exists(Paths.get(getDefaultConfigFilePath()));
     }
     
-    private void logError(String message) {
-        if (api != null) {
-            try {
-                AISecretsDetector detector = AISecretsDetector.getInstance();
-                if (detector != null) {
-                    detector.logMsgError(message);
-                } else {
-                    // Fall back to Burp's logging if detector not ready
-                    api.logging().logToError(message);
-                }
-            } catch (Exception e) {
-                // Fall back to Burp's logging if there's any error
-                api.logging().logToError(message);
-            }
-        } else {
-            System.err.println(message);
-        }
-    }
 } 

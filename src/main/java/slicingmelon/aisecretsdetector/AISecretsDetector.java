@@ -85,6 +85,9 @@ public class AISecretsDetector implements BurpExtension {
         this.api = api;
         api.extension().setName("AI Secrets Detector");
         
+        // Initialize Logger first
+        Logger.initialize(api);
+        
         // Set instance for Config access
         instance = this;
         
@@ -94,7 +97,7 @@ public class AISecretsDetector implements BurpExtension {
             
             // Verify config is properly initialized
             if (config == null || config.getSettings() == null) {
-                logMsgError("Config initialization failed, creating minimal config");
+                api.logging().logToError("Config initialization failed, creating minimal config");
                 config = Config.getInstance(); // This will create a minimal instance
             }
             
@@ -164,13 +167,13 @@ public class AISecretsDetector implements BurpExtension {
         });
         
         api.extension().registerUnloadingHandler(() -> {
-            logMsg("AI Secrets Detector extension unloading...");
+            api.logging().logToOutput("AI Secrets Detector extension unloading...");
             saveSecretCounters();
             shutdownWorkers();
             ui.clearLogs();
         });
         
-        logMsg("AI Secrets Detector extension loaded successfully");
+        api.logging().logToOutput("AI Secrets Detector extension loaded successfully");
     }
     
     private void initializeWorkers() {
@@ -325,7 +328,7 @@ public class AISecretsDetector implements BurpExtension {
             }
             
         } catch (Exception e) {
-            logMsgError("Error processing HTTP response: " + e.getMessage());
+            Logger.logErrorMsg("Error processing HTTP response: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -679,26 +682,17 @@ public class AISecretsDetector implements BurpExtension {
         return SKIP_FILE_EXTENSIONS.contains(ext);
     }
 
-    // helper function to log normal messages 
+    // helper function to log normal messages - only UI logging
     public void logMsg(String message) {
-        // Only log if logging is enabled
-        if (config != null && config.getSettings().isLoggingEnabled()) {
-            // Log to Burp's output
-            api.logging().logToOutput(message);
-            
-            // Also log to UI if available
-            if (ui != null) {
-                ui.appendToLog(message);
-            }
+        // Only log to UI if logging is enabled
+        if (config != null && config.getSettings().isLoggingEnabled() && ui != null) {
+            ui.appendToLog(message);
         }
     }
 
-    // helper function to log error messages 
+    // helper function to log error messages - only UI logging
     public void logMsgError(String message) {
-        // Always log to Burp's error stream
-        api.logging().logToError(message);
-        
-        // Also log to UI if enabled
+        // Only log to UI if logging is enabled
         if (config != null && config.getSettings().isLoggingEnabled() && ui != null) {
             ui.appendToErrorLog(message);
         }
@@ -709,6 +703,14 @@ public class AISecretsDetector implements BurpExtension {
      */
     public static AISecretsDetector getInstance() {
         return instance;
+    }
+    
+    public Config getConfig() {
+        return config;
+    }
+    
+    public UI getUI() {
+        return ui;
     }
     
     /**
