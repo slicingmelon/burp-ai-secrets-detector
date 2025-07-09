@@ -295,7 +295,7 @@ public class Config {
             Config minimalConfig = new Config();
             minimalConfig.patterns = new ArrayList<>();
             minimalConfig.settings = new Settings();
-            minimalConfig.config = new Toml();
+            minimalConfig.config = tomlMapper.createObjectNode();
             minimalConfig.api = null;
             minimalConfig.onConfigChangedCallback = null;
             return minimalConfig;
@@ -304,7 +304,7 @@ public class Config {
             Config emergency = new Config();
             emergency.patterns = new ArrayList<>();
             emergency.settings = new Settings();
-            emergency.config = new Toml();
+            emergency.config = tomlMapper.createObjectNode();
             return emergency;
         }
     }
@@ -329,7 +329,7 @@ public class Config {
             
             if (savedConfig != null && !savedConfig.isEmpty()) {
                 // Parse the persisted config
-                this.config = new Toml().read(savedConfig);
+                this.config = tomlMapper.readTree(savedConfig);
                 parseConfig();
             } else {
                 // Load default config from resources
@@ -351,7 +351,7 @@ public class Config {
         
         // Ensure config is never null
         if (this.config == null) {
-            this.config = new Toml();
+            this.config = tomlMapper.createObjectNode();
         }
     }
     
@@ -359,19 +359,19 @@ public class Config {
         try {
             InputStream configStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH);
             if (configStream != null) {
-                this.config = new Toml().read(configStream);
+                this.config = tomlMapper.readTree(configStream);
                 parseConfig();
                 // Save default config to persistence
                 saveConfig();
             } else {
                 Logger.logCriticalError("Default config file not found in resources");
                 // Create empty config to avoid null pointer exceptions
-                this.config = new Toml();
+                this.config = tomlMapper.createObjectNode();
             }
         } catch (Exception e) {
             Logger.logCriticalError("Failed to load default configuration: " + e.getMessage());
             // Create empty config to avoid null pointer exceptions
-            this.config = new Toml();
+            this.config = tomlMapper.createObjectNode();
         }
     }
     
@@ -394,7 +394,8 @@ public class Config {
         }
         
         // Get version from config, fallback to "unknown" if not found
-        configVersion = config.getString("version", "unknown");
+        JsonNode versionNode = config.get("version");
+        configVersion = versionNode != null ? versionNode.asText("unknown") : "unknown";
     }
     
     private void parseSettings() {
@@ -403,56 +404,68 @@ public class Config {
             return;
         }
         
-        if (config.contains("settings")) {
-            Toml settingsToml = config.getTable("settings");
+        JsonNode settingsNode = config.get("settings");
+        if (settingsNode != null && settingsNode.isObject()) {
             
-            if (settingsToml.getLong("workers") != null) {
-                settings.setWorkers(settingsToml.getLong("workers").intValue());
+            JsonNode workersNode = settingsNode.get("workers");
+            if (workersNode != null && workersNode.isNumber()) {
+                settings.setWorkers(workersNode.asInt());
             }
             
-            if (settingsToml.getBoolean("in_scope_only") != null) {
-                settings.setInScopeOnly(settingsToml.getBoolean("in_scope_only"));
+            JsonNode inScopeOnlyNode = settingsNode.get("in_scope_only");
+            if (inScopeOnlyNode != null && inScopeOnlyNode.isBoolean()) {
+                settings.setInScopeOnly(inScopeOnlyNode.asBoolean());
             }
             
-            if (settingsToml.getBoolean("logging_enabled") != null) {
-                settings.setLoggingEnabled(settingsToml.getBoolean("logging_enabled"));
+            JsonNode loggingEnabledNode = settingsNode.get("logging_enabled");
+            if (loggingEnabledNode != null && loggingEnabledNode.isBoolean()) {
+                settings.setLoggingEnabled(loggingEnabledNode.asBoolean());
             }
             
-            if (settingsToml.getBoolean("randomness_algorithm_enabled") != null) {
-                settings.setRandomnessAlgorithmEnabled(settingsToml.getBoolean("randomness_algorithm_enabled"));
+            JsonNode randomnessAlgorithmEnabledNode = settingsNode.get("randomness_algorithm_enabled");
+            if (randomnessAlgorithmEnabledNode != null && randomnessAlgorithmEnabledNode.isBoolean()) {
+                settings.setRandomnessAlgorithmEnabled(randomnessAlgorithmEnabledNode.asBoolean());
             }
             
-            if (settingsToml.getLong("generic_secret_min_length") != null) {
-                settings.setGenericSecretMinLength(settingsToml.getLong("generic_secret_min_length").intValue());
+            JsonNode genericSecretMinLengthNode = settingsNode.get("generic_secret_min_length");
+            if (genericSecretMinLengthNode != null && genericSecretMinLengthNode.isNumber()) {
+                settings.setGenericSecretMinLength(genericSecretMinLengthNode.asInt());
             }
             
-            if (settingsToml.getLong("generic_secret_max_length") != null) {
-                settings.setGenericSecretMaxLength(settingsToml.getLong("generic_secret_max_length").intValue());
+            JsonNode genericSecretMaxLengthNode = settingsNode.get("generic_secret_max_length");
+            if (genericSecretMaxLengthNode != null && genericSecretMaxLengthNode.isNumber()) {
+                settings.setGenericSecretMaxLength(genericSecretMaxLengthNode.asInt());
             }
             
-            if (settingsToml.getLong("duplicate_threshold") != null) {
-                settings.setDuplicateThreshold(settingsToml.getLong("duplicate_threshold").intValue());
+            JsonNode duplicateThresholdNode = settingsNode.get("duplicate_threshold");
+            if (duplicateThresholdNode != null && duplicateThresholdNode.isNumber()) {
+                settings.setDuplicateThreshold(duplicateThresholdNode.asInt());
             }
             
-            if (settingsToml.getLong("max_highlights_per_secret") != null) {
-                settings.setMaxHighlightsPerSecret(settingsToml.getLong("max_highlights_per_secret").intValue());
+            JsonNode maxHighlightsPerSecretNode = settingsNode.get("max_highlights_per_secret");
+            if (maxHighlightsPerSecretNode != null && maxHighlightsPerSecretNode.isNumber()) {
+                settings.setMaxHighlightsPerSecret(maxHighlightsPerSecretNode.asInt());
             }
             
             // Parse excluded file extensions
-            List<String> excludedExtensions = settingsToml.getList("excluded_file_extensions");
-            if (excludedExtensions != null) {
-                settings.setExcludedFileExtensions(new HashSet<>(excludedExtensions));
+            JsonNode excludedExtensionsNode = settingsNode.get("excluded_file_extensions");
+            if (excludedExtensionsNode != null && excludedExtensionsNode.isArray()) {
+                Set<String> excludedExtensions = new HashSet<>();
+                for (JsonNode extensionNode : excludedExtensionsNode) {
+                    excludedExtensions.add(extensionNode.asText());
+                }
+                settings.setExcludedFileExtensions(excludedExtensions);
             }
             
             // Parse enabled tools
-            List<String> enabledToolsStr = settingsToml.getList("enabled_tools");
-            if (enabledToolsStr != null) {
+            JsonNode enabledToolsNode = settingsNode.get("enabled_tools");
+            if (enabledToolsNode != null && enabledToolsNode.isArray()) {
                 Set<ToolType> enabledTools = new HashSet<>();
-                for (String toolStr : enabledToolsStr) {
+                for (JsonNode toolNode : enabledToolsNode) {
                     try {
-                        enabledTools.add(ToolType.valueOf(toolStr));
+                        enabledTools.add(ToolType.valueOf(toolNode.asText()));
                     } catch (IllegalArgumentException e) {
-                        Logger.logCriticalError("Invalid tool type: " + toolStr);
+                        Logger.logCriticalError("Invalid tool type: " + toolNode.asText());
                     }
                 }
                 settings.setEnabledTools(enabledTools);
@@ -468,13 +481,18 @@ public class Config {
             return;
         }
         
-        List<Map<String, Object>> patternMaps = config.getList("patterns");
-        if (patternMaps != null) {
-            for (Map<String, Object> patternMap : patternMaps) {
-                String name = (String) patternMap.get("name");
-                String prefix = (String) patternMap.get("prefix");
-                String pattern = (String) patternMap.get("pattern");
-                String suffix = (String) patternMap.get("suffix");
+        JsonNode patternsNode = config.get("patterns");
+        if (patternsNode != null && patternsNode.isArray()) {
+            for (JsonNode patternNode : patternsNode) {
+                JsonNode nameNode = patternNode.get("name");
+                JsonNode prefixNode = patternNode.get("prefix");
+                JsonNode patternValueNode = patternNode.get("pattern");
+                JsonNode suffixNode = patternNode.get("suffix");
+                
+                String name = nameNode != null ? nameNode.asText() : null;
+                String prefix = prefixNode != null ? prefixNode.asText() : null;
+                String pattern = patternValueNode != null ? patternValueNode.asText() : null;
+                String suffix = suffixNode != null ? suffixNode.asText() : null;
                 
                 if (name != null && !name.isEmpty() && pattern != null && !pattern.isEmpty()) {
                     try {
@@ -556,10 +574,7 @@ public class Config {
             configMap.put("patterns", patternsList);
             
             // Convert to TOML string
-            TomlWriter writer = new TomlWriter();
-            StringWriter stringWriter = new StringWriter();
-            writer.write(configMap, stringWriter);
-            String tomlString = stringWriter.toString();
+            String tomlString = tomlMapper.writeValueAsString(configMap);
             
             // Save to persistence
             PersistedObject persistedData = api.persistence().extensionData();
@@ -816,10 +831,7 @@ public class Config {
         configMap.put("patterns", patternsList);
         
         // Convert to TOML string
-        TomlWriter writer = new TomlWriter();
-        StringWriter stringWriter = new StringWriter();
-        writer.write(configMap, stringWriter);
-        String tomlString = stringWriter.toString();
+        String tomlString = tomlMapper.writeValueAsString(configMap);
         
         // Write to file
         try (FileWriter fileWriter = new FileWriter(filePath)) {
@@ -840,7 +852,7 @@ public class Config {
         
         try (FileReader fileReader = new FileReader(file)) {
             // Parse the TOML file
-            this.config = new Toml().read(fileReader);
+            this.config = tomlMapper.readTree(fileReader);
             
             // Parse the loaded config
             parseConfig();
