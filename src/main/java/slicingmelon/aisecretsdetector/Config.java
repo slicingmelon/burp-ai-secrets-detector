@@ -856,25 +856,11 @@ public class Config {
     private TomlWriter createConfiguredTomlWriter() {
         TomlWriter writer = new TomlWriter();
         writer.setHideRedundantLevels(false); // Generate proper TOML sections!
-        
-        // This predicate decides whether a string should be written as a literal string (''')
-        // We apply it to any string that looks like a regex or is an empty string.
-        writer.setWriteStringLiteralPredicate(str -> {
-            if (str == null) {
-                return false;
-            }
-            // Use triple quotes for empty strings and strings containing regex-like characters
-            // to preserve them correctly, just like in default-config.toml.
-            return str.isEmpty() ||
-                   str.contains("\\") ||
-                   str.contains("|") ||
-                   str.contains("(") || str.contains(")") ||
-                   str.contains("[") || str.contains("]") ||
-                   str.contains("{") || str.contains("}") ||
-                   str.contains("*") || str.contains("+") ||
-                   str.contains("?") ||
-                   str.contains("^") || str.contains("$");
-        });
+        writer.setIndent(""); // Disable indentation
+
+        // Force all strings to be written as multi-line literal strings (''')
+        // This ensures all regex patterns and other fields are preserved exactly.
+        writer.setWriteStringMultilinePredicate(str -> true);
         
         return writer;
     }
