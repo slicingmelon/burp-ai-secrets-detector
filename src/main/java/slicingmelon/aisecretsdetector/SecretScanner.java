@@ -223,6 +223,24 @@ public class SecretScanner {
             
             Logger.logCritical("SecretScanner.scanResponse: Response length: " + responseString.length() + " characters");
             
+            // DEBUG: Show first 200 characters of response to verify content
+            String sampleContent = responseString.length() > 200 ? responseString.substring(0, 200) : responseString;
+            Logger.logCritical("SecretScanner.scanResponse: First 200 chars: " + sampleContent);
+            
+            // Add a simple test pattern to verify scanning works
+            try {
+                Pattern testPattern = Pattern.compile("(https?://[\\w.-]+)");
+                Matcher testMatcher = testPattern.matcher(responseString);
+                int testMatches = 0;
+                while (testMatcher.find() && testMatches < 3) {
+                    testMatches++;
+                    Logger.logCritical("SecretScanner.scanResponse: TEST PATTERN found URL: " + testMatcher.group(1));
+                }
+                Logger.logCritical("SecretScanner.scanResponse: TEST PATTERN found " + testMatches + " URLs total");
+            } catch (Exception e) {
+                Logger.logCriticalError("SecretScanner.scanResponse: TEST PATTERN failed: " + e.getMessage());
+            }
+            
             // Declare variables outside loops for efficiency
             String secretValue;
             Secret secret;

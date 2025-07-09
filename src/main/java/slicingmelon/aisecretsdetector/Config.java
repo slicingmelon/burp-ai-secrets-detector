@@ -476,14 +476,22 @@ public class Config {
     private void saveToConfigFile() {
         try {
             Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
+            Logger.logCritical("Config.saveToConfigFile: Saving to path: " + configPath.toAbsolutePath());
+            
             Files.createDirectories(configPath.getParent());
 
             // Always use the beautiful default format, then update values
+            Logger.logCritical("Config.saveToConfigFile: Copying default config");
             copyDefaultConfigToUserDirectory(configPath);
+            
+            Logger.logCritical("Config.saveToConfigFile: Updating config values - minLength=" + settings.getGenericSecretMinLength() + ", maxLength=" + settings.getGenericSecretMaxLength());
             updateConfigValues(configPath);
+            
+            Logger.logCritical("Config.saveToConfigFile: Config file saved successfully");
             
         } catch (IOException e) {
             Logger.logCriticalError("Error saving config to file: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -737,14 +745,26 @@ public class Config {
     }
 
     public void updateGenericSecretLengths(int minLength, int maxLength) {
+        Logger.logCritical("Config.updateGenericSecretLengths: Called with minLength=" + minLength + ", maxLength=" + maxLength);
+        
         if (settings != null) {
+            int oldMinLength = settings.getGenericSecretMinLength();
+            int oldMaxLength = settings.getGenericSecretMaxLength();
+            
             settings.setGenericSecretMinLength(minLength);
             settings.setGenericSecretMaxLength(maxLength);
+            
+            Logger.logCritical("Config.updateGenericSecretLengths: Updated settings from " + oldMinLength + "-" + oldMaxLength + " to " + minLength + "-" + maxLength);
             
             // Recompile all patterns with new length values
             recompilePatterns();
             
+            Logger.logCritical("Config.updateGenericSecretLengths: Calling saveConfig()");
             saveConfig();
+            
+            Logger.logCritical("Config.updateGenericSecretLengths: saveConfig() completed");
+        } else {
+            Logger.logCriticalError("Config.updateGenericSecretLengths: settings is null!");
         }
     }
     
