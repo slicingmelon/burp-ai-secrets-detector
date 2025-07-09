@@ -472,13 +472,8 @@ public class Config {
             onConfigChangedCallback.run();
         }
         
-        // Notify UI to refresh if available
-        if (AISecretsDetector.getInstance() != null) {
-            UI ui = AISecretsDetector.getInstance().getUI();
-            if (ui != null) {
-                ui.refreshUI();
-            }
-        }
+        // Note: UI refresh is handled by specific methods when needed, not automatically
+        // to prevent cascading refresh cycles
     }
 
     private void saveToConfigFile() {
