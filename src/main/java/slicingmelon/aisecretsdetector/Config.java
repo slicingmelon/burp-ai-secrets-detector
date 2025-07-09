@@ -716,7 +716,12 @@ public class Config {
     }
     
     public String getCurrentExtensionVersion() {
-        return VersionUtil.getVersion();
+        try {
+            return VersionUtil.getVersion();
+        } catch (Exception e) {
+            Logger.logCriticalError("Error getting extension version: " + e.getMessage());
+            return "1.7.1"; // Fallback to current version
+        }
     }
     
     public boolean isConfigUpToDate() {
