@@ -547,28 +547,28 @@ public class Config {
     
         try {
             // Create a new empty config to build the output, ensuring a clean structure.
-            CommentedConfig newConfig = fileConfig.configFormat().createConfig();
+            CommentedConfig newConfig = TomlFormat.instance().createConfig();
     
             // Set version
             newConfig.set("version", this.configVersion);
             newConfig.setComment("version", " AI Secrets Detector Configuration\n Version of this config file - should match extension version");
     
-            // Set settings, reading values from the current settings object
-            CommentedConfig settingsConfig = (CommentedConfig) newConfig.createSubConfig();
-            settingsConfig.set("workers", this.settings.getWorkers());
-            settingsConfig.set("in_scope_only", this.settings.isInScopeOnly());
-            settingsConfig.set("logging_enabled", this.settings.isLoggingEnabled());
-            settingsConfig.set("randomness_algorithm_enabled", this.settings.isRandomnessAlgorithmEnabled());
-            settingsConfig.set("generic_secret_min_length", this.settings.getGenericSecretMinLength());
-            settingsConfig.set("generic_secret_max_length", this.settings.getGenericSecretMaxLength());
-            settingsConfig.set("duplicate_threshold", this.settings.getDuplicateThreshold());
-            settingsConfig.set("max_highlights_per_secret", this.settings.getMaxHighlightsPerSecret());
-            settingsConfig.set("excluded_file_extensions", new ArrayList<>(this.settings.getExcludedFileExtensions()));
+            // Set settings, reading values from the current Config instance
+            CommentedConfig settings = newConfig.createSubConfig();
+            settings.set("workers", this.settings.getWorkers());
+            settings.set("in_scope_only", this.settings.isInScopeOnly());
+            settings.set("logging_enabled", this.settings.isLoggingEnabled());
+            settings.set("randomness_algorithm_enabled", this.settings.isRandomnessAlgorithmEnabled());
+            settings.set("generic_secret_min_length", this.settings.getGenericSecretMinLength());
+            settings.set("generic_secret_max_length", this.settings.getGenericSecretMaxLength());
+            settings.set("duplicate_threshold", this.settings.getDuplicateThreshold());
+            settings.set("max_highlights_per_secret", this.settings.getMaxHighlightsPerSecret());
+            settings.set("excluded_file_extensions", new ArrayList<>(this.settings.getExcludedFileExtensions()));
             
             List<String> enabledToolsStr = this.settings.getEnabledTools().stream()
                 .map(ToolType::name).sorted().collect(Collectors.toList());
-            settingsConfig.set("enabled_tools", enabledToolsStr);
-            newConfig.set("settings", settingsConfig);
+            settings.set("enabled_tools", enabledToolsStr);
+            newConfig.set("settings", settings);
     
             // Set patterns
             List<CommentedConfig> patternsList = new ArrayList<>();
@@ -851,21 +851,18 @@ public class Config {
     }
     
     /**
-     * Creates a TomlWriter configured to our needs. We want to use triple quotes for all
-     * strings to ensure regex patterns are preserved as raw literals without escaping.
+     * Creates a TomlWriter configured to use triple-quotes for all strings.
+     * This ensures regex patterns are preserved as raw literals without unwanted escaping.
      */
     private TomlWriter createConfiguredTomlWriter() {
         TomlWriter writer = new TomlWriter();
-        writer.setHideRedundantLevels(false); // Generate proper TOML sections!
-        writer.setIndent("  "); // Use spaces for indentation for readability
+        writer.setIndent("  "); // Use 2-space indent for readability
         
         // Force all strings to be written as multi-line literal strings (''')
-        // This ensures all regex patterns and other fields are preserved exactly.
+        // This ensures all values are preserved exactly as-is.
         writer.setWriteStringMultilinePredicate(str -> true);
         writer.setWriteStringLiteralPredicate(str -> true);
         
         return writer;
     }
-
-    // initializeExternalConfigFile is no longer needed as the builder handles it.
 } 
