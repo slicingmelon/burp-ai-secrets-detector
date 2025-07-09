@@ -14,6 +14,19 @@ dependencies {
     implementation 'com.moandjiezana.toml:toml4j:0.7.2'
 }
 
+// Generate version.properties file during build
+task generateVersionFile {
+    doLast {
+        def versionFile = file("$buildDir/resources/main/version.properties")
+        versionFile.parentFile.mkdirs()
+        versionFile.text = "version=${version}\n"
+    }
+}
+
+processResources {
+    dependsOn generateVersionFile
+}
+
 jar {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from {

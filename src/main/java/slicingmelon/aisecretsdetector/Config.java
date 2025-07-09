@@ -440,7 +440,7 @@ public class Config {
         patterns.clear();
         
         if (config == null) {
-            logError("Cannot parse patterns: config is null");
+            Logger.logCriticalError("Cannot parse patterns: config is null");
             return;
         }
         
@@ -464,7 +464,7 @@ public class Config {
                         PatternConfig patternConfig = new PatternConfig(name, prefix, pattern, suffix);
                         patterns.add(patternConfig);
                     } catch (Exception e) {
-                        logError("Failed to compile pattern '" + name + "': " + e.getMessage());
+                        Logger.logCriticalError("Failed to compile pattern '" + name + "': " + e.getMessage());
                     }
                 }
             }
@@ -480,7 +480,7 @@ public class Config {
         try {
             // Can't save config without API or settings
             if (api == null || settings == null) {
-                logError("Cannot save config: API or settings is null");
+                Logger.logCriticalError("Cannot save config: API or settings is null");
                 return;
             }
             // Convert current configuration to TOML format
@@ -538,7 +538,7 @@ public class Config {
             }
             
         } catch (Exception e) {
-            logError("Failed to save configuration: " + e.getMessage());
+            Logger.logCriticalError("Failed to save configuration: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -682,7 +682,7 @@ public class Config {
         try {
             Files.createDirectories(Paths.get(configDir));
         } catch (IOException e) {
-            logError("Failed to create config directory: " + e.getMessage());
+            Logger.logCriticalError("Failed to create config directory: " + e.getMessage());
         }
         
         return Paths.get(configDir, "config.toml").toString();

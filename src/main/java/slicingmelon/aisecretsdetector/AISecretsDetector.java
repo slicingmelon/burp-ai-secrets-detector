@@ -173,7 +173,7 @@ public class AISecretsDetector implements BurpExtension {
             ui.clearLogs();
         });
         
-        api.logging().logToOutput("AI Secrets Detector extension loaded successfully");
+        api.logging().logToOutput("AI Secrets Detector " + VersionUtil.getFormattedVersion() + " extension loaded successfully");
     }
     
     private void initializeWorkers() {
