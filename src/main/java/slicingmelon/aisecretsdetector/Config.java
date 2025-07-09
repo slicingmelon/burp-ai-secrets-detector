@@ -10,8 +10,11 @@ package slicingmelon.aisecretsdetector;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.persistence.PersistedObject;
 import burp.api.montoya.core.ToolType;
-import com.moandjiezana.toml.Toml;
-import com.moandjiezana.toml.TomlWriter;
+import com.fasterxml.jackson.dataformat.toml.TomlMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,11 +42,12 @@ public class Config {
     
     private MontoyaApi api;
     private static Config instance;
-    private Toml config;
+    private JsonNode config;
     private List<PatternConfig> patterns;
     private Settings settings;
     private String configVersion; // Version of the current config
     private Runnable onConfigChangedCallback;
+    private static final TomlMapper tomlMapper = new TomlMapper();
     
     // Configuration classes
     public static class PatternConfig {
@@ -230,7 +234,7 @@ public class Config {
         this.onConfigChangedCallback = onConfigChangedCallback;
         this.patterns = new ArrayList<>();
         this.settings = new Settings(); // Always initialize settings first
-        this.config = new Toml(); // Always initialize config to prevent null
+        this.config = tomlMapper.createObjectNode(); // Always initialize config to prevent null
         
         // Only load config if we have an API instance
         if (api != null) {
