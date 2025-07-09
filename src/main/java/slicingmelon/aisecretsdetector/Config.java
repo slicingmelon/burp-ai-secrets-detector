@@ -391,8 +391,6 @@ public class Config {
             }
         } catch (Exception e) {
             Logger.logCriticalError("Failed to load default configuration: " + e.getMessage());
-            this.settings = new Settings();
-            this.patterns = new ArrayList<>();
         }
     }
     
@@ -851,17 +849,21 @@ public class Config {
     }
     
     /**
-     * Creates a TomlWriter configured to use triple-quotes for all strings.
-     * This ensures regex patterns are preserved as raw literals without unwanted escaping.
+     * Creates a TomlWriter configured to produce the cleanest possible output.
+     * It uses single-quoted literal strings ('...') to ensure regex patterns are
+     * preserved as raw literals without unwanted escaping or newlines.
      */
     private TomlWriter createConfiguredTomlWriter() {
         TomlWriter writer = new TomlWriter();
         writer.setIndent("  "); // Use 2-space indent for readability
-        
-        // Force all strings to be written as multi-line literal strings (''')
-        // This ensures all values are preserved exactly as-is.
-        writer.setWriteStringMultilinePredicate(str -> true);
-        writer.setWriteStringLiteralPredicate(str -> true);
+
+        // Use literal strings for any string that can be represented as such (no single quotes).
+        // This is crucial for preserving backslashes in regexes.
+        writer.setWriteStringLiteralPredicate(str -> !str.contains("'"));
+
+        // Only use multiline strings for values that genuinely contain a newline.
+        // This prevents the writer from adding unwanted newlines to simple values.
+        writer.setWriteStringMultilinePredicate(str -> str.contains("\n"));
         
         return writer;
     }
