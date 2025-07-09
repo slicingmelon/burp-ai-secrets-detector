@@ -3,16 +3,42 @@
 version = "1.7.1"
 
 [settings]
+# File extensions to skip during scanning (binary/media files unlikely to contain secrets)
 excluded_file_extensions = ["3g2", "3gp", "aac", "aif", "aifc", "aiff", "au", "avi", "flac", "flv", "m3u", "m4a", "m4v", "mid", "midi", "mkv", "mov", "mp2", "mp3", "mp4", "mpa", "mpe", "mpeg", "mpg", "mpv2", "oga", "ogg", "ogv", "ogx", "ra", "ram", "rmi", "snd", "wav", "weba", "webm", "wma", "wmv", "bmp", "gif", "ico", "ief", "jfif", "jpe", "jpeg", "jpg", "pbm", "pgm", "png", "pnm", "ppm", "ras", "raw", "rgb", "svg", "tiff", "webp", "xbm", "xpm", "xwd", "psd", "ai", "eps", "cmx", "7z", "arc", "bz", "bz2", "gz", "rar", "tar", "zip", "zipx", "xz", "lz", "lzma", "apk", "jar", "war", "ear", "mpkg", "bin", "cod", "com", "exe", "msi", "dll", "so", "dylib", "app", "deb", "rpm", "pkg", "dmg", "iso", "img", "abw", "azw", "doc", "docx", "epub", "mpp", "odp", "ods", "odt", "pages", "numbers", "keynote", "pdf", "ppt", "pptx", "rtf", "vsd", "xls", "xlsx", "eot", "otf", "ttf", "woff", "woff2", "dat", "mdb", "accdb", "o", "obj", "swf", "fla", "xul", "css"]
+
+# Number of worker threads for processing HTTP responses
 workers = 15
+
+# Only scan requests/responses that are in the defined scope in Burp
 in_scope_only = true
+
+# Enable logging to the extension's log tab
 logging_enabled = false
+
+# Enable randomness algorithm for detecting generic secrets
 randomness_algorithm_enabled = true
+
+# Minimum length for generic secret detection (randomness algorithm)
 generic_secret_min_length = 15
+
+# Maximum length for generic secret detection (randomness algorithm)
 generic_secret_max_length = 80
+
+# Threshold for duplicate secret detection (same secret value across target host)
 duplicate_threshold = 5
+
+# Maximum number of highlights per secret type per response
 max_highlights_per_secret = 3
+
+# Tools from which to process messages
 enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
+
+# Secret detection patterns
+# Each pattern has:
+# - name: Human-readable name for the secret type
+# - prefix: Regex pattern that appears before the secret
+# - pattern: Main regex pattern that captures the secret (use capture groups)
+# - suffix: Regex pattern that appears after the secret
 
 [[patterns]]
 name = "Age Secret Key"
