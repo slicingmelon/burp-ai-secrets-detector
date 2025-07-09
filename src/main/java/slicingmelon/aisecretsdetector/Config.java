@@ -334,6 +334,8 @@ public class Config {
     private void loadConfig() {
         // 1. Try to load from Burp persistence first (primary source of truth)
         if (api != null && loadFromBurpPersistence()) {
+            // Even if we loaded from persistence, ensure config.toml exists
+            saveToConfigFile();
             return;
         }
 
@@ -444,62 +446,96 @@ public class Config {
             Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
             Files.createDirectories(configPath.getParent());
 
-            // If config.toml doesn't exist, copy default-config.toml first to preserve comments
-            if (!Files.exists(configPath)) {
-                copyDefaultConfigToUserDirectory(configPath);
-            }
-
-            // Preserve any user header comments
-            List<String> headerComments = extractHeaderComments(configPath);
-
-            // Create the TOML structure
-            TomlRoot tomlRoot = new TomlRoot();
-            tomlRoot.version = this.configVersion;
-            tomlRoot.settings = this.settings;
-            tomlRoot.patterns = this.patterns;
-
-            // Write with Jackson TOML (clean, proper format)
-            String newTomlContent = tomlMapper.writeValueAsString(tomlRoot);
-
-            // Combine header comments with new content
-            String finalContent = headerComments.isEmpty() ? 
-                newTomlContent : 
-                String.join("\n", headerComments) + "\n\n" + newTomlContent;
-
-            Files.write(configPath, finalContent.getBytes(StandardCharsets.UTF_8));
+            // Always start with a fresh copy of default config to preserve formatting
+            copyDefaultConfigToUserDirectory(configPath);
+            
+            // Now update only the values that need to change
+            updateConfigValues(configPath);
+            
         } catch (IOException e) {
             Logger.logCriticalError("Error saving config to file: " + e.getMessage());
         }
     }
 
     /**
-     * Extracts header comments (comments before the first config line) to preserve user notes
+     * Updates only the values in the config file, preserving formatting and structure
      */
-    private List<String> extractHeaderComments(Path configPath) {
-        try {
-            if (!Files.exists(configPath)) {
-                return new ArrayList<>();
-            }
-
-            List<String> lines = Files.readAllLines(configPath, StandardCharsets.UTF_8);
-            List<String> headerComments = new ArrayList<>();
+    private void updateConfigValues(Path configPath) throws IOException {
+        List<String> lines = Files.readAllLines(configPath, StandardCharsets.UTF_8);
+        List<String> updatedLines = new ArrayList<>();
+        
+        boolean inSettingsSection = false;
+        
+        for (String line : lines) {
+            String trimmed = line.trim();
             
-            for (String line : lines) {
-                String trimmed = line.trim();
-                // Collect comments and empty lines until we hit actual config
-                if (trimmed.startsWith("#") || trimmed.isEmpty()) {
-                    headerComments.add(line);
+            // Detect sections
+            if (trimmed.equals("[settings]")) {
+                inSettingsSection = true;
+                updatedLines.add(line);
+                continue;
+            } else if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                inSettingsSection = false;
+                updatedLines.add(line);
+                continue;
+            }
+            
+            // Update version
+            if (trimmed.startsWith("version = ")) {
+                updatedLines.add("version = \"" + this.configVersion + "\"");
+                continue;
+            }
+            
+            // Update settings values
+            if (inSettingsSection) {
+                if (trimmed.startsWith("workers = ")) {
+                    updatedLines.add("workers = " + this.settings.getWorkers());
+                } else if (trimmed.startsWith("in_scope_only = ")) {
+                    updatedLines.add("in_scope_only = " + this.settings.isInScopeOnly());
+                } else if (trimmed.startsWith("logging_enabled = ")) {
+                    updatedLines.add("logging_enabled = " + this.settings.isLoggingEnabled());
+                } else if (trimmed.startsWith("randomness_algorithm_enabled = ")) {
+                    updatedLines.add("randomness_algorithm_enabled = " + this.settings.isRandomnessAlgorithmEnabled());
+                } else if (trimmed.startsWith("generic_secret_min_length = ")) {
+                    updatedLines.add("generic_secret_min_length = " + this.settings.getGenericSecretMinLength());
+                } else if (trimmed.startsWith("generic_secret_max_length = ")) {
+                    updatedLines.add("generic_secret_max_length = " + this.settings.getGenericSecretMaxLength());
+                } else if (trimmed.startsWith("duplicate_threshold = ")) {
+                    updatedLines.add("duplicate_threshold = " + this.settings.getDuplicateThreshold());
+                } else if (trimmed.startsWith("max_highlights_per_secret = ")) {
+                    updatedLines.add("max_highlights_per_secret = " + this.settings.getMaxHighlightsPerSecret());
+                } else if (trimmed.startsWith("excluded_file_extensions = ")) {
+                    updatedLines.add("excluded_file_extensions = " + formatStringArray(this.settings.getExcludedFileExtensions()));
+                } else if (trimmed.startsWith("enabled_tools = ")) {
+                    updatedLines.add("enabled_tools = " + formatToolArray(this.settings.getEnabledTools()));
                 } else {
-                    // Stop at first non-comment line
-                    break;
+                    updatedLines.add(line);
                 }
+            } else {
+                updatedLines.add(line);
             }
-            
-            return headerComments;
-        } catch (IOException e) {
-            Logger.logCritical("Could not read existing config for comment preservation: " + e.getMessage());
-            return new ArrayList<>();
         }
+        
+        // Write the updated content back
+        Files.write(configPath, updatedLines, StandardCharsets.UTF_8);
+    }
+
+    private String formatStringArray(Set<String> strings) {
+        if (strings == null || strings.isEmpty()) {
+            return "[]";
+        }
+        return "[" + strings.stream()
+                .map(s -> "\"" + s + "\"")
+                .collect(Collectors.joining(", ")) + "]";
+    }
+
+    private String formatToolArray(Set<ToolType> tools) {
+        if (tools == null || tools.isEmpty()) {
+            return "[]";
+        }
+        return "[" + tools.stream()
+                .map(t -> "\"" + t.name() + "\"")
+                .collect(Collectors.joining(", ")) + "]";
     }
     
     private void copyDefaultConfigToUserDirectory(Path configPath) throws IOException {
@@ -681,5 +717,17 @@ public class Config {
     public boolean hasExportedConfigFile() {
         Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
         return Files.exists(configPath);
+    }
+
+    private TomlRoot loadFromConfigFile() {
+        try {
+            Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
+            if (Files.exists(configPath)) {
+                return tomlMapper.readValue(configPath.toFile(), TomlRoot.class);
+            }
+        } catch (IOException e) {
+            Logger.logCriticalError("Error loading config from file: " + e.getMessage());
+        }
+        return null;
     }
 } 
