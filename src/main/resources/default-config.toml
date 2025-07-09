@@ -43,31 +43,31 @@ enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
 [[patterns]]
 name = "URL with Credentials"
 prefix = ''''''
-pattern = '''(?i)\b([a-zA-Z]+://(?:[A-Za-z0-9_-]{1,32}):(?:[^@{}|^\\[\\]`]+)@[a-zA-Z0-9.-]+(?:/[^/\s]*)?)\b'''
+pattern = '''(?i)\\b([a-zA-Z]+://(?:[A-Za-z0-9_-]{1,32}):(?:[^@{}|^\\[\\]`]+)@[a-zA-Z0-9.-]+(?:/[^/\\s]*)?)\\b'''
 suffix = ''''''
 
 [[patterns]]
 name = "Age Secret Key"
 prefix = ''''''
-pattern = '''(AGE-SECRET-KEY-1[\dA-Z]{58})'''
+pattern = '''(AGE-SECRET-KEY-1[\\dA-Z]{58})'''
 suffix = ''''''
 
 [[patterns]]
 name = "Algolia ID"
-prefix = '''(?i)(?:algolia|docsearch|appId)(?:.|[\n\r\t]){0,40}?'''
-pattern = '''\b([A-Z0-9]{10})\b'''
+prefix = '''(?i)(?:algolia|docsearch|appId)(?:.|[\\n\\r\\t]){0,40}?'''
+pattern = '''\\b([A-Z0-9]{10})\\b'''
 suffix = ''''''
 
 [[patterns]]
 name = "Algolia Key"
-prefix = '''(?i)(?:algolia|docsearch|apiKey)(?:.|[\n\r\t]){0,40}?'''
-pattern = '''\b([a-zA-Z0-9]{32})\b'''
+prefix = '''(?i)(?:algolia|docsearch|apiKey)(?:.|[\\n\\r\\t]){0,40}?'''
+pattern = '''\\b([a-zA-Z0-9]{32})\\b'''
 suffix = ''''''
 
 [[patterns]]
 name = "Azure Storage Account Key"
 prefix = '''(?i)(?:account)?key\\s*[:=]\\s*'''
-pattern = '''([\\\\d+/=A-Za-z]{88})'''
+pattern = '''([\\d+/=A-Za-z]{88})'''
 suffix = '''(?:[^\\w]|$)'''
 
 [[patterns]]

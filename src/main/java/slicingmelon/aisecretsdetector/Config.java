@@ -89,8 +89,11 @@ public class Config {
         public void compile(int minLength, int maxLength) {
             String fullPattern = buildFullPattern(prefix, pattern, suffix, minLength, maxLength);
             try {
+                Logger.logCritical("Compiling pattern '" + name + "' with regex: " + fullPattern);
                 this.compiledPattern = Pattern.compile(fullPattern);
+                Logger.logCritical("Successfully compiled pattern '" + name + "'");
             } catch (Exception e) {
+                Logger.logCriticalError("FAILED to compile pattern '" + name + "' with regex: " + fullPattern + " - Error: " + e.getMessage());
                 throw new IllegalArgumentException("Invalid regex in pattern '" + name + "': " + e.getMessage(), e);
             }
         }

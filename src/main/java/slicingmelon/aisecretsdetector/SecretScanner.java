@@ -171,25 +171,33 @@ public class SecretScanner {
             patterns = new ArrayList<>();
             
             if (configInstance != null) {
+                Logger.logCritical("SecretScanner: Loading patterns from config...");
                 // Convert Config.PatternConfig to SecretPattern
                 for (Config.PatternConfig patternConfig : configInstance.getPatterns()) {
                     try {
-                        SecretPattern secretPattern = new SecretPattern(
-                            patternConfig.getName(), 
-                            patternConfig.getCompiledPattern()
-                        );
-                        patterns.add(secretPattern);
+                        Pattern compiledPattern = patternConfig.getCompiledPattern();
+                        if (compiledPattern != null) {
+                            SecretPattern secretPattern = new SecretPattern(
+                                patternConfig.getName(), 
+                                compiledPattern
+                            );
+                            patterns.add(secretPattern);
+                            Logger.logCritical("SecretScanner: Successfully loaded pattern '" + patternConfig.getName() + "'");
+                        } else {
+                            Logger.logCriticalError("SecretScanner: Pattern '" + patternConfig.getName() + "' has null compiled pattern");
+                        }
                     } catch (Exception e) {
-                        AISecretsDetector.getInstance().logMsgError("Failed to load pattern '" + patternConfig.getName() + "': " + e.getMessage());
+                        Logger.logCriticalError("SecretScanner: Failed to load pattern '" + patternConfig.getName() + "': " + e.getMessage());
+                        e.printStackTrace();
                     }
                 }
                 
-                AISecretsDetector.getInstance().logMsg("SecretScanner initialized with " + patterns.size() + " patterns from config");
+                Logger.logCritical("SecretScanner: Initialized with " + patterns.size() + " patterns from config");
             } else {
-                AISecretsDetector.getInstance().logMsgError("Config instance is null during SecretScanner initialization");
+                Logger.logCriticalError("SecretScanner: Config instance is null during initialization");
             }
         } catch (Exception e) {
-            AISecretsDetector.getInstance().logMsgError("Error initializing SecretScanner: " + e.getMessage());
+            Logger.logCriticalError("SecretScanner: Error initializing: " + e.getMessage());
             e.printStackTrace();
             patterns = new ArrayList<>(); // fallback to empty list
             configInstance = Config.getInstance();
@@ -205,12 +213,15 @@ public class SecretScanner {
         
         int maxHighlights = config.getSettings().getMaxHighlightsPerSecret();
         
+        Logger.logCritical("SecretScanner.scanResponse: Starting scan with " + secretPatterns.size() + " patterns");
+        
         try {
             // Use String for reliable regex matching
             String responseString = response.toString();
             // Use ByteArray for fast, byte-accurate searching of found secrets
             ByteArray responseBytes = response.toByteArray();
-            // Log through the detector instance
+            
+            Logger.logCritical("SecretScanner.scanResponse: Response length: " + responseString.length() + " characters");
             
             // Declare variables outside loops for efficiency
             String secretValue;
@@ -218,28 +229,32 @@ public class SecretScanner {
             
             for (SecretPattern pattern : secretPatterns) {
                 try {
-                    // Testing pattern: pattern.getName()
+                    Logger.logCritical("SecretScanner.scanResponse: Testing pattern: " + pattern.getName());
                     
                     if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2")) && !SecretScannerUtils.isRandomnessAlgorithmEnabled()) {
-                        // Skipping pattern - randomness algorithm disabled
+                        Logger.logCritical("SecretScanner.scanResponse: Skipping pattern " + pattern.getName() + " - randomness algorithm disabled");
                         continue;
                     }
 
                     Matcher matcher = pattern.getPattern().matcher(responseString);
+                    int matchCount = 0;
                     
                     while (matcher.find()) {
+                        matchCount++;
+                        Logger.logCritical("SecretScanner.scanResponse: Found match #" + matchCount + " for pattern " + pattern.getName());
+                        
                         // STEP 1: IDENTIFY secret value using Java's regex engine (Burp's API indexOf pattern not working properly)
                         if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2")) && matcher.groupCount() >= 1) {
                             secretValue = matcher.group(1);
-                            // Extracted potential secret for pattern
+                            Logger.logCritical("SecretScanner.scanResponse: Extracted potential secret for pattern " + pattern.getName() + ": " + secretValue);
                             
                             if (!RandomnessAlgorithm.isRandom(ByteArray.byteArray(secretValue))) {
-                                // Skipping non-random string
+                                Logger.logCritical("SecretScanner.scanResponse: Skipping non-random string: " + secretValue);
                                 continue;
                             }
                             
                             if (isRecaptchaSecret(secretValue)) {
-                                // Skipping reCAPTCHA secret
+                                Logger.logCritical("SecretScanner.scanResponse: Skipping reCAPTCHA secret: " + secretValue);
                                 continue;
                             }
                         } else {
@@ -249,17 +264,18 @@ public class SecretScanner {
                             } else {
                                 secretValue = matcher.group(0); // Whole match
                             }
-                            // Extracted secret value for pattern
+                            Logger.logCritical("SecretScanner.scanResponse: Extracted secret value for pattern " + pattern.getName() + ": " + secretValue);
                         }
 
                         // STEP 2: CHECK FOR UNIQUENESS for this pattern
                         // If we have already found and highlighted this exact secret value for this pattern, skip to the next match.
                         Set<String> foundValuesForPattern = uniqueSecretsPerPattern.computeIfAbsent(pattern.getName(), _ -> new HashSet<>());
                         if (!foundValuesForPattern.add(secretValue)) {
+                            Logger.logCritical("SecretScanner.scanResponse: Skipping duplicate secret for pattern " + pattern.getName());
                             continue;
                         }
                         
-                        // Found new unique secret for pattern
+                        Logger.logCritical("SecretScanner.scanResponse: Found new unique secret for pattern " + pattern.getName());
 
                         // STEP 3: LOCATE all occurrences using ByteArray.indexOf, as it's supposedly faster.
                         int searchStart = 0;
@@ -280,20 +296,26 @@ public class SecretScanner {
                             foundSecrets.add(secret);
                             highlightsCreated++;
 
+                            Logger.logCritical("SecretScanner.scanResponse: Created highlight #" + highlightsCreated + " for secret at position " + fullStartPos + "-" + fullEndPos);
+
                             // Move search start past this occurrence
                             searchStart = fullEndPos;
                         }
                     }
+                    
+                    if (matchCount == 0) {
+                        Logger.logCritical("SecretScanner.scanResponse: No matches found for pattern: " + pattern.getName());
+                    }
                 } catch (Exception e) {
-                    // Error with pattern
+                    Logger.logCriticalError("SecretScanner.scanResponse: Error with pattern " + pattern.getName() + ": " + e.getMessage());
                     e.printStackTrace();
                 }
             }
             
-            // Scan completed with foundSecrets.size() total secrets
+            Logger.logCritical("SecretScanner.scanResponse: Scan completed with " + foundSecrets.size() + " total secrets");
             
         } catch (Exception e) {
-            // Error scanning response
+            Logger.logCriticalError("SecretScanner.scanResponse: Error scanning response: " + e.getMessage());
             e.printStackTrace();
         }
         

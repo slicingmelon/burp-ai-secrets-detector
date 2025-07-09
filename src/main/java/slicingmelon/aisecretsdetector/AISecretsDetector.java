@@ -130,24 +130,32 @@ public class AISecretsDetector implements BurpExtension {
             
             @Override
             public ResponseReceivedAction handleHttpResponseReceived(HttpResponseReceived responseReceived) {
+                Logger.logCritical("AISecretsDetector: HTTP response received from " + responseReceived.initiatingRequest().url());
+                
                 // Check if response is from an enabled tool
                 if (!isToolEnabled(responseReceived)) {
+                    Logger.logCritical("AISecretsDetector: Response filtered out - not from enabled tool");
                     return ResponseReceivedAction.continueWith(responseReceived);
                 }
 
                 // Skip binary file extensions that are unlikely to contain secrets
                 if (shouldSkipFileExtension(responseReceived.initiatingRequest().fileExtension())) {
+                    Logger.logCritical("AISecretsDetector: Response filtered out - file extension: " + responseReceived.initiatingRequest().fileExtension());
                     return ResponseReceivedAction.continueWith(responseReceived);
                 }
 
                 if (shouldSkipMimeType(responseReceived.mimeType())) {
+                    Logger.logCritical("AISecretsDetector: Response filtered out - MIME type: " + responseReceived.mimeType());
                     return ResponseReceivedAction.continueWith(responseReceived);
                 }
                 
                 // Check if in scope only
                 if (config.getSettings().isInScopeOnly() && !responseReceived.initiatingRequest().isInScope()) {
+                    Logger.logCritical("AISecretsDetector: Response filtered out - not in scope");
                     return ResponseReceivedAction.continueWith(responseReceived);
                 }
+                
+                Logger.logCritical("AISecretsDetector: Response passed all filters, submitting to worker thread");
                 
                 // Submit to our worker thread pool for processing
                 executorService.submit(() -> processHttpResponse(responseReceived));
@@ -196,18 +204,23 @@ public class AISecretsDetector implements BurpExtension {
     * Process HTTP responses
     */
     private void processHttpResponse(HttpResponseReceived responseReceived) {
+        Logger.logCritical("AISecretsDetector.processHttpResponse: Processing response from " + responseReceived.initiatingRequest().url());
+        
         try {
             // Save response to temp file first (minimize memory usage)
             HttpResponse tempResponse = responseReceived.copyToTempFile();
             
+            Logger.logCritical("AISecretsDetector.processHttpResponse: Calling secretScanner.scanResponse");
             SecretScanner.SecretScanResult result = secretScanner.scanResponse(tempResponse);
+            
+            Logger.logCritical("AISecretsDetector.processHttpResponse: Scanner returned " + result.getSecretCount() + " secrets");
             
             // Process found secrets
             if (result.hasSecrets()) {
                 String url = responseReceived.initiatingRequest().url().toString();
                 String baseUrl = extractBaseUrl(url);
-                logMsg("HTTP Handler: Secrets found in response from: " + url);
-                logMsg("HTTP Handler: Base URL: " + baseUrl);
+                Logger.logCritical("AISecretsDetector.processHttpResponse: Secrets found in response from: " + url);
+                Logger.logCritical("AISecretsDetector.processHttpResponse: Base URL: " + baseUrl);
                 
                 // Create the HttpRequestResponse object first (like official example)
                 HttpRequestResponse requestResponse = HttpRequestResponse.httpRequestResponse(
@@ -230,13 +243,13 @@ public class AISecretsDetector implements BurpExtension {
                         // *** STEP 2: CREATE INDIVIDUAL MARKER ***
                         // Use pre-calculated start and end positions from scanner to create each RED marker
                         responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
-                        logMsg("HTTP Handler: Found exact position for " + secretType + " at " + secret.getStartIndex() + "-" + secret.getEndIndex());
+                        Logger.logCritical("AISecretsDetector.processHttpResponse: Found exact position for " + secretType + " at " + secret.getStartIndex() + "-" + secret.getEndIndex());
                         
                         newSecrets.add(secretValue);
                         
                         secretTypeMap.computeIfAbsent(secretType, _ -> new HashSet<>()).add(secretValue);
                         
-                        logMsg("HTTP Handler: Found " + secretType + ": " + secretValue);
+                        Logger.logCritical("AISecretsDetector.processHttpResponse: Found " + secretType + ": " + secretValue);
                     }
                 }
                 
@@ -252,12 +265,11 @@ public class AISecretsDetector implements BurpExtension {
                     int finalCount = Math.max(existingCount, persistedCount);
                     secretCounts.put(secret, finalCount);
                     
-                    logMsg(String.format("Secret count for %s - Existing: %d, Persisted: %d, Final: %d", 
-                            secret, existingCount, persistedCount, finalCount));
+                    Logger.logCritical("AISecretsDetector.processHttpResponse: Secret count for " + secret + " - Existing: " + existingCount + ", Persisted: " + persistedCount + ", Final: " + finalCount);
                 }
                 
                 int duplicateThreshold = config.getSettings().getDuplicateThreshold();
-                logMsg("Current duplicate threshold: " + duplicateThreshold);
+                Logger.logCritical("AISecretsDetector.processHttpResponse: Current duplicate threshold: " + duplicateThreshold);
                 
                 // Filter out secrets that appear too frequently
                 Set<String> secretsToReport = new HashSet<>();
@@ -275,14 +287,12 @@ public class AISecretsDetector implements BurpExtension {
                             }
                         }
                         
-                        logMsg("HTTP Handler: Will report secret: " + secret + 
-                                " (seen " + count + " times, threshold: " + duplicateThreshold + ")");
+                        Logger.logCritical("AISecretsDetector.processHttpResponse: Will report secret: " + secret + " (seen " + count + " times, threshold: " + duplicateThreshold + ")");
                         
                         // Increment the counter for this secret
                         incrementSecretCounter(baseUrl, secret);
                     } else {
-                        logMsg("HTTP Handler: Skipping secret due to threshold: " + secret + 
-                                " (seen " + count + " times, threshold: " + duplicateThreshold + ")");
+                        Logger.logCritical("AISecretsDetector.processHttpResponse: Skipping secret due to threshold: " + secret + " (seen " + count + " times, threshold: " + duplicateThreshold + ")");
                     }
                 }
                 
@@ -314,16 +324,18 @@ public class AISecretsDetector implements BurpExtension {
                     );
                     
                     // Add the issue to Burp's issues list and log the action
-                    logMsg("HTTP Handler: Adding NEW audit issue for URL: " + requestResponse.request().url());
-                    logMsg("HTTP Handler: Reporting " + secretsToReport.size() + " new secrets (base URL: " + baseUrl + ")");
+                    Logger.logCritical("AISecretsDetector.processHttpResponse: Adding NEW audit issue for URL: " + requestResponse.request().url());
+                    Logger.logCritical("AISecretsDetector.processHttpResponse: Reporting " + secretsToReport.size() + " new secrets (base URL: " + baseUrl + ")");
                     api.siteMap().add(auditIssue);
                 } else {
-                    logMsg("HTTP Handler: No new secrets to report for base URL: " + baseUrl + " (all exceeded threshold)");
+                    Logger.logCritical("AISecretsDetector.processHttpResponse: No new secrets to report for base URL: " + baseUrl + " (all exceeded threshold)");
                 }
+            } else {
+                Logger.logCritical("AISecretsDetector.processHttpResponse: No secrets found in response");
             }
             
         } catch (Exception e) {
-            Logger.logErrorMsg("Error processing HTTP response: " + e.getMessage());
+            Logger.logCriticalError("AISecretsDetector.processHttpResponse: Error processing HTTP response: " + e.getMessage());
             e.printStackTrace();
         }
     }
