@@ -11,8 +11,7 @@ repositories {
 
 dependencies {
     implementation 'net.portswigger.burp.extensions:montoya-api:2025.6'
-    implementation 'com.electronwill.night-config:toml:3.8.2'
-    implementation 'com.electronwill.night-config:core:3.8.2'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.19.1'
 }
 
 // Generate version.properties file during build
