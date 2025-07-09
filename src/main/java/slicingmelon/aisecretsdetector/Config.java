@@ -12,10 +12,8 @@ import burp.api.montoya.core.ToolType;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.toml.TomlFactory;
 import com.fasterxml.jackson.dataformat.toml.TomlMapper;
-import com.fasterxml.jackson.dataformat.toml.TomlWriteFeature;
 
 import java.io.File;
 import java.io.IOException;
@@ -290,8 +288,6 @@ public class Config {
 
     private TomlMapper createTomlMapper() {
         return TomlMapper.builder()
-                .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
-                .configure(SerializationFeature.INDENT_OUTPUT, true)
                 .build();
     }
 
@@ -453,18 +449,59 @@ public class Config {
                 copyDefaultConfigToUserDirectory(configPath);
             }
 
-            // Now update the existing file with current settings using Jackson TOML
+            // Preserve any user header comments
+            List<String> headerComments = extractHeaderComments(configPath);
+
+            // Create the TOML structure
             TomlRoot tomlRoot = new TomlRoot();
             tomlRoot.version = this.configVersion;
             tomlRoot.settings = this.settings;
             tomlRoot.patterns = this.patterns;
 
-            tomlMapper.writeValue(configPath.toFile(), tomlRoot);
+            // Write with Jackson TOML (clean, proper format)
+            String newTomlContent = tomlMapper.writeValueAsString(tomlRoot);
+
+            // Combine header comments with new content
+            String finalContent = headerComments.isEmpty() ? 
+                newTomlContent : 
+                String.join("\n", headerComments) + "\n\n" + newTomlContent;
+
+            Files.write(configPath, finalContent.getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             Logger.logCriticalError("Error saving config to file: " + e.getMessage());
         }
     }
 
+    /**
+     * Extracts header comments (comments before the first config line) to preserve user notes
+     */
+    private List<String> extractHeaderComments(Path configPath) {
+        try {
+            if (!Files.exists(configPath)) {
+                return new ArrayList<>();
+            }
+
+            List<String> lines = Files.readAllLines(configPath, StandardCharsets.UTF_8);
+            List<String> headerComments = new ArrayList<>();
+            
+            for (String line : lines) {
+                String trimmed = line.trim();
+                // Collect comments and empty lines until we hit actual config
+                if (trimmed.startsWith("#") || trimmed.isEmpty()) {
+                    headerComments.add(line);
+                } else {
+                    // Stop at first non-comment line
+                    break;
+                }
+            }
+            
+            return headerComments;
+        } catch (IOException e) {
+            Logger.logCritical("Could not read existing config for comment preservation: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+    
     private void copyDefaultConfigToUserDirectory(Path configPath) throws IOException {
         try (InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH)) {
             if (defaultConfigStream != null) {
