@@ -9,7 +9,7 @@ package slicingmelon.aisecretsdetector;
 
 import java.util.List;
 import java.util.ArrayList;
-import java.util.regex.Pattern;
+//import java.util.regex.Pattern;
 
 /**
  * Utility class for SecretScanner - now uses Config class for patterns
