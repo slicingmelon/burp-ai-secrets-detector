@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -45,6 +46,7 @@ public class Config {
     private Runnable onConfigChangedCallback;
     private Settings settings;
     private List<PatternConfig> patterns;
+    private String rawTomlContent; // Store raw TOML content to avoid double-escaping
 
     private final TomlMapper tomlMapper;
 
@@ -366,7 +368,11 @@ public class Config {
         Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
         if (Files.exists(configPath)) {
             try {
-                TomlRoot tomlRoot = tomlMapper.readValue(configPath.toFile(), TomlRoot.class);
+                // Read raw TOML content from file
+                this.rawTomlContent = Files.readString(configPath, StandardCharsets.UTF_8);
+                
+                // Parse the raw TOML content
+                TomlRoot tomlRoot = tomlMapper.readValue(this.rawTomlContent, TomlRoot.class);
                 parseTomlRoot(tomlRoot);
                 saveToBurpPersistence(); // Save to Burp persistence for future use
                 return;
@@ -391,6 +397,10 @@ public class Config {
             String versionData = api.persistence().extensionData().getString(PERSISTENCE_VERSION_KEY);
             
             if (configData != null && !configData.isEmpty()) {
+                // Store raw TOML content directly to avoid double-escaping
+                this.rawTomlContent = configData;
+                
+                // Parse the raw TOML content
                 TomlRoot tomlRoot = tomlMapper.readValue(configData, TomlRoot.class);
                 parseTomlRoot(tomlRoot);
                 
@@ -413,14 +423,29 @@ public class Config {
         }
 
         try {
-            TomlRoot tomlRoot = new TomlRoot();
-            tomlRoot.version = this.configVersion;
-            tomlRoot.settings = this.settings;
-            tomlRoot.patterns = this.patterns;
+            // Use raw TOML content to avoid double-escaping during serialization
+            if (rawTomlContent != null && !rawTomlContent.isEmpty()) {
+                // Update the raw TOML content with current settings if needed
+                String updatedTomlContent = updateRawTomlContent(rawTomlContent);
+                api.persistence().extensionData().setString(PERSISTENCE_CONFIG_KEY, updatedTomlContent);
+                api.persistence().extensionData().setString(PERSISTENCE_VERSION_KEY, this.configVersion);
+                
+                // Update our stored raw content
+                this.rawTomlContent = updatedTomlContent;
+            } else {
+                // Fallback to serialization (shouldn't happen after fix, but kept for safety)
+                TomlRoot tomlRoot = new TomlRoot();
+                tomlRoot.version = this.configVersion;
+                tomlRoot.settings = this.settings;
+                tomlRoot.patterns = this.patterns;
 
-            String configData = tomlMapper.writeValueAsString(tomlRoot);
-            api.persistence().extensionData().setString(PERSISTENCE_CONFIG_KEY, configData);
-            api.persistence().extensionData().setString(PERSISTENCE_VERSION_KEY, this.configVersion);
+                String configData = tomlMapper.writeValueAsString(tomlRoot);
+                api.persistence().extensionData().setString(PERSISTENCE_CONFIG_KEY, configData);
+                api.persistence().extensionData().setString(PERSISTENCE_VERSION_KEY, this.configVersion);
+                
+                // Store the serialized content as raw content for future use
+                this.rawTomlContent = configData;
+            }
         } catch (Exception e) {
             Logger.logCriticalError("Error saving config to Burp persistence: " + e.getMessage());
         }
@@ -429,7 +454,12 @@ public class Config {
     private void loadDefaultConfig() {
         try (InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH)) {
             if (defaultConfigStream != null) {
-                TomlRoot tomlRoot = tomlMapper.readValue(defaultConfigStream, TomlRoot.class);
+                // Read raw TOML content first
+                byte[] rawBytes = defaultConfigStream.readAllBytes();
+                this.rawTomlContent = new String(rawBytes, StandardCharsets.UTF_8);
+                
+                // Parse the raw TOML content  
+                TomlRoot tomlRoot = tomlMapper.readValue(this.rawTomlContent, TomlRoot.class);
                 parseTomlRoot(tomlRoot);
             } else {
                 Logger.logCriticalError("Default config file not found.");
@@ -602,6 +632,24 @@ public class Config {
                 .map(t -> "\"" + t.name() + "\"")
                 .collect(Collectors.joining(", ")) + "]";
     }
+
+    private String formatStringArrayForToml(Set<String> strings) {
+        if (strings == null || strings.isEmpty()) {
+            return "[]";
+        }
+        return "[" + strings.stream()
+                .map(s -> "\"" + s + "\"")
+                .collect(Collectors.joining(", ")) + "]";
+    }
+
+    private String formatToolArrayForToml(Set<ToolType> tools) {
+        if (tools == null || tools.isEmpty()) {
+            return "[]";
+        }
+        return "[" + tools.stream()
+                .map(t -> "\"" + t.name() + "\"")
+                .collect(Collectors.joining(", ")) + "]";
+    }
     
     private void copyDefaultConfigToUserDirectory(Path configPath) throws IOException {
         try (InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH)) {
@@ -615,7 +663,7 @@ public class Config {
     }
     
     public void resetToDefaults() {
-        loadDefaultConfig();
+        loadDefaultConfig(); // This now preserves rawTomlContent
         saveConfig(); // This will save to both Burp persistence and config.toml
         
         // Notify UI to refresh if available
@@ -637,9 +685,15 @@ public class Config {
         try {
             // Load the current default config
             TomlRoot defaultTomlRoot = null;
+            String defaultRawToml = null;
             try (InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH)) {
                 if (defaultConfigStream != null) {
-                    defaultTomlRoot = tomlMapper.readValue(defaultConfigStream, TomlRoot.class);
+                    // Read raw TOML content
+                    byte[] rawBytes = defaultConfigStream.readAllBytes();
+                    defaultRawToml = new String(rawBytes, StandardCharsets.UTF_8);
+                    
+                    // Parse the raw TOML content
+                    defaultTomlRoot = tomlMapper.readValue(defaultRawToml, TomlRoot.class);
                 }
             }
 
@@ -681,6 +735,11 @@ public class Config {
 
             // Update version to current
             this.configVersion = getCurrentExtensionVersion();
+
+            // Use the default raw TOML content as our base
+            if (defaultRawToml != null) {
+                this.rawTomlContent = defaultRawToml;
+            }
 
             // Save the merged config
             saveConfig();
@@ -805,7 +864,11 @@ public class Config {
     public void importConfigFromFile(String filePath) throws IOException {
         Path sourcePath = Paths.get(filePath);
         if (Files.exists(sourcePath)) {
-            TomlRoot tomlRoot = tomlMapper.readValue(sourcePath.toFile(), TomlRoot.class);
+            // Read raw TOML content from file
+            this.rawTomlContent = Files.readString(sourcePath, StandardCharsets.UTF_8);
+            
+            // Parse the raw TOML content
+            TomlRoot tomlRoot = tomlMapper.readValue(this.rawTomlContent, TomlRoot.class);
             
             parseTomlRoot(tomlRoot);
             
@@ -846,11 +909,87 @@ public class Config {
         try {
             Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
             if (Files.exists(configPath)) {
-                return tomlMapper.readValue(configPath.toFile(), TomlRoot.class);
+                // Read raw TOML content from file
+                this.rawTomlContent = Files.readString(configPath, StandardCharsets.UTF_8);
+                
+                // Parse and return the TOML root
+                return tomlMapper.readValue(this.rawTomlContent, TomlRoot.class);
             }
         } catch (IOException e) {
             Logger.logCriticalError("Error loading config from file: " + e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * Updates the raw TOML content with current settings values to avoid double-escaping
+     * This method directly modifies the TOML string instead of serializing Java objects
+     */
+    private String updateRawTomlContent(String rawToml) {
+        if (rawToml == null || rawToml.isEmpty()) {
+            return rawToml;
+        }
+        
+        try {
+            List<String> lines = Arrays.asList(rawToml.split("\\r?\\n"));
+            List<String> updatedLines = new ArrayList<>();
+            
+            boolean inSettingsSection = false;
+            
+            for (String line : lines) {
+                String trimmed = line.trim();
+                
+                // Detect sections
+                if (trimmed.equals("[settings]")) {
+                    inSettingsSection = true;
+                    updatedLines.add(line);
+                    continue;
+                } else if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                    inSettingsSection = false;
+                    updatedLines.add(line);
+                    continue;
+                }
+                
+                // Update version
+                if (trimmed.startsWith("version = ")) {
+                    updatedLines.add("version = \"" + this.configVersion + "\"");
+                    continue;
+                }
+                
+                // Update settings values
+                if (inSettingsSection && settings != null) {
+                    if (trimmed.startsWith("workers = ")) {
+                        updatedLines.add("workers = " + settings.getWorkers());
+                    } else if (trimmed.startsWith("in_scope_only = ")) {
+                        updatedLines.add("in_scope_only = " + settings.isInScopeOnly());
+                    } else if (trimmed.startsWith("logging_enabled = ")) {
+                        updatedLines.add("logging_enabled = " + settings.isLoggingEnabled());
+                    } else if (trimmed.startsWith("randomness_algorithm_enabled = ")) {
+                        updatedLines.add("randomness_algorithm_enabled = " + settings.isRandomnessAlgorithmEnabled());
+                    } else if (trimmed.startsWith("generic_secret_min_length = ")) {
+                        updatedLines.add("generic_secret_min_length = " + settings.getGenericSecretMinLength());
+                    } else if (trimmed.startsWith("generic_secret_max_length = ")) {
+                        updatedLines.add("generic_secret_max_length = " + settings.getGenericSecretMaxLength());
+                    } else if (trimmed.startsWith("duplicate_threshold = ")) {
+                        updatedLines.add("duplicate_threshold = " + settings.getDuplicateThreshold());
+                    } else if (trimmed.startsWith("max_highlights_per_secret = ")) {
+                        updatedLines.add("max_highlights_per_secret = " + settings.getMaxHighlightsPerSecret());
+                    } else if (trimmed.startsWith("excluded_file_extensions = ")) {
+                        updatedLines.add("excluded_file_extensions = " + formatStringArrayForToml(settings.getExcludedFileExtensions()));
+                    } else if (trimmed.startsWith("enabled_tools = ")) {
+                        updatedLines.add("enabled_tools = " + formatToolArrayForToml(settings.getEnabledTools()));
+                    } else {
+                        updatedLines.add(line);
+                    }
+                } else {
+                    updatedLines.add(line);
+                }
+            }
+            
+            return String.join("\n", updatedLines);
+        } catch (Exception e) {
+            Logger.logCriticalError("Error updating raw TOML content: " + e.getMessage());
+            return rawToml; // Return original content if update fails
+        }
     }
 } 

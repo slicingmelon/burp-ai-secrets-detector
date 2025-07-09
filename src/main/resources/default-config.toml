@@ -343,7 +343,7 @@ suffix = ''''''
 [[patterns]]
 name = "TEST PATTERN - HTTP"
 prefix = ''''''
-pattern = '''(http[s]?://[a-zA-Z0-9.-]+)'''
+pattern = '''\\b(http[s]?://[a-zA-Z0-9.-]+)'''
 suffix = ''''''
 
 [[patterns]]
