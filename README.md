@@ -101,5 +101,3 @@ See the full [CHANGELOG](./CHANGELOG.md).
 ## Credits
 
 Credits to [RipSecrets](https://github.com/sirwart/ripsecrets) for the randomness detection algorithm, a tool designed to find secrets accidentally committed to repositories.
-
-This project is licensed under the [MIT License](./LICENSE).
