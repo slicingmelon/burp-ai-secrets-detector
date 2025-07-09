@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.nio.charset.StandardCharsets;
 
 public class Config {
     private static final String DEFAULT_CONFIG_PATH = "/default-config.toml";
@@ -536,68 +537,62 @@ public class Config {
             parsePatterns(fileConfig);
         }
     }
-    
-    public void saveConfig() {
+
+    private void saveConfig() {
         if (fileConfig == null) {
             Logger.logCritical("Cannot save config, fileConfig is null.");
             return;
         }
     
         try {
-            // Create a new empty config to build the output, ensuring a clean structure.
-            CommentedConfig newConfig = TomlFormat.instance().createConfig();
+            StringBuilder sb = new StringBuilder();
     
-            // Set version
-            newConfig.set("version", this.configVersion);
-            newConfig.setComment("version", " AI Secrets Detector Configuration\n Version of this config file - should match extension version");
+            // Header and version
+            sb.append("# AI Secrets Detector Configuration\n");
+            sb.append("# Version of this config file - should match extension version\n");
+            sb.append("version = '").append(this.configVersion).append("'\n\n");
     
-            // Set settings, reading values from the current Config instance
-            CommentedConfig settings = newConfig.createSubConfig();
-            settings.set("workers", this.settings.getWorkers());
-            settings.set("in_scope_only", this.settings.isInScopeOnly());
-            settings.set("logging_enabled", this.settings.isLoggingEnabled());
-            settings.set("randomness_algorithm_enabled", this.settings.isRandomnessAlgorithmEnabled());
-            settings.set("generic_secret_min_length", this.settings.getGenericSecretMinLength());
-            settings.set("generic_secret_max_length", this.settings.getGenericSecretMaxLength());
-            settings.set("duplicate_threshold", this.settings.getDuplicateThreshold());
-            settings.set("max_highlights_per_secret", this.settings.getMaxHighlightsPerSecret());
-            settings.set("excluded_file_extensions", new ArrayList<>(this.settings.getExcludedFileExtensions()));
+            // Settings
+            sb.append("[settings]\n");
+            sb.append("  workers = ").append(this.settings.getWorkers()).append("\n");
+            sb.append("  in_scope_only = ").append(this.settings.isInScopeOnly()).append("\n");
+            sb.append("  logging_enabled = ").append(this.settings.isLoggingEnabled()).append("\n");
+            sb.append("  randomness_algorithm_enabled = ").append(this.settings.isRandomnessAlgorithmEnabled()).append("\n");
+            sb.append("  generic_secret_min_length = ").append(this.settings.getGenericSecretMinLength()).append("\n");
+            sb.append("  generic_secret_max_length = ").append(this.settings.getGenericSecretMaxLength()).append("\n");
+            sb.append("  duplicate_threshold = ").append(this.settings.getDuplicateThreshold()).append("\n");
+            sb.append("  max_highlights_per_secret = ").append(this.settings.getMaxHighlightsPerSecret()).append("\n");
+    
+            // Format arrays
+            String excludedExtensions = this.settings.getExcludedFileExtensions().stream()
+                .map(s -> "'" + s + "'")
+                .sorted()
+                .collect(Collectors.joining(", "));
+            sb.append("  excluded_file_extensions = [").append(excludedExtensions).append("]\n");
             
-            List<String> enabledToolsStr = this.settings.getEnabledTools().stream()
-                .map(ToolType::name).sorted().collect(Collectors.toList());
-            settings.set("enabled_tools", enabledToolsStr);
-            newConfig.set("settings", settings);
+            String enabledToolsStr = this.settings.getEnabledTools().stream()
+                .map(ToolType::name)
+                .sorted()
+                .map(s -> "'" + s + "'")
+                .collect(Collectors.joining(", "));
+            sb.append("  enabled_tools = [").append(enabledToolsStr).append("]\n");
     
-            // Set patterns
-            List<CommentedConfig> patternsList = new ArrayList<>();
-            if (patterns != null) {
-                for (PatternConfig pattern : patterns) {
-                    CommentedConfig patternMap = TomlFormat.newConcurrentConfig();
-                    patternMap.set("name", pattern.getName());
-                    patternMap.set("prefix", pattern.getPrefix());
-                    patternMap.set("pattern", pattern.getPattern());
-                    patternMap.set("suffix", pattern.getSuffix());
-                    patternsList.add(patternMap);
-                }
+            // Patterns
+            for (PatternConfig pattern : patterns) {
+                sb.append("\n[[patterns]]\n");
+                sb.append("  name = '''").append(pattern.getName()).append("'''\n");
+                sb.append("  pattern = '''").append(pattern.getPattern()).append("'''\n");
+                sb.append("  prefix = '''").append(pattern.getPrefix()).append("'''\n");
+                sb.append("  suffix = '''").append(pattern.getSuffix()).append("'''\n");
             }
-            newConfig.set("patterns", patternsList);
     
-            // Replace the content of the existing fileConfig with the new, clean config.
-            fileConfig.clear();
-            fileConfig.putAll(newConfig);
-    
-            // Save the file using our custom writer to preserve formatting
-            createConfiguredTomlWriter().write(fileConfig, fileConfig.getFile(), WritingMode.REPLACE);
+            // Write the manually constructed string to the file, overwriting it.
+            Files.write(fileConfig.getNioPath(), sb.toString().getBytes(StandardCharsets.UTF_8));
             
             Logger.logMsg("Configuration saved to " + fileConfig.getNioPath());
             
-            // Notify of config change
-            if (onConfigChangedCallback != null) {
-                onConfigChangedCallback.run();
-            }
-            
         } catch (Exception e) {
-            Logger.logCriticalError("Failed to save configuration: " + e.getMessage());
+            Logger.logCritical("Failed to save configuration: " + e.getMessage());
         }
     }
     
@@ -846,25 +841,5 @@ public class Config {
      */
     public boolean hasExportedConfigFile() {
         return Files.exists(Paths.get(getDefaultConfigFilePath()));
-    }
-    
-    /**
-     * Creates a TomlWriter configured to produce the cleanest possible output.
-     * It uses single-quoted literal strings ('...') to ensure regex patterns are
-     * preserved as raw literals without unwanted escaping or newlines.
-     */
-    private TomlWriter createConfiguredTomlWriter() {
-        TomlWriter writer = new TomlWriter();
-        writer.setIndent("  "); // Use 2-space indent for readability
-
-        // Use literal strings for any string that can be represented as such (no single quotes).
-        // This is crucial for preserving backslashes in regexes.
-        writer.setWriteStringLiteralPredicate(str -> !str.contains("'"));
-
-        // Only use multiline strings for values that genuinely contain a newline.
-        // This prevents the writer from adding unwanted newlines to simple values.
-        writer.setWriteStringMultilinePredicate(str -> str.contains("\n"));
-        
-        return writer;
     }
 } 
