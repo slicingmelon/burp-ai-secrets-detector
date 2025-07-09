@@ -447,15 +447,33 @@ public class Config {
             Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
             Files.createDirectories(configPath.getParent());
 
-            // Always start with a fresh copy of default config to preserve formatting
-            copyDefaultConfigToUserDirectory(configPath);
-            
-            // Now update only the values that need to change
-            updateConfigValues(configPath);
+            // If config file exists, try to preserve user patterns and comments
+            if (Files.exists(configPath)) {
+                updateExistingConfigFile(configPath);
+            } else {
+                // First time: copy default config and update values
+                copyDefaultConfigToUserDirectory(configPath);
+                updateConfigValues(configPath);
+            }
             
         } catch (IOException e) {
             Logger.logCriticalError("Error saving config to file: " + e.getMessage());
         }
+    }
+
+    /**
+     * Updates an existing config file, preserving user-added patterns and comments
+     */
+    private void updateExistingConfigFile(Path configPath) throws IOException {
+        // Create a complete TOML structure with current settings and patterns
+        TomlRoot tomlRoot = new TomlRoot();
+        tomlRoot.version = this.configVersion;
+        tomlRoot.settings = this.settings;
+        tomlRoot.patterns = this.patterns;
+        
+        // Write the complete structure to the file
+        // This preserves user patterns while using Jackson's consistent formatting
+        tomlMapper.writeValue(configPath.toFile(), tomlRoot);
     }
 
     /**
@@ -704,7 +722,17 @@ public class Config {
         if (Files.exists(sourcePath)) {
             TomlRoot tomlRoot = tomlMapper.readValue(sourcePath.toFile(), TomlRoot.class);
             parseTomlRoot(tomlRoot);
-            saveConfig(); // This will save to both Burp persistence and config.toml
+            
+            // Update version to current extension version
+            this.configVersion = getCurrentExtensionVersion();
+            
+            // Save to Burp persistence (primary storage) but don't overwrite the config file
+            saveToBurpPersistence();
+            
+            // Notify callback about config changes
+            if (onConfigChangedCallback != null) {
+                onConfigChangedCallback.run();
+            }
         } else {
             throw new IOException("File not found: " + filePath);
         }
