@@ -28,6 +28,8 @@ import java.util.Map;
 import java.util.ArrayList;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 public class Config {
     private static final String DEFAULT_CONFIG_PATH = "/default-config.toml";
@@ -374,10 +376,9 @@ public class Config {
     }
     
     private void loadDefaultConfig() {
-        try {
-            InputStream configStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH);
-            if (configStream != null) {
-                CommentedConfig inMemoryConfig = TomlFormat.instance().createParser().parse(configStream);
+        try (InputStream defaultConfigStream = getClass().getClassLoader().getResourceAsStream("default-config.toml")) {
+            if (defaultConfigStream != null) {
+                CommentedConfig inMemoryConfig = TomlFormat.instance().createParser().parse(defaultConfigStream);
                 
                 // Temporarily use this in-memory config
                 this.fileConfig = null; // No file, so set to null
@@ -539,39 +540,37 @@ public class Config {
     }
     
     public void saveConfig() {
+        if (fileConfig == null) {
+            Logger.logCritical("Cannot save config, fileConfig is null.");
+            return;
+        }
+    
         try {
-            // Cannot save if there's no file config object
-            if (fileConfig == null) {
-                Logger.logErrorMsg("Cannot save config: fileConfig is not initialized. Changes will not be persisted.");
-                return;
-            }
+            // Create a new empty config to build the output, ensuring a clean structure.
+            CommentedConfig newConfig = fileConfig.configFormat().createConfig();
+    
+            // Set version
+            newConfig.set("version", this.configVersion);
+            newConfig.setComment("version", " AI Secrets Detector Configuration\n Version of this config file - should match extension version");
+    
+            // Set settings, reading values from the current settings object
+            CommentedConfig settingsConfig = (CommentedConfig) newConfig.createSubConfig();
+            settingsConfig.set("workers", this.settings.getWorkers());
+            settingsConfig.set("in_scope_only", this.settings.isInScopeOnly());
+            settingsConfig.set("logging_enabled", this.settings.isLoggingEnabled());
+            settingsConfig.set("randomness_algorithm_enabled", this.settings.isRandomnessAlgorithmEnabled());
+            settingsConfig.set("generic_secret_min_length", this.settings.getGenericSecretMinLength());
+            settingsConfig.set("generic_secret_max_length", this.settings.getGenericSecretMaxLength());
+            settingsConfig.set("duplicate_threshold", this.settings.getDuplicateThreshold());
+            settingsConfig.set("max_highlights_per_secret", this.settings.getMaxHighlightsPerSecret());
+            settingsConfig.set("excluded_file_extensions", new ArrayList<>(this.settings.getExcludedFileExtensions()));
             
-            // Update the fileConfig object with current settings before saving
-            // This preserves comments around the values.
-            fileConfig.set("version", getCurrentExtensionVersion());
-            
-            CommentedConfig settingsMap = fileConfig.get("settings");
-            if (settingsMap != null) {
-                settingsMap.set("workers", settings.getWorkers());
-                settingsMap.set("in_scope_only", settings.isInScopeOnly());
-                settingsMap.set("logging_enabled", settings.isLoggingEnabled());
-                settingsMap.set("randomness_algorithm_enabled", settings.isRandomnessAlgorithmEnabled());
-                settingsMap.set("generic_secret_min_length", settings.getGenericSecretMinLength());
-                settingsMap.set("generic_secret_max_length", settings.getGenericSecretMaxLength());
-                settingsMap.set("duplicate_threshold", settings.getDuplicateThreshold());
-                settingsMap.set("max_highlights_per_secret", settings.getMaxHighlightsPerSecret());
-                settingsMap.set("excluded_file_extensions", new ArrayList<>(settings.getExcludedFileExtensions()));
-                
-                List<String> enabledToolsStr = settings.getEnabledTools().stream()
-                    .map(ToolType::name).sorted().collect(Collectors.toList());
-                settingsMap.set("enabled_tools", enabledToolsStr);
-            }
-
-            // Update patterns in fileConfig. This is tricky for preserving comments.
-            // We assume the list of patterns itself (the PatternConfig objects) is the source of truth
-            // and we rewrite the whole list. This means comments between pattern blocks will be lost,
-            // but comments *inside* a pattern block should be preserved if we modify them carefully.
-            // For now, rewriting the whole list is the most reliable way to save changes from the UI.
+            List<String> enabledToolsStr = this.settings.getEnabledTools().stream()
+                .map(ToolType::name).sorted().collect(Collectors.toList());
+            settingsConfig.set("enabled_tools", enabledToolsStr);
+            newConfig.set("settings", settingsConfig);
+    
+            // Set patterns
             List<CommentedConfig> patternsList = new ArrayList<>();
             if (patterns != null) {
                 for (PatternConfig pattern : patterns) {
@@ -583,8 +582,12 @@ public class Config {
                     patternsList.add(patternMap);
                 }
             }
-            fileConfig.set("patterns", patternsList);
-
+            newConfig.set("patterns", patternsList);
+    
+            // Replace the content of the existing fileConfig with the new, clean config.
+            fileConfig.clear();
+            fileConfig.putAll(newConfig);
+    
             // Save the file using our custom writer to preserve formatting
             createConfiguredTomlWriter().write(fileConfig, fileConfig.getFile(), WritingMode.REPLACE);
             
@@ -597,7 +600,6 @@ public class Config {
             
         } catch (Exception e) {
             Logger.logCriticalError("Failed to save configuration: " + e.getMessage());
-            e.printStackTrace();
         }
     }
     
@@ -849,19 +851,18 @@ public class Config {
     }
     
     /**
-     * Create and configure a TomlWriter with proper settings for regex patterns.
-     * This writer ensures that pattern fields are written as literal (triple-quote) strings.
-     * @return Configured TomlWriter instance
+     * Creates a TomlWriter configured to our needs. We want to use triple quotes for all
+     * strings to ensure regex patterns are preserved as raw literals without escaping.
      */
     private TomlWriter createConfiguredTomlWriter() {
         TomlWriter writer = new TomlWriter();
         writer.setHideRedundantLevels(false); // Generate proper TOML sections!
-        writer.setIndent(""); // Disable indentation
-
-        // To get multiline literal strings ('''), both the literal and multiline
-        // predicates must return true for the given string.
-        writer.setWriteStringLiteralPredicate(str -> !str.contains("'''"));
+        writer.setIndent("  "); // Use spaces for indentation for readability
+        
+        // Force all strings to be written as multi-line literal strings (''')
+        // This ensures all regex patterns and other fields are preserved exactly.
         writer.setWriteStringMultilinePredicate(str -> true);
+        writer.setWriteStringLiteralPredicate(str -> true);
         
         return writer;
     }
