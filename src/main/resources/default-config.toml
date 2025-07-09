@@ -41,7 +41,7 @@ enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
 # - suffix: Regex pattern that appears after the secret
 
 # Note that you do not need to double escape the regex
-# (e.g., use `\s` instead of `\\s`, `\b` instead of `\\b`, etc.)
+# (e.g., use \S instead of \\s, \b instead of \\b, etc.)
 # because TOML triple-quoted strings preserve backslashes as-is.
 
 [[patterns]]
