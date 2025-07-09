@@ -10,16 +10,15 @@ package slicingmelon.aisecretsdetector;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.persistence.PersistedObject;
 import burp.api.montoya.core.ToolType;
-import com.fasterxml.jackson.dataformat.toml.TomlMapper;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.electronwill.nightconfig.core.UnmodifiableConfig;
+import com.electronwill.nightconfig.core.file.FileConfig;
+import com.electronwill.nightconfig.toml.TomlFormat;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.File;
 import java.io.FileReader;
+import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -40,12 +39,11 @@ public class Config {
     
     private MontoyaApi api;
     private static Config instance;
-    private JsonNode config;
+    private com.electronwill.nightconfig.core.Config config;
     private List<PatternConfig> patterns;
     private Settings settings;
     private String configVersion; // Version of the current config
     private Runnable onConfigChangedCallback;
-    private static final TomlMapper tomlMapper = new TomlMapper();
     
     // Configuration classes
     public static class PatternConfig {
@@ -232,7 +230,7 @@ public class Config {
         this.onConfigChangedCallback = onConfigChangedCallback;
         this.patterns = new ArrayList<>();
         this.settings = new Settings(); // Always initialize settings first
-        this.config = tomlMapper.createObjectNode(); // Always initialize config to prevent null
+        this.config = new com.electronwill.nightconfig.core.Config(); // Always initialize config to prevent null
         
         // Only load config if we have an API instance
         if (api != null) {
@@ -290,19 +288,19 @@ public class Config {
      */
     private static Config createMinimalInstance() {
         try {
-            Config minimalConfig = new Config();
+            Config minimalConfig = new com.electronwill.nightconfig.core.Config();
             minimalConfig.patterns = new ArrayList<>();
             minimalConfig.settings = new Settings();
-            minimalConfig.config = tomlMapper.createObjectNode();
+            minimalConfig.config = new com.electronwill.nightconfig.core.Config();
             minimalConfig.api = null;
             minimalConfig.onConfigChangedCallback = null;
             return minimalConfig;
         } catch (Exception e) {
             // If even minimal creation fails, create an absolutely basic instance
-            Config emergency = new Config();
+            Config emergency = new com.electronwill.nightconfig.core.Config();
             emergency.patterns = new ArrayList<>();
             emergency.settings = new Settings();
-            emergency.config = tomlMapper.createObjectNode();
+            emergency.config = new com.electronwill.nightconfig.core.Config();
             return emergency;
         }
     }
@@ -327,7 +325,7 @@ public class Config {
             
             if (savedConfig != null && !savedConfig.isEmpty()) {
                 // Parse the persisted config
-                this.config = tomlMapper.readTree(savedConfig);
+                this.config = com.electronwill.nightconfig.core.Config.of(TomlFormat.TOML.parse(savedConfig));
                 parseConfig();
             } else {
                 // Load default config from resources
@@ -349,7 +347,7 @@ public class Config {
         
         // Ensure config is never null
         if (this.config == null) {
-            this.config = tomlMapper.createObjectNode();
+            this.config = com.electronwill.nightconfig.core.Config.of(TomlFormat.TOML.parse(new com.electronwill.nightconfig.core.Config()));
         }
     }
     
@@ -357,19 +355,19 @@ public class Config {
         try {
             InputStream configStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH);
             if (configStream != null) {
-                this.config = tomlMapper.readTree(configStream);
+                this.config = com.electronwill.nightconfig.core.Config.of(TomlFormat.TOML.parse(configStream));
                 parseConfig();
                 // Save default config to persistence
                 saveConfig();
             } else {
                 Logger.logCriticalError("Default config file not found in resources");
                 // Create empty config to avoid null pointer exceptions
-                this.config = tomlMapper.createObjectNode();
+                this.config = com.electronwill.nightconfig.core.Config.of(TomlFormat.TOML.parse(new com.electronwill.nightconfig.core.Config()));
             }
         } catch (Exception e) {
             Logger.logCriticalError("Failed to load default configuration: " + e.getMessage());
             // Create empty config to avoid null pointer exceptions
-            this.config = tomlMapper.createObjectNode();
+            this.config = com.electronwill.nightconfig.core.Config.of(TomlFormat.TOML.parse(new com.electronwill.nightconfig.core.Config()));
         }
     }
     
@@ -392,8 +390,8 @@ public class Config {
         }
         
         // Get version from config, fallback to "unknown" if not found
-        JsonNode versionNode = config.get("version");
-        configVersion = versionNode != null ? versionNode.asText("unknown") : "unknown";
+        String version = config.get("version");
+        configVersion = version != null ? version : "unknown";
     }
     
     private void parseSettings() {
@@ -402,71 +400,69 @@ public class Config {
             return;
         }
         
-        JsonNode settingsNode = config.get("settings");
-        if (settingsNode != null && settingsNode.isObject()) {
+        com.electronwill.nightconfig.core.Config settingsConfig = config.get("settings");
+        if (settingsConfig != null && settingsConfig.isMap()) {
             
-            JsonNode workersNode = settingsNode.get("workers");
-            if (workersNode != null && workersNode.isNumber()) {
-                settings.setWorkers(workersNode.asInt());
+            int workers = settingsConfig.get("workers");
+            if (workers != null) {
+                settings.setWorkers(workers);
             }
             
-            JsonNode inScopeOnlyNode = settingsNode.get("in_scope_only");
-            if (inScopeOnlyNode != null && inScopeOnlyNode.isBoolean()) {
-                settings.setInScopeOnly(inScopeOnlyNode.asBoolean());
+            Boolean inScopeOnly = settingsConfig.get("in_scope_only");
+            if (inScopeOnly != null) {
+                settings.setInScopeOnly(inScopeOnly);
             }
             
-            JsonNode loggingEnabledNode = settingsNode.get("logging_enabled");
-            if (loggingEnabledNode != null && loggingEnabledNode.isBoolean()) {
-                settings.setLoggingEnabled(loggingEnabledNode.asBoolean());
+            Boolean loggingEnabled = settingsConfig.get("logging_enabled");
+            if (loggingEnabled != null) {
+                settings.setLoggingEnabled(loggingEnabled);
             }
             
-            JsonNode randomnessAlgorithmEnabledNode = settingsNode.get("randomness_algorithm_enabled");
-            if (randomnessAlgorithmEnabledNode != null && randomnessAlgorithmEnabledNode.isBoolean()) {
-                settings.setRandomnessAlgorithmEnabled(randomnessAlgorithmEnabledNode.asBoolean());
+            Boolean randomnessAlgorithmEnabled = settingsConfig.get("randomness_algorithm_enabled");
+            if (randomnessAlgorithmEnabled != null) {
+                settings.setRandomnessAlgorithmEnabled(randomnessAlgorithmEnabled);
             }
             
-            JsonNode genericSecretMinLengthNode = settingsNode.get("generic_secret_min_length");
-            if (genericSecretMinLengthNode != null && genericSecretMinLengthNode.isNumber()) {
-                settings.setGenericSecretMinLength(genericSecretMinLengthNode.asInt());
+            int genericSecretMinLength = settingsConfig.get("generic_secret_min_length");
+            if (genericSecretMinLength != null) {
+                settings.setGenericSecretMinLength(genericSecretMinLength);
             }
             
-            JsonNode genericSecretMaxLengthNode = settingsNode.get("generic_secret_max_length");
-            if (genericSecretMaxLengthNode != null && genericSecretMaxLengthNode.isNumber()) {
-                settings.setGenericSecretMaxLength(genericSecretMaxLengthNode.asInt());
+            int genericSecretMaxLength = settingsConfig.get("generic_secret_max_length");
+            if (genericSecretMaxLength != null) {
+                settings.setGenericSecretMaxLength(genericSecretMaxLength);
             }
             
-            JsonNode duplicateThresholdNode = settingsNode.get("duplicate_threshold");
-            if (duplicateThresholdNode != null && duplicateThresholdNode.isNumber()) {
-                settings.setDuplicateThreshold(duplicateThresholdNode.asInt());
+            int duplicateThreshold = settingsConfig.get("duplicate_threshold");
+            if (duplicateThreshold != null) {
+                settings.setDuplicateThreshold(duplicateThreshold);
             }
             
-            JsonNode maxHighlightsPerSecretNode = settingsNode.get("max_highlights_per_secret");
-            if (maxHighlightsPerSecretNode != null && maxHighlightsPerSecretNode.isNumber()) {
-                settings.setMaxHighlightsPerSecret(maxHighlightsPerSecretNode.asInt());
+            int maxHighlightsPerSecret = settingsConfig.get("max_highlights_per_secret");
+            if (maxHighlightsPerSecret != null) {
+                settings.setMaxHighlightsPerSecret(maxHighlightsPerSecret);
             }
             
             // Parse excluded file extensions
-            JsonNode excludedExtensionsNode = settingsNode.get("excluded_file_extensions");
-            if (excludedExtensionsNode != null && excludedExtensionsNode.isArray()) {
-                Set<String> excludedExtensions = new HashSet<>();
-                for (JsonNode extensionNode : excludedExtensionsNode) {
-                    excludedExtensions.add(extensionNode.asText());
-                }
-                settings.setExcludedFileExtensions(excludedExtensions);
+            Set<String> excludedExtensions = settingsConfig.get("excluded_file_extensions");
+            if (excludedExtensions != null) {
+                Set<String> excludedExtensionsSet = new HashSet<>();
+                excludedExtensionsSet.addAll(excludedExtensions);
+                settings.setExcludedFileExtensions(excludedExtensionsSet);
             }
             
             // Parse enabled tools
-            JsonNode enabledToolsNode = settingsNode.get("enabled_tools");
-            if (enabledToolsNode != null && enabledToolsNode.isArray()) {
-                Set<ToolType> enabledTools = new HashSet<>();
-                for (JsonNode toolNode : enabledToolsNode) {
+            Set<String> enabledTools = settingsConfig.get("enabled_tools");
+            if (enabledTools != null) {
+                Set<ToolType> enabledToolsSet = new HashSet<>();
+                for (String toolName : enabledTools) {
                     try {
-                        enabledTools.add(ToolType.valueOf(toolNode.asText()));
+                        enabledToolsSet.add(ToolType.valueOf(toolName));
                     } catch (IllegalArgumentException e) {
-                        Logger.logCriticalError("Invalid tool type: " + toolNode.asText());
+                        Logger.logCriticalError("Invalid tool type: " + toolName);
                     }
                 }
-                settings.setEnabledTools(enabledTools);
+                settings.setEnabledTools(enabledToolsSet);
             }
         }
     }
@@ -479,18 +475,15 @@ public class Config {
             return;
         }
         
-        JsonNode patternsNode = config.get("patterns");
-        if (patternsNode != null && patternsNode.isArray()) {
-            for (JsonNode patternNode : patternsNode) {
-                JsonNode nameNode = patternNode.get("name");
-                JsonNode prefixNode = patternNode.get("prefix");
-                JsonNode patternValueNode = patternNode.get("pattern");
-                JsonNode suffixNode = patternNode.get("suffix");
+        com.electronwill.nightconfig.core.Config patternsConfig = config.get("patterns");
+        if (patternsConfig != null && patternsConfig.isMap()) {
+            for (Map.Entry<String, com.electronwill.nightconfig.core.Config> entry : patternsConfig.entrySet()) {
+                String name = entry.getKey();
+                com.electronwill.nightconfig.core.Config patternConfig = entry.getValue();
                 
-                String name = nameNode != null ? nameNode.asText() : null;
-                String prefix = prefixNode != null ? prefixNode.asText() : null;
-                String pattern = patternValueNode != null ? patternValueNode.asText() : null;
-                String suffix = suffixNode != null ? suffixNode.asText() : null;
+                String prefix = patternConfig.get("prefix");
+                String pattern = patternConfig.get("pattern");
+                String suffix = patternConfig.get("suffix");
                 
                 if (name != null && !name.isEmpty() && pattern != null && !pattern.isEmpty()) {
                     try {
@@ -501,8 +494,8 @@ public class Config {
                                 settings.getGenericSecretMinLength() + "," + settings.getGenericSecretMaxLength());
                         }
                         
-                        PatternConfig patternConfig = new PatternConfig(name, prefix, pattern, suffix);
-                        patterns.add(patternConfig);
+                        PatternConfig patternConfigObj = new PatternConfig(name, prefix, pattern, suffix);
+                        patterns.add(patternConfigObj);
                     } catch (Exception e) {
                         Logger.logCriticalError("Failed to compile pattern '" + name + "': " + e.getMessage());
                     }
@@ -530,49 +523,49 @@ public class Config {
                 return;
             }
             // Convert current configuration to TOML format
-            Map<String, Object> configMap = new HashMap<>();
+            com.electronwill.nightconfig.core.Config configMap = new com.electronwill.nightconfig.core.Config();
             
             // Add version (use current extension version)
-            configMap.put("version", getCurrentExtensionVersion());
+            configMap.set("version", getCurrentExtensionVersion());
             
             // Add settings
-            Map<String, Object> settingsMap = new HashMap<>();
-            settingsMap.put("workers", settings.getWorkers());
-            settingsMap.put("in_scope_only", settings.isInScopeOnly());
-            settingsMap.put("logging_enabled", settings.isLoggingEnabled());
-            settingsMap.put("randomness_algorithm_enabled", settings.isRandomnessAlgorithmEnabled());
-            settingsMap.put("generic_secret_min_length", settings.getGenericSecretMinLength());
-            settingsMap.put("generic_secret_max_length", settings.getGenericSecretMaxLength());
-            settingsMap.put("duplicate_threshold", settings.getDuplicateThreshold());
-            settingsMap.put("max_highlights_per_secret", settings.getMaxHighlightsPerSecret());
-            settingsMap.put("excluded_file_extensions", new ArrayList<>(settings.getExcludedFileExtensions()));
+            com.electronwill.nightconfig.core.Config settingsMap = new com.electronwill.nightconfig.core.Config();
+            settingsMap.set("workers", settings.getWorkers());
+            settingsMap.set("in_scope_only", settings.isInScopeOnly());
+            settingsMap.set("logging_enabled", settings.isLoggingEnabled());
+            settingsMap.set("randomness_algorithm_enabled", settings.isRandomnessAlgorithmEnabled());
+            settingsMap.set("generic_secret_min_length", settings.getGenericSecretMinLength());
+            settingsMap.set("generic_secret_max_length", settings.getGenericSecretMaxLength());
+            settingsMap.set("duplicate_threshold", settings.getDuplicateThreshold());
+            settingsMap.set("max_highlights_per_secret", settings.getMaxHighlightsPerSecret());
+            settingsMap.set("excluded_file_extensions", new ArrayList<>(settings.getExcludedFileExtensions()));
             
             List<String> enabledToolsStr = new ArrayList<>();
             for (ToolType tool : settings.getEnabledTools()) {
                 enabledToolsStr.add(tool.name());
             }
-            settingsMap.put("enabled_tools", enabledToolsStr);
+            settingsMap.set("enabled_tools", enabledToolsStr);
             
-            configMap.put("settings", settingsMap);
+            configMap.set("settings", settingsMap);
             
             // Add patterns (ensure patterns is not null)
-            List<Map<String, Object>> patternsList = new ArrayList<>();
+            List<com.electronwill.nightconfig.core.Config> patternsList = new ArrayList<>();
             if (patterns != null) {
                 for (PatternConfig pattern : patterns) {
                     if (pattern != null) {
-                        Map<String, Object> patternMap = new HashMap<>();
-                        patternMap.put("name", pattern.getName());
-                        patternMap.put("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
-                        patternMap.put("pattern", pattern.getPattern());
-                        patternMap.put("suffix", pattern.getSuffix() != null ? pattern.getSuffix() : "");
+                        com.electronwill.nightconfig.core.Config patternMap = new com.electronwill.nightconfig.core.Config();
+                        patternMap.set("name", pattern.getName());
+                        patternMap.set("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
+                        patternMap.set("pattern", pattern.getPattern());
+                        patternMap.set("suffix", pattern.getSuffix() != null ? pattern.getSuffix() : "");
                         patternsList.add(patternMap);
                     }
                 }
             }
-            configMap.put("patterns", patternsList);
+            configMap.set("patterns", patternsList);
             
             // Convert to TOML string
-            String tomlString = tomlMapper.writeValueAsString(configMap);
+            String tomlString = TomlFormat.TOML.toToml(configMap);
             
             // Save to persistence
             PersistedObject persistedData = api.persistence().extensionData();
@@ -594,7 +587,8 @@ public class Config {
     
     /**
      * Automatically sync the external config.toml file when settings change
-     * @param tomlString The TOML content to write
+     * Jackson TOML generates flat key-value pairs, but we need proper TOML sections
+     * @param tomlString The TOML content to write (ignored - we generate proper format)
      */
     private void autoSyncExternalConfigFile(String tomlString) {
         try {
@@ -604,14 +598,101 @@ public class Config {
             // Create directory if it doesn't exist
             Files.createDirectories(configPath.getParent());
             
-            // Write the TOML content to file - Jackson should preserve triple quotes
-            Files.write(configPath, tomlString.getBytes());
+            // Generate proper TOML format instead of Jackson's flat output
+            String properTomlContent = generateProperTomlContent();
+            Files.write(configPath, properTomlContent.getBytes());
             
             Logger.logMsg("Auto-synced configuration to " + configFilePath);
             
         } catch (Exception e) {
             Logger.logErrorMsg("Failed to auto-sync config file: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Generate proper TOML content with correct formatting and triple-quote literals
+     * Jackson TOML generates flat key-value pairs, but we need proper TOML sections
+     * @return Properly formatted TOML string
+     */
+    private String generateProperTomlContent() {
+        StringBuilder toml = new StringBuilder();
+        
+        // Add header comment and version
+        toml.append("# AI Secrets Detector Configuration\n");
+        toml.append("# Version of this config file - should match extension version\n");
+        toml.append("version = \"").append(getCurrentExtensionVersion()).append("\"\n\n");
+        
+        // Add settings section
+        toml.append("[settings]\n");
+        toml.append("excluded_file_extensions = ");
+        appendStringArray(toml, settings.getExcludedFileExtensions());
+        toml.append("\n");
+        toml.append("workers = ").append(settings.getWorkers()).append("\n");
+        toml.append("in_scope_only = ").append(settings.isInScopeOnly()).append("\n");
+        toml.append("logging_enabled = ").append(settings.isLoggingEnabled()).append("\n");
+        toml.append("randomness_algorithm_enabled = ").append(settings.isRandomnessAlgorithmEnabled()).append("\n");
+        toml.append("generic_secret_min_length = ").append(settings.getGenericSecretMinLength()).append("\n");
+        toml.append("generic_secret_max_length = ").append(settings.getGenericSecretMaxLength()).append("\n");
+        toml.append("duplicate_threshold = ").append(settings.getDuplicateThreshold()).append("\n");
+        toml.append("max_highlights_per_secret = ").append(settings.getMaxHighlightsPerSecret()).append("\n");
+        toml.append("enabled_tools = ");
+        appendToolsArray(toml, settings.getEnabledTools());
+        toml.append("\n\n");
+        
+        // Add patterns - use array of tables format
+        if (patterns != null && !patterns.isEmpty()) {
+            for (PatternConfig pattern : patterns) {
+                toml.append("[[patterns]]\n");
+                toml.append("name = \"").append(escapeTomlString(pattern.getName())).append("\"\n");
+                toml.append("prefix = '''").append(pattern.getPrefix() != null ? pattern.getPrefix() : "").append("'''\n");
+                toml.append("pattern = '''").append(pattern.getPattern()).append("'''\n");
+                toml.append("suffix = '''").append(pattern.getSuffix() != null ? pattern.getSuffix() : "").append("'''\n\n");
+            }
+        }
+        
+        return toml.toString();
+    }
+    
+    /**
+     * Append a string array in TOML format
+     */
+    private void appendStringArray(StringBuilder toml, Set<String> strings) {
+        toml.append("[");
+        if (strings != null && !strings.isEmpty()) {
+            String[] array = strings.toArray(new String[0]);
+            for (int i = 0; i < array.length; i++) {
+                if (i > 0) toml.append(", ");
+                toml.append("\"").append(escapeTomlString(array[i])).append("\"");
+            }
+        }
+        toml.append("]");
+    }
+    
+    /**
+     * Append tools array in TOML format
+     */
+    private void appendToolsArray(StringBuilder toml, Set<ToolType> tools) {
+        toml.append("[");
+        if (tools != null && !tools.isEmpty()) {
+            ToolType[] array = tools.toArray(new ToolType[0]);
+            for (int i = 0; i < array.length; i++) {
+                if (i > 0) toml.append(", ");
+                toml.append("\"").append(array[i].name()).append("\"");
+            }
+        }
+        toml.append("]");
+    }
+    
+    /**
+     * Escape strings for TOML basic strings (inside double quotes)
+     */
+    private String escapeTomlString(String str) {
+        if (str == null) return "";
+        return str.replace("\\", "\\\\")
+                  .replace("\"", "\\\"")
+                  .replace("\n", "\\n")
+                  .replace("\r", "\\r")
+                  .replace("\t", "\\t");
     }
     
 
@@ -789,45 +870,45 @@ public class Config {
      */
     public void exportConfigToFile(String filePath) throws IOException {
         // Generate TOML content using Jackson
-        Map<String, Object> configMap = new HashMap<>();
+        com.electronwill.nightconfig.core.Config configMap = new com.electronwill.nightconfig.core.Config();
         
         // Add version (use current extension version)
-        configMap.put("version", getCurrentExtensionVersion());
+        configMap.set("version", getCurrentExtensionVersion());
         
         // Add settings
-        Map<String, Object> settingsMap = new HashMap<>();
-        settingsMap.put("workers", settings.getWorkers());
-        settingsMap.put("in_scope_only", settings.isInScopeOnly());
-        settingsMap.put("logging_enabled", settings.isLoggingEnabled());
-        settingsMap.put("randomness_algorithm_enabled", settings.isRandomnessAlgorithmEnabled());
-        settingsMap.put("generic_secret_min_length", settings.getGenericSecretMinLength());
-        settingsMap.put("generic_secret_max_length", settings.getGenericSecretMaxLength());
-        settingsMap.put("duplicate_threshold", settings.getDuplicateThreshold());
-        settingsMap.put("max_highlights_per_secret", settings.getMaxHighlightsPerSecret());
-        settingsMap.put("excluded_file_extensions", new ArrayList<>(settings.getExcludedFileExtensions()));
+        com.electronwill.nightconfig.core.Config settingsMap = new com.electronwill.nightconfig.core.Config();
+        settingsMap.set("workers", settings.getWorkers());
+        settingsMap.set("in_scope_only", settings.isInScopeOnly());
+        settingsMap.set("logging_enabled", settings.isLoggingEnabled());
+        settingsMap.set("randomness_algorithm_enabled", settings.isRandomnessAlgorithmEnabled());
+        settingsMap.set("generic_secret_min_length", settings.getGenericSecretMinLength());
+        settingsMap.set("generic_secret_max_length", settings.getGenericSecretMaxLength());
+        settingsMap.set("duplicate_threshold", settings.getDuplicateThreshold());
+        settingsMap.set("max_highlights_per_secret", settings.getMaxHighlightsPerSecret());
+        settingsMap.set("excluded_file_extensions", new ArrayList<>(settings.getExcludedFileExtensions()));
         
         List<String> enabledToolsStr = new ArrayList<>();
         for (ToolType tool : settings.getEnabledTools()) {
             enabledToolsStr.add(tool.name());
         }
-        settingsMap.put("enabled_tools", enabledToolsStr);
+        settingsMap.set("enabled_tools", enabledToolsStr);
         
-        configMap.put("settings", settingsMap);
+        configMap.set("settings", settingsMap);
         
         // Add patterns
-        List<Map<String, Object>> patternsList = new ArrayList<>();
+        List<com.electronwill.nightconfig.core.Config> patternsList = new ArrayList<>();
         for (PatternConfig pattern : patterns) {
-            Map<String, Object> patternMap = new HashMap<>();
-            patternMap.put("name", pattern.getName());
-            patternMap.put("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
-            patternMap.put("pattern", pattern.getPattern());
-            patternMap.put("suffix", pattern.getSuffix() != null ? pattern.getSuffix() : "");
+            com.electronwill.nightconfig.core.Config patternMap = new com.electronwill.nightconfig.core.Config();
+            patternMap.set("name", pattern.getName());
+            patternMap.set("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
+            patternMap.set("pattern", pattern.getPattern());
+            patternMap.set("suffix", pattern.getSuffix() != null ? pattern.getSuffix() : "");
             patternsList.add(patternMap);
         }
-        configMap.put("patterns", patternsList);
+        configMap.set("patterns", patternsList);
         
         // Convert to TOML string and write to file
-        String tomlString = tomlMapper.writeValueAsString(configMap);
+        String tomlString = TomlFormat.TOML.toToml(configMap);
         Files.write(Paths.get(filePath), tomlString.getBytes());
     }
     
@@ -844,7 +925,7 @@ public class Config {
         
         try (FileReader fileReader = new FileReader(file)) {
             // Parse the TOML file
-            this.config = tomlMapper.readTree(fileReader);
+            this.config = com.electronwill.nightconfig.core.Config.of(TomlFormat.TOML.parse(fileReader));
             
             // Parse the loaded config
             parseConfig();
