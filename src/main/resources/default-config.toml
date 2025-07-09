@@ -19,3 +19,9 @@ name = "Age Secret Key"
 prefix = ''
 pattern = '''(AGE-SECRET-KEY-1[\dA-Z]{58})'''
 suffix = ''
+
+[[patterns]]
+name = "Algolia ID"
+prefix = '''(?i)(?:algolia|docsearch|appId)(?:.|[\n\r\t]){0,40}?'''
+pattern = '''\b([A-Z0-9]{10})\b'''
+suffix = '''
