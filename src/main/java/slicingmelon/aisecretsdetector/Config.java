@@ -557,7 +557,8 @@ public class Config {
                 Logger.logCritical("Saving config with " + patterns.size() + " patterns");
                 for (PatternConfig pattern : patterns) {
                     if (pattern != null) {
-                        CommentedConfig patternMap = TomlFormat.newConfig();
+                        // Use LinkedHashMap to preserve field order: name, prefix, pattern, suffix
+                        CommentedConfig patternMap = TomlFormat.newConfig(java.util.LinkedHashMap::new);
                         patternMap.set("name", pattern.getName());
                         patternMap.set("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
                         patternMap.set("pattern", pattern.getPattern());
@@ -654,7 +655,8 @@ public class Config {
             List<CommentedConfig> patternsList = new ArrayList<>();
             if (patterns != null) {
                 for (PatternConfig pattern : patterns) {
-                    CommentedConfig patternMap = TomlFormat.newConfig();
+                    // Use LinkedHashMap to preserve field order: name, prefix, pattern, suffix
+                    CommentedConfig patternMap = TomlFormat.newConfig(java.util.LinkedHashMap::new);
                     patternMap.set("name", pattern.getName());
                     patternMap.set("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
                     patternMap.set("pattern", pattern.getPattern());
@@ -979,10 +981,12 @@ public class Config {
         writer.setHideRedundantLevels(false); // Generate proper TOML sections!
         writer.setIndent(""); // No indentation - flat TOML format
         
-        // Configure writer to use literal strings (triple quotes) for regex patterns
+        // Configure writer to use literal strings (triple quotes) for ALL pattern fields
+        // This ensures consistent formatting like the default-config.toml
         writer.setWriteStringLiteralPredicate(str -> {
-            // Use literal strings for regex patterns (strings with backslashes or complex patterns)
-            return str != null && (str.contains("\\") || str.contains("(?") || str.contains("*") || str.contains("+") || str.contains("?") || str.contains("|"));
+            // Use triple quotes for all strings in patterns (including empty strings)
+            // This matches the format in default-config.toml exactly
+            return true; // Use triple quotes for everything to match default format
         });
         
         return writer;
