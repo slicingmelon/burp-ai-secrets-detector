@@ -5,3 +5,4 @@ bin/
 build/classes/
 build/generated/
 build/tmp/
+build/resources/
