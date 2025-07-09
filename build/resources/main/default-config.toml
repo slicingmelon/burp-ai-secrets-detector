@@ -36,7 +36,7 @@ enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
 # Secret detection patterns
 # Each pattern has:
 # - name: Human-readable name for the secret type
-# - prefix: Regex pattern that appears before the secret
+# - prefix: Regex pattern that appears before the secret (use '''literalregexpattern''' for literal strings)
 # - pattern: Main regex pattern that captures the secret (use capture groups)
 # - suffix: Regex pattern that appears after the secret
 
@@ -338,12 +338,6 @@ suffix = '''\b'''
 name = "Generic Private Key"
 prefix = ''''''
 pattern = '''(?i)(-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\s\S-]{64,}?KEY(?: BLOCK)?-----)'''
-suffix = ''''''
-
-[[patterns]]
-name = "TEST PATTERN - HTTP"
-prefix = ''''''
-pattern = '''\b(http[s]?://[a-zA-Z0-9.-]+)'''
 suffix = ''''''
 
 [[patterns]]
