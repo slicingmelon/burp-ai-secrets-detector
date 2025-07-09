@@ -26,6 +26,17 @@ public class UI {
     private static UI instance;
     private static final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
     
+    // UI Components that need to be refreshed when config changes
+    private JSpinner workersSpinner;
+    private JCheckBox inScopeCheckbox;
+    private JCheckBox loggingCheckbox;
+    private JCheckBox randomnessCheckbox;
+    private JSpinner minLengthSpinner;
+    private JSpinner maxLengthSpinner;
+    private JSpinner duplicateThresholdSpinner;
+    private Map<ToolType, JCheckBox> toolCheckboxes;
+    private JLabel configLocationValue;
+    
     public static UI getInstance() {
         return instance;
     }
@@ -88,7 +99,7 @@ public class UI {
                 50,
                 1
         );
-        JSpinner workersSpinner = new JSpinner(workersModel);
+        workersSpinner = new JSpinner(workersModel);
         
         JComponent editor = workersSpinner.getEditor();
         Dimension prefSize = new Dimension(60, editor.getPreferredSize().height);
@@ -113,7 +124,7 @@ public class UI {
         leftPanel.add(spinnerPanel, leftConstraints);
         
         // In-scope only setting
-        JCheckBox inScopeCheckbox = new JCheckBox("In-Scope Requests Only", 
+        inScopeCheckbox = new JCheckBox("In-Scope Requests Only", 
                 config != null ? config.getSettings().isInScopeOnly() : true);
         inScopeCheckbox.addActionListener(e -> {
             if (config != null) {
@@ -130,7 +141,7 @@ public class UI {
         leftPanel.add(inScopeCheckbox, leftConstraints);
         
         // Enable logging setting
-        JCheckBox loggingCheckbox = new JCheckBox("Enable Logging", 
+        loggingCheckbox = new JCheckBox("Enable Logging", 
                 config != null ? config.getSettings().isLoggingEnabled() : false);
         loggingCheckbox.addActionListener(e -> {
             if (config != null) {
@@ -154,7 +165,7 @@ public class UI {
         rightConstraints.anchor = GridBagConstraints.WEST;
         
         // Randomness Algorithm Enable
-        JCheckBox randomnessCheckbox = new JCheckBox("Enable Randomness Algorithm Detection", 
+        randomnessCheckbox = new JCheckBox("Enable Randomness Algorithm Detection", 
                 config != null ? config.getSettings().isRandomnessAlgorithmEnabled() : true);
         randomnessCheckbox.addActionListener(e -> {
             if (config != null) {
@@ -184,7 +195,7 @@ public class UI {
                 128,
                 1
         );
-        JSpinner minLengthSpinner = new JSpinner(minLengthModel);
+        minLengthSpinner = new JSpinner(minLengthModel);
         minLengthSpinner.addChangeListener(e -> {
             if (config != null) {
                 int newMinLength = (Integer) minLengthSpinner.getValue();
@@ -216,7 +227,7 @@ public class UI {
                 128,
                 1
         );
-        JSpinner maxLengthSpinner = new JSpinner(maxLengthModel);
+        maxLengthSpinner = new JSpinner(maxLengthModel);
         maxLengthSpinner.addChangeListener(e -> {
             if (config != null) {
                 int currentMinLength = config.getSettings().getGenericSecretMinLength();
@@ -248,7 +259,7 @@ public class UI {
                 50,
                 1
         );
-        JSpinner duplicateThresholdSpinner = new JSpinner(duplicateThresholdModel);
+        duplicateThresholdSpinner = new JSpinner(duplicateThresholdModel);
         duplicateThresholdSpinner.addChangeListener(e -> {
             if (config != null) {
                 config.getSettings().setDuplicateThreshold((Integer) duplicateThresholdSpinner.getValue());
@@ -276,7 +287,7 @@ public class UI {
         toolPanel.setBorder(new TitledBorder("Process Messages from Tools:"));
         
         // Tool checkboxes
-        Map<ToolType, JCheckBox> toolCheckboxes = new HashMap<>();
+        toolCheckboxes = new HashMap<>();
         ToolType[] tools = {ToolType.TARGET, ToolType.PROXY, ToolType.SCANNER, ToolType.EXTENSIONS, ToolType.REPEATER, ToolType.INTRUDER};
         
         for (ToolType tool : tools) {
@@ -302,13 +313,17 @@ public class UI {
         configLocationLabel.setFont(configLocationLabel.getFont().deriveFont(Font.BOLD));
         configInfoPanel.add(configLocationLabel);
         
-        JLabel configLocationValue = new JLabel(getConfigLocationInfo());
+        configLocationValue = new JLabel(getConfigLocationInfo());
         configLocationValue.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 11));
         configInfoPanel.add(configLocationValue);
         
         // Button panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         buttonPanel.setBorder(new TitledBorder("Actions:"));
+        
+        JButton refreshUIButton = new JButton("Refresh UI");
+        refreshUIButton.addActionListener(e -> refreshUI());
+        buttonPanel.add(refreshUIButton);
         
         JButton resetCountersButton = new JButton("Reset Secret Counters");
         resetCountersButton.addActionListener(e -> resetSecretCounters());
@@ -404,10 +419,64 @@ public class UI {
         return panel;
     }
     
-    private void refreshUI() {
-        // This method can be used to refresh UI components if needed
+    public void refreshUI() {
+        // This method updates all UI components with current config values
         SwingUtilities.invokeLater(() -> {
-            // Update any UI components that need refreshing
+            if (config == null) {
+                config = Config.getInstance();
+            }
+            
+            if (config == null) {
+                return;
+            }
+            
+            // Update spinners
+            if (workersSpinner != null) {
+                workersSpinner.setValue(config.getSettings().getWorkers());
+            }
+            
+            if (minLengthSpinner != null) {
+                minLengthSpinner.setValue(config.getSettings().getGenericSecretMinLength());
+            }
+            
+            if (maxLengthSpinner != null) {
+                maxLengthSpinner.setValue(config.getSettings().getGenericSecretMaxLength());
+            }
+            
+            if (duplicateThresholdSpinner != null) {
+                duplicateThresholdSpinner.setValue(config.getSettings().getDuplicateThreshold());
+            }
+            
+            // Update checkboxes
+            if (inScopeCheckbox != null) {
+                inScopeCheckbox.setSelected(config.getSettings().isInScopeOnly());
+            }
+            
+            if (loggingCheckbox != null) {
+                loggingCheckbox.setSelected(config.getSettings().isLoggingEnabled());
+            }
+            
+            if (randomnessCheckbox != null) {
+                randomnessCheckbox.setSelected(config.getSettings().isRandomnessAlgorithmEnabled());
+            }
+            
+            // Update tool checkboxes
+            if (toolCheckboxes != null) {
+                for (Map.Entry<ToolType, JCheckBox> entry : toolCheckboxes.entrySet()) {
+                    ToolType tool = entry.getKey();
+                    JCheckBox checkbox = entry.getValue();
+                    if (checkbox != null) {
+                        checkbox.setSelected(config.getSettings().isToolEnabled(tool));
+                    }
+                }
+            }
+            
+            // Update config location info
+            if (configLocationValue != null) {
+                configLocationValue.setText(getConfigLocationInfo());
+            }
+            
+            appendToLog("UI refreshed with current config values");
         });
     }
     
@@ -451,6 +520,7 @@ public class UI {
         if (AISecretsDetector.getInstance() != null) {
             AISecretsDetector.getInstance().clearSecretCounters();
             appendToLog("Secret counters have been reset");
+            refreshUI();
         }
     }
     
@@ -458,6 +528,7 @@ public class UI {
         if (config != null) {
             config.resetToDefaults();
             appendToLog("Configuration reset to defaults");
+            refreshUI();
         }
     }
     

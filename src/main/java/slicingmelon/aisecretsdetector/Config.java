@@ -471,6 +471,14 @@ public class Config {
         if (onConfigChangedCallback != null) {
             onConfigChangedCallback.run();
         }
+        
+        // Notify UI to refresh if available
+        if (AISecretsDetector.getInstance() != null) {
+            UI ui = AISecretsDetector.getInstance().getUI();
+            if (ui != null) {
+                ui.refreshUI();
+            }
+        }
     }
 
     private void saveToConfigFile() {
@@ -614,6 +622,14 @@ public class Config {
     public void resetToDefaults() {
         loadDefaultConfig();
         saveConfig(); // This will save to both Burp persistence and config.toml
+        
+        // Notify UI to refresh if available
+        if (AISecretsDetector.getInstance() != null) {
+            UI ui = AISecretsDetector.getInstance().getUI();
+            if (ui != null) {
+                ui.refreshUI();
+            }
+        }
     }
 
     @Deprecated
@@ -808,11 +824,19 @@ public class Config {
             if (onConfigChangedCallback != null) {
                 onConfigChangedCallback.run();
             }
+            
+            // Notify UI to refresh if available
+            if (AISecretsDetector.getInstance() != null) {
+                UI ui = AISecretsDetector.getInstance().getUI();
+                if (ui != null) {
+                    ui.refreshUI();
+                }
+            }
         } else {
             throw new IOException("File not found: " + filePath);
         }
     }
-
+    
     public String getDefaultConfigFilePath() {
         Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
         return configPath.toAbsolutePath().toString();
