@@ -18,9 +18,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.StringWriter;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.FileReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -596,7 +594,8 @@ public class Config {
     
     /**
      * Automatically sync the external config.toml file when settings change
-     * @param tomlString The TOML content to write
+     * Uses template-based approach to preserve original TOML formatting
+     * @param tomlString The TOML content to write (not used in template approach)
      */
     private void autoSyncExternalConfigFile(String tomlString) {
         try {
@@ -606,14 +605,123 @@ public class Config {
             // Create directory if it doesn't exist
             Files.createDirectories(configPath.getParent());
             
-            // Write the TOML content to file
-            Files.write(configPath, tomlString.getBytes());
+            // Use template-based approach to preserve formatting
+            syncConfigWithTemplate(configFilePath);
             
             Logger.logMsg("Auto-synced configuration to " + configFilePath);
             
         } catch (Exception e) {
             Logger.logErrorMsg("Failed to auto-sync config file: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Sync external config file using template-based approach
+     * Only updates [settings] section, preserves patterns formatting
+     * @param configFilePath The path to write the config file
+     */
+    private void syncConfigWithTemplate(String configFilePath) throws IOException {
+        // Read the original default config template
+        InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH);
+        if (defaultConfigStream == null) {
+            throw new IOException("Default config template not found");
+        }
+        
+        try {
+            // Read template as string
+            String templateContent = new String(defaultConfigStream.readAllBytes());
+            
+            // Update version and settings section
+            String updatedContent = updateTemplateWithCurrentSettings(templateContent);
+            
+            // Write to file
+            Files.write(Paths.get(configFilePath), updatedContent.getBytes());
+            
+        } finally {
+            defaultConfigStream.close();
+        }
+    }
+    
+    /**
+     * Update template content with current settings while preserving patterns
+     * @param templateContent The original template content
+     * @return Updated content with current settings
+     */
+    private String updateTemplateWithCurrentSettings(String templateContent) {
+        StringBuilder updatedContent = new StringBuilder();
+        String[] lines = templateContent.split("\n");
+        boolean inSettingsSection = false;
+        boolean foundVersion = false;
+        
+        for (String line : lines) {
+            String trimmedLine = line.trim();
+            
+            // Update version line
+            if (!foundVersion && trimmedLine.startsWith("version = ")) {
+                updatedContent.append("version = \"").append(getCurrentExtensionVersion()).append("\"\n");
+                foundVersion = true;
+                continue;
+            }
+            
+            // Detect [settings] section
+            if (trimmedLine.equals("[settings]")) {
+                inSettingsSection = true;
+                updatedContent.append(line).append("\n");
+                
+                // Write current settings
+                appendCurrentSettings(updatedContent);
+                continue;
+            }
+            
+            // End of settings section (next section starts)
+            if (inSettingsSection && trimmedLine.startsWith("[") && !trimmedLine.equals("[settings]")) {
+                inSettingsSection = false;
+            }
+            
+            // Skip original settings lines, keep everything else
+            if (!inSettingsSection) {
+                updatedContent.append(line).append("\n");
+            }
+        }
+        
+        return updatedContent.toString();
+    }
+    
+    /**
+     * Append current settings to the content builder
+     * @param content The content builder to append to
+     */
+    private void appendCurrentSettings(StringBuilder content) {
+        if (settings == null) return;
+        
+        // Format settings exactly as we want them
+        content.append("excluded_file_extensions = [");
+        boolean first = true;
+        for (String ext : settings.getExcludedFileExtensions()) {
+            if (!first) content.append(", ");
+            content.append("\"").append(ext).append("\"");
+            first = false;
+        }
+        content.append("]\n");
+        
+        content.append("workers = ").append(settings.getWorkers()).append("\n");
+        content.append("in_scope_only = ").append(settings.isInScopeOnly()).append("\n");
+        content.append("logging_enabled = ").append(settings.isLoggingEnabled()).append("\n");
+        content.append("randomness_algorithm_enabled = ").append(settings.isRandomnessAlgorithmEnabled()).append("\n");
+        content.append("generic_secret_min_length = ").append(settings.getGenericSecretMinLength()).append("\n");
+        content.append("generic_secret_max_length = ").append(settings.getGenericSecretMaxLength()).append("\n");
+        content.append("duplicate_threshold = ").append(settings.getDuplicateThreshold()).append("\n");
+        content.append("max_highlights_per_secret = ").append(settings.getMaxHighlightsPerSecret()).append("\n");
+        
+        content.append("enabled_tools = [");
+        first = true;
+        for (ToolType tool : settings.getEnabledTools()) {
+            if (!first) content.append(", ");
+            content.append("\"").append(tool.name()).append("\"");
+            first = false;
+        }
+        content.append("]\n");
+        content.append("\n"); // Add blank line before patterns
     }
     
     public void resetToDefaults() {
@@ -632,12 +740,8 @@ public class Config {
             loadDefaultConfig();
             applyDynamicPatterns();
             
-            // Save to persistence and auto-sync to external file
+            // Save to persistence and auto-sync to external file (uses template approach)
             saveConfig();
-            
-            // Also overwrite external config file with fresh default
-            String configFilePath = getDefaultConfigFilePath();
-            copyDefaultConfigToFile(configFilePath);
             
             Logger.logCritical("Configuration reset to defaults");
             
@@ -788,55 +892,13 @@ public class Config {
     
     /**
      * Export current configuration to a TOML file
+     * Uses template-based approach to preserve original formatting
      * @param filePath The path where to save the config file
      * @throws IOException If file operations fail
      */
     public void exportConfigToFile(String filePath) throws IOException {
-        // Generate TOML content (same as saveConfig but to file)
-        Map<String, Object> configMap = new HashMap<>();
-        
-        // Add version (use current extension version)
-        configMap.put("version", getCurrentExtensionVersion());
-        
-        // Add settings
-        Map<String, Object> settingsMap = new HashMap<>();
-        settingsMap.put("workers", settings.getWorkers());
-        settingsMap.put("in_scope_only", settings.isInScopeOnly());
-        settingsMap.put("logging_enabled", settings.isLoggingEnabled());
-        settingsMap.put("randomness_algorithm_enabled", settings.isRandomnessAlgorithmEnabled());
-        settingsMap.put("generic_secret_min_length", settings.getGenericSecretMinLength());
-        settingsMap.put("generic_secret_max_length", settings.getGenericSecretMaxLength());
-        settingsMap.put("duplicate_threshold", settings.getDuplicateThreshold());
-        settingsMap.put("max_highlights_per_secret", settings.getMaxHighlightsPerSecret());
-        settingsMap.put("excluded_file_extensions", new ArrayList<>(settings.getExcludedFileExtensions()));
-        
-        List<String> enabledToolsStr = new ArrayList<>();
-        for (ToolType tool : settings.getEnabledTools()) {
-            enabledToolsStr.add(tool.name());
-        }
-        settingsMap.put("enabled_tools", enabledToolsStr);
-        
-        configMap.put("settings", settingsMap);
-        
-        // Add patterns
-        List<Map<String, Object>> patternsList = new ArrayList<>();
-        for (PatternConfig pattern : patterns) {
-            Map<String, Object> patternMap = new HashMap<>();
-            patternMap.put("name", pattern.getName());
-            patternMap.put("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
-            patternMap.put("pattern", pattern.getPattern());
-            patternMap.put("suffix", pattern.getSuffix() != null ? pattern.getSuffix() : "");
-            patternsList.add(patternMap);
-        }
-        configMap.put("patterns", patternsList);
-        
-        // Convert to TOML string
-        String tomlString = tomlMapper.writeValueAsString(configMap);
-        
-        // Write to file
-        try (FileWriter fileWriter = new FileWriter(filePath)) {
-            fileWriter.write(tomlString);
-        }
+        // Use template-based approach to preserve formatting
+        syncConfigWithTemplate(filePath);
     }
     
     /**
@@ -909,7 +971,7 @@ public class Config {
     
     /**
      * Initialize external config file on first install
-     * Copies default-config.toml to config.toml only if config.toml doesn't exist
+     * Creates config.toml using template approach only if it doesn't exist
      */
     public void initializeExternalConfigFile() {
         String configFilePath = getDefaultConfigFilePath();
@@ -917,8 +979,8 @@ public class Config {
         // Only create if config.toml doesn't exist (first install)
         if (!Files.exists(Paths.get(configFilePath))) {
             try {
-                // Copy default config to external location
-                copyDefaultConfigToFile(configFilePath);
+                // Use template approach to create initial config file
+                syncConfigWithTemplate(configFilePath);
                 Logger.logCritical("First install: Created config file at " + configFilePath);
             } catch (IOException e) {
                 Logger.logCriticalError("Failed to create initial config file: " + e.getMessage());
@@ -926,32 +988,6 @@ public class Config {
         }
     }
     
-    /**
-     * Copy the default configuration to the specified file path
-     * @param filePath The destination file path
-     * @throws IOException If file operations fail
-     */
-    private void copyDefaultConfigToFile(String filePath) throws IOException {
-        // Load default config from resources
-        InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH);
-        if (defaultConfigStream == null) {
-            throw new IOException("Default config not found in resources");
-        }
-        
-        try {
-            // Read default config content
-            byte[] configBytes = defaultConfigStream.readAllBytes();
-            
-            // Ensure directory exists
-            Path configPath = Paths.get(filePath);
-            Files.createDirectories(configPath.getParent());
-            
-            // Write to file
-            Files.write(configPath, configBytes);
-            
-        } finally {
-            defaultConfigStream.close();
-        }
-    }
+
     
 } 
