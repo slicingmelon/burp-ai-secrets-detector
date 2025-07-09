@@ -542,9 +542,9 @@ public class UI {
                 JOptionPane.QUESTION_MESSAGE
             );
             
-            if (filePath != null && !filePath.trim().isEmpty()) {
+            if (filePath != null) {
                 // Use default path if user just presses OK with empty input
-                if (filePath.trim().equals("")) {
+                if (filePath.trim().isEmpty()) {
                     filePath = defaultPath;
                 }
                 
@@ -588,9 +588,9 @@ public class UI {
                 JOptionPane.QUESTION_MESSAGE
             );
             
-            if (filePath != null && !filePath.trim().isEmpty()) {
+            if (filePath != null) {
                 // Use default path if user just presses OK with empty input
-                if (filePath.trim().equals("")) {
+                if (filePath.trim().isEmpty()) {
                     filePath = defaultPath;
                 }
                 
