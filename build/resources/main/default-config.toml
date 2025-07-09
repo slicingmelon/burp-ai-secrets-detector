@@ -16,27 +16,27 @@ enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
 
 [[patterns]]
 name = "URL with Credentials"
-prefix = '''''
+prefix = ''
 pattern = '''(?i)\b([a-zA-Z]+://(?:[A-Za-z0-9_-]{1,32}):(?:[^@{}|^\\[\\]`]+)@[a-zA-Z0-9.-]+(?:/[^/\s]*)?)\b'''
-suffix = '''''
+suffix = ''
 
 [[patterns]]
 name = "Age Secret Key"
-prefix = '''''
+prefix = ''
 pattern = '''(AGE-SECRET-KEY-1[\dA-Z]{58})'''
-suffix = '''''
+suffix = ''
 
 [[patterns]]
 name = "Algolia ID"
 prefix = '''(?i)(?:algolia|docsearch|appId)(?:.|[\n\r\t]){0,40}?'''
 pattern = '''\b([A-Z0-9]{10})\b'''
-suffix = '''''
+suffix = ''
 
 [[patterns]]
 name = "Algolia Key"
 prefix = '''(?i)(?:algolia|docsearch|apiKey)(?:.|[\n\r\t]){0,40}?'''
 pattern = '''\b([a-zA-Z0-9]{32})\b'''
-suffix = '''''
+suffix = ''
 
 [[patterns]]
 name = "Azure Storage Account Key"
@@ -46,21 +46,21 @@ suffix = '''(?:[^\\w]|$)'''
 
 [[patterns]]
 name = "Azure AD Client Secret"
-prefix = ''''''
+prefix = ''
 pattern = '''\\b([a-zA-Z0-9_~.]{3}\\dQ~[a-zA-Z0-9_~.-]{31,34})'''
 suffix = '''(?:[^\\w]|$)'''
 
 [[patterns]]
 name = "AWS Access Key"
-prefix = ''''''
+prefix = ''
 pattern = '''\\b((?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16,20})\\b'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Bcrypt Hash"
-prefix = ''''''
+prefix = ''
 pattern = '''\\b(\\$2[abxy]\\$\\d{2}\\$[./A-Za-z0-9]{53})\\b'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Fastly API Key"
@@ -70,51 +70,51 @@ suffix = '''(?:[^\\w]|$)'''
 
 [[patterns]]
 name = "GitHub Personal Access Token"
-prefix = ''''''
+prefix = ''
 pattern = '''((?:gh[oprsu]|github_pat)_[\\dA-Za-z_]{36})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "GitLab Token"
-prefix = ''''''
+prefix = ''
 pattern = '''(glpat-[\\dA-Za-z_=-]{20,22})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Cloudflare API Token"
 prefix = '''(?i)(?:cloudflare)(?:.|[\\n\\r\\t]){0,40}?'''
 pattern = '''\\b([A-Za-z0-9_-]{40})\\b'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Cloudflare Global API Key"
 prefix = '''(?i)(?:cloudflare)(?:.|[\\n\\r\\t]){0,40}?'''
 pattern = '''\\b([A-Za-z0-9_-]{37})\\b'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Cloudflare Origin CA Key"
-prefix = ''''''
+prefix = ''
 pattern = '''\\b(v1\\.0-[A-Za-z0-9-]{171})\\b'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "DigitalOcean Personal Access Token"
-prefix = ''''''
+prefix = ''
 pattern = '''\\b((?:dop|doo|dor)_v1_[a-f0-9]{64})\\b'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Google Cloud Platform (GCP) API Key"
-prefix = ''''''
+prefix = ''
 pattern = '''\\b(AIza[\\w-]{35})\\b'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Heroku API Key v2"
-prefix = ''''''
+prefix = ''
 pattern = '''\\b(HRKU-AA[0-9a-zA-Z_-]{58})\\b'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Mailgun Signing Key"
@@ -130,121 +130,121 @@ suffix = '''\\b'''
 
 [[patterns]]
 name = "OpenAI API Key"
-prefix = ''''''
+prefix = ''
 pattern = '''\\b(sk-(?:proj|svcacct|admin)-(?:[A-Za-z0-9_-]{74}|[A-Za-z0-9_-]{58})T3BlbkFJ(?:[A-Za-z0-9_-]{74}|[A-Za-z0-9_-]{58}))\\b'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "OpenAI API Key Legacy"
-prefix = ''''''
+prefix = ''
 pattern = '''\\b(sk-[a-zA-Z0-9]{20}T3BlbkFJ[a-zA-Z0-9]{20})\\b'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "NPM Token (modern)"
-prefix = ''''''
+prefix = ''
 pattern = '''(npm_[\\dA-Za-z]{36})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "NPM Token (legacy)"
-prefix = ''''''
+prefix = ''
 pattern = '''(//.+/:_authToken=[\\dA-Za-z_-]+)'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Postman API Token"
-prefix = ''''''
+prefix = ''
 pattern = '''\\b(PMAK-[a-f0-9]{24}\\-[a-f0-9]{34})\\b'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Google reCAPTCHA Key"
-prefix = ''''''
+prefix = ''
 pattern = '''\\b(6[LM][A-Za-z0-9_-]{38})\\b'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Slack Token"
-prefix = ''''''
+prefix = ''
 pattern = '''(xox[aboprs]-(?:\\d+-)+[\\da-z]+)'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Slack App Token"
-prefix = ''''''
+prefix = ''
 pattern = '''(xapp-\\d-[A-Z0-9]+-\\d+-[a-z0-9]+)'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Slack Bot Token"
-prefix = ''''''
+prefix = ''
 pattern = '''(xoxb-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9-]*)'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Slack Legacy Bot Token"
-prefix = ''''''
+prefix = ''
 pattern = '''(xoxb-[0-9]{8,14}-[a-zA-Z0-9]{18,26})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Slack User Token"
-prefix = ''''''
+prefix = ''
 pattern = '''(xox[pe](?:-[0-9]{10,13}){3}-[a-zA-Z0-9-]{28,34})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Slack Legacy Token"
-prefix = ''''''
+prefix = ''
 pattern = '''(xox[os]-\\d+-\\d+-\\d+-[a-fA-F\\d]+)'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Slack Config Access Token"
-prefix = ''''''
+prefix = ''
 pattern = '''(xoxe\\.xox[bp]-\\d-[A-Z0-9]{163,166})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Slack Config Refresh Token"
-prefix = ''''''
+prefix = ''
 pattern = '''(xoxe-\\d-[A-Z0-9]{146})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Slack Legacy Workspace Token"
-prefix = ''''''
+prefix = ''
 pattern = '''(xox[ar]-(?:\\d-)?[0-9a-zA-Z]{8,48})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Slack Webhook URL"
-prefix = ''''''
+prefix = ''
 pattern = '''((?:https?://)?hooks\\.slack\\.com/(?:services|workflows|triggers)/[A-Za-z0-9+/]{43,56})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Microsoft Teams Webhook"
-prefix = ''''''
+prefix = ''
 pattern = '''(https://[a-z0-9]+\\.webhook\\.office\\.com/webhookb2/[a-z0-9]{8}-([a-z0-9]{4}-){3}[a-z0-9]{12}@[a-z0-9]{8}-([a-z0-9]{4}-){3}[a-z0-9]{12}/IncomingWebhook/[a-z0-9]{32}/[a-z0-9]{8}-([a-z0-9]{4}-){3}[a-z0-9]{12})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "SendGrid API Key"
-prefix = ''''''
+prefix = ''
 pattern = '''(SG\\.[\\dA-Za-z_-]{22}\\.[\\dA-Za-z_-]{43})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Stripe API Key"
-prefix = ''''''
+prefix = ''
 pattern = '''\\b((?:sk|rk)_(?:test|live|prod)_[a-zA-Z0-9]{10,99})\\b'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Square Access Token"
-prefix = ''''''
+prefix = ''
 pattern = '''\\b((?:EAAA|sq0atp-)[\\w-]{22,60})'''
 suffix = '''(?:[\\x60'"\\s;]|\\\\[nrt]|\\\\"|</|$)'''
 
@@ -258,49 +258,49 @@ suffix = '''\\b'''
 name = "Telegram Bot API Token"
 prefix = '''(?i)(?:telegram|tgram://)(?:.|[\\n\\r\\t]){0,40}?'''
 pattern = '''\\b([0-9]{8,10}:[a-zA-Z0-9_-]{35})\\b'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Shopify Access Token"
-prefix = ''''''
+prefix = ''
 pattern = '''(shpat_[a-fA-F0-9]{32})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Shopify Custom Access Token"
-prefix = ''''''
+prefix = ''
 pattern = '''(shpca_[a-fA-F0-9]{32})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Shopify Private App Access Token"
-prefix = ''''''
+prefix = ''
 pattern = '''(shppa_[a-fA-F0-9]{32})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Shopify Shared Secret"
-prefix = ''''''
+prefix = ''
 pattern = '''(shpss_[a-fA-F0-9]{32})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Twilio API Key"
-prefix = ''''''
+prefix = ''
 pattern = '''\\b((?:AC|SK)[0-9a-fA-F]{32})\\b'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Mailchimp API Key"
-prefix = ''''''
+prefix = ''
 pattern = '''([0-9a-f]{32}-us[0-9]{1,2})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Intra42 Secret"
-prefix = ''''''
+prefix = ''
 pattern = '''(s-s4t2(?:af|ud)-[\\da-f]{64})'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Zendesk Secret Key"
@@ -310,9 +310,9 @@ suffix = '''\\b'''
 
 [[patterns]]
 name = "Generic Private Key"
-prefix = ''''''
+prefix = ''
 pattern = '''(?i)(-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\\s\\S-]{64,}?KEY(?: BLOCK)?-----)'''
-suffix = ''''''
+suffix = ''
 
 [[patterns]]
 name = "Generic Secret"
