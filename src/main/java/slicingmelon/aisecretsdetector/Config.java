@@ -10,11 +10,8 @@ package slicingmelon.aisecretsdetector;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.persistence.PersistedObject;
 import burp.api.montoya.core.ToolType;
-import com.fasterxml.jackson.dataformat.toml.TomlMapper;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.moandjiezana.toml.Toml;
+import com.moandjiezana.toml.TomlWriter;
 
 import java.io.IOException;
 import java.io.InputStream;
