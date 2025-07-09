@@ -858,8 +858,9 @@ public class Config {
         writer.setHideRedundantLevels(false); // Generate proper TOML sections!
         writer.setIndent(""); // Disable indentation
 
-        // Force all strings to be written as multi-line literal strings (''')
-        // This ensures all regex patterns and other fields are preserved exactly.
+        // To get multiline literal strings ('''), both the literal and multiline
+        // predicates must return true for the given string.
+        writer.setWriteStringLiteralPredicate(str -> true);
         writer.setWriteStringMultilinePredicate(str -> true);
         
         return writer;
