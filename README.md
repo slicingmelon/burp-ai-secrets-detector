@@ -3,6 +3,19 @@ Burp extension that automatically detects leaked secrets in HTTP responses. The 
 
 Author: Petru Surugiu <[pedro_infosec](https://x.com/pedro_infosec)>
 
+- [Burp AI Secrets Detector](#burp-ai-secrets-detector)
+  - [Installation](#installation)
+  - [How It Works](#how-it-works)
+    - [1. Fixed Pattern Detection](#1-fixed-pattern-detection)
+    - [2. Random String Detection Algorithm](#2-random-string-detection-algorithm)
+  - [Content Type Filtering](#content-type-filtering)
+  - [Configuration](#configuration)
+  - [Optimizations](#optimizations)
+  - [Results](#results)
+  - [Changelog](#changelog)
+  - [TO DO](#to-do)
+  - [Credits](#credits)
+
 ## Installation
 
 1. Download the jar file from [build/libs/ folder](https://github.com/slicingmelon/burp-ai-secrets-detector/tree/main/build/libs).
@@ -76,6 +89,10 @@ Results comparison vs Trufflehog:
 ![Results](./images/burp-secrets-detector-vs-trufflehog.jpg)
 
 
+## Changelog
+
+See the full [CHANGELOG](./CHANGELOG.md).
+
 ## TO DO
 
 - The extension needs thorough testing to minimize false positives before enabling AI integration, as each false positive would unnecessarily consume tokens.
@@ -84,3 +101,5 @@ Results comparison vs Trufflehog:
 ## Credits
 
 Credits to [RipSecrets](https://github.com/sirwart/ripsecrets) for the randomness detection algorithm, a tool designed to find secrets accidentally committed to repositories.
+
+This project is licensed under the [MIT License](./LICENSE).
