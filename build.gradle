@@ -11,7 +11,8 @@ repositories {
 
 dependencies {
     implementation 'net.portswigger.burp.extensions:montoya-api:2025.6'
-    implementation 'com.moandjiezana.toml:toml4j:0.7.2'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.18.2'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.2'
 }
 
 // Generate version.properties file during build
