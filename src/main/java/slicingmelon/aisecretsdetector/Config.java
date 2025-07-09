@@ -8,21 +8,16 @@
 package slicingmelon.aisecretsdetector;
 
 import burp.api.montoya.MontoyaApi;
-import burp.api.montoya.persistence.PersistedObject;
 import burp.api.montoya.core.ToolType;
 import com.electronwill.nightconfig.core.CommentedConfig;
-import com.electronwill.nightconfig.core.file.FileConfig;
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
+import com.electronwill.nightconfig.core.io.WritingMode;
 import com.electronwill.nightconfig.toml.TomlFormat;
 import com.electronwill.nightconfig.toml.TomlParser;
 import com.electronwill.nightconfig.toml.TomlWriter;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.File;
-import java.io.FileReader;
-import java.io.StringWriter;
-import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -30,20 +25,16 @@ import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class Config {
-    private static final String CONFIG_KEY = "config_toml";
-    private static final String CONFIG_VERSION_KEY = "config_version";
     private static final String DEFAULT_CONFIG_PATH = "/default-config.toml";
     
     private MontoyaApi api;
     private static Config instance;
-    private CommentedConfig config;
+    private CommentedFileConfig fileConfig; // File-based config is the source of truth
     private List<PatternConfig> patterns;
     private Settings settings;
     private String configVersion; // Version of the current config
@@ -65,7 +56,11 @@ public class Config {
             
             // Compile the pattern based on prefix, pattern, and suffix
             String fullPattern = buildFullPattern(prefix, pattern, suffix);
-            this.compiledPattern = Pattern.compile(fullPattern);
+            try {
+                this.compiledPattern = Pattern.compile(fullPattern);
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Invalid regex in pattern '" + name + "': " + e.getMessage(), e);
+            }
         }
         
         private String buildFullPattern(String prefix, String pattern, String suffix) {
@@ -246,7 +241,9 @@ public class Config {
         this.onConfigChangedCallback = onConfigChangedCallback;
         this.patterns = new ArrayList<>();
         this.settings = new Settings(); // Always initialize settings first
-        this.config = createEmptyConfig(); // Always initialize config to prevent null
+
+        // Set system property to preserve insertion order
+        System.setProperty("nightconfig.preserveInsertionOrder", "true");
         
         // Only load config if we have an API instance
         if (api != null) {
@@ -254,7 +251,8 @@ public class Config {
                 loadConfig();
             } catch (Exception e) {
                 Logger.logCriticalError("Error during config loading, using defaults: " + e.getMessage());
-                // Keep the default settings and empty config we already initialized
+                // Fallback to in-memory default config
+                loadDefaultConfig();
             }
         }
     }
@@ -265,6 +263,8 @@ public class Config {
             // This prevents null pointer exceptions
             try {
                 instance = new Config(null, null);
+                // Load defaults into a temporary in-memory config
+                instance.loadDefaultConfig();
             } catch (Exception e) {
                 // If even that fails, create a truly minimal instance
                 instance = createMinimalInstance();
@@ -294,6 +294,8 @@ public class Config {
                 instance = createMinimalInstance();
                 instance.api = api;
                 instance.onConfigChangedCallback = onConfigChangedCallback;
+                // Load defaults into a temporary in-memory config
+                instance.loadDefaultConfig();
             }
             return instance;
         }
@@ -307,7 +309,7 @@ public class Config {
             Config minimalConfig = new Config(null, null);
             minimalConfig.patterns = new ArrayList<>();
             minimalConfig.settings = new Settings();
-            minimalConfig.config = createEmptyConfig();
+            minimalConfig.fileConfig = null; // No file config for minimal instance
             minimalConfig.api = null;
             minimalConfig.onConfigChangedCallback = null;
             return minimalConfig;
@@ -316,7 +318,7 @@ public class Config {
             Config emergency = new Config(null, null);
             emergency.patterns = new ArrayList<>();
             emergency.settings = new Settings();
-            emergency.config = createEmptyConfig();
+            emergency.fileConfig = null;
             return emergency;
         }
     }
@@ -330,41 +332,44 @@ public class Config {
     
     private void loadConfig() {
         try {
-            // First, try to load from persistence
-            if (api == null) {
-                loadDefaultConfig();
-                return;
+            String configFilePath = getDefaultConfigFilePath();
+            Path configPath = Paths.get(configFilePath);
+
+            // If config file doesn't exist, create it from the default resource.
+            if (!Files.exists(configPath)) {
+                Logger.logCritical("Config file not found. Creating from default resource: " + configPath);
+                try (InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH)) {
+                    if (defaultConfigStream == null) {
+                        throw new IOException("Default config resource not found: " + DEFAULT_CONFIG_PATH);
+                    }
+                    Files.createDirectories(configPath.getParent());
+                    Files.copy(defaultConfigStream, configPath);
+                } catch (IOException e) {
+                    Logger.logCriticalError("Failed to create config file from default: " + e.getMessage());
+                    // Stop loading if creation fails
+                    loadDefaultConfig(); // Fallback to in-memory default
+                    return;
+                }
             }
+
+            // Configure the TomlFormat with our custom writer
+            TomlFormat tomlFormat = TomlFormat.instance();
             
-            PersistedObject persistedData = api.persistence().extensionData();
-            String savedConfig = persistedData.getString(CONFIG_KEY);
+            this.fileConfig = CommentedFileConfig.builder(configPath, tomlFormat)
+                .writingMode(WritingMode.REPLACE) // REPLACE is needed to write comments correctly.
+                .preserveInsertionOrder()
+                .build();
+
+            fileConfig.load();
             
-            if (savedConfig != null && !savedConfig.isEmpty()) {
-                // Parse the persisted config
-                TomlParser parser = TomlFormat.instance().createParser();
-                this.config = parser.parse(new StringReader(savedConfig));
-                parseConfig();
-            } else {
-                // Load default config from resources
-                loadDefaultConfig();
-            }
-            
-            // Initialize external config file on first install (only if it doesn't exist)
-            initializeExternalConfigFile();
-            
-            // Apply dynamic pattern replacement for generic secrets
+            parseConfig();
             applyDynamicPatterns();
             
         } catch (Exception e) {
-            Logger.logCriticalError("Failed to load configuration: " + e.getMessage());
+            Logger.logCriticalError("Failed to load configuration from file: " + e.getMessage());
             e.printStackTrace();
-            // Fallback to default config
+            // Fallback to default config loaded in memory
             loadDefaultConfig();
-        }
-        
-        // Ensure config is never null
-        if (this.config == null) {
-            this.config = TomlFormat.newConfig();
         }
     }
     
@@ -372,35 +377,44 @@ public class Config {
         try {
             InputStream configStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH);
             if (configStream != null) {
-                TomlParser parser = TomlFormat.instance().createParser();
-                this.config = parser.parse(configStream);
-                parseConfig();
-                // Save default config to persistence
-                saveConfig();
+                CommentedConfig inMemoryConfig = TomlFormat.instance().createParser().parse(configStream);
+                
+                // Temporarily use this in-memory config
+                this.fileConfig = null; // No file, so set to null
+                parseConfig(inMemoryConfig); // Parse from this object
+                applyDynamicPatterns();
             } else {
                 Logger.logCriticalError("Default config file not found in resources");
-                // Create empty config to avoid null pointer exceptions
-                this.config = createEmptyConfig();
+                this.settings = new Settings();
+                this.patterns = new ArrayList<>();
             }
         } catch (Exception e) {
             Logger.logCriticalError("Failed to load default configuration: " + e.getMessage());
-            // Create empty config to avoid null pointer exceptions
-            this.config = createEmptyConfig();
+            this.settings = new Settings();
+            this.patterns = new ArrayList<>();
         }
     }
     
     private void parseConfig() {
-        // Parse version first
-        parseVersion();
-        
-        // Parse settings
-        parseSettings();
-        
-        // Parse patterns
-        parsePatterns();
+        if (fileConfig == null) {
+            Logger.logCriticalError("Cannot parse config: fileConfig is null.");
+            return;
+        }
+        parseConfig(fileConfig);
     }
     
-    private void parseVersion() {
+    private void parseConfig(CommentedConfig config) {
+        // Parse version first
+        parseVersion(config);
+        
+        // Parse settings
+        parseSettings(config);
+        
+        // Parse patterns
+        parsePatterns(config);
+    }
+    
+    private void parseVersion(CommentedConfig config) {
         if (config == null) {
             Logger.logCriticalError("Cannot parse version: config is null");
             configVersion = "unknown";
@@ -412,7 +426,7 @@ public class Config {
         configVersion = version != null ? version : "unknown";
     }
     
-    private void parseSettings() {
+    private void parseSettings(CommentedConfig config) {
         if (config == null) {
             Logger.logCriticalError("Cannot parse settings: config is null");
             return;
@@ -464,9 +478,7 @@ public class Config {
             // Parse excluded file extensions
             List<String> excludedExtensions = settingsConfig.get("excluded_file_extensions");
             if (excludedExtensions != null) {
-                Set<String> excludedExtensionsSet = new HashSet<>();
-                excludedExtensionsSet.addAll(excludedExtensions);
-                settings.setExcludedFileExtensions(excludedExtensionsSet);
+                settings.setExcludedFileExtensions(new HashSet<>(excludedExtensions));
             }
             
             // Parse enabled tools
@@ -475,7 +487,7 @@ public class Config {
                 Set<ToolType> enabledToolsSet = new HashSet<>();
                 for (String toolName : enabledTools) {
                     try {
-                        enabledToolsSet.add(ToolType.valueOf(toolName));
+                        enabledToolsSet.add(ToolType.valueOf(toolName.toUpperCase()));
                     } catch (IllegalArgumentException e) {
                         Logger.logCriticalError("Invalid tool type: " + toolName);
                     }
@@ -485,7 +497,7 @@ public class Config {
         }
     }
     
-    private void parsePatterns() {
+    private void parsePatterns(CommentedConfig config) {
         patterns.clear();
         
         if (config == null) {
@@ -505,7 +517,6 @@ public class Config {
                     try {
                         // Handle dynamic patterns before compiling
                         if (name.equals("Generic Secret") || name.equals("Generic Secret v2")) {
-                            // Use replace() instead of String.format() to avoid issues with literal % characters
                             pattern = pattern.replace("%d,%d", 
                                 settings.getGenericSecretMinLength() + "," + settings.getGenericSecretMaxLength());
                         }
@@ -521,81 +532,63 @@ public class Config {
     }
     
     private void applyDynamicPatterns() {
-        // Re-parse patterns to apply updated dynamic values
-        parsePatterns();
+        // Re-parse patterns to apply updated dynamic values from the config object
+        if (fileConfig != null) {
+            parsePatterns(fileConfig);
+        }
     }
     
     public void saveConfig() {
         try {
-            // Can't save config without API or settings
-            if (api == null || settings == null) {
-                Logger.logCriticalError("Cannot save config: API or settings is null");
+            // Cannot save if there's no file config object
+            if (fileConfig == null) {
+                Logger.logErrorMsg("Cannot save config: fileConfig is not initialized. Changes will not be persisted.");
                 return;
             }
             
-            // Don't save if we're still initializing (this.config might be null)
-            if (this.config == null) {
-                Logger.logCriticalError("Cannot save config: config object is null (still initializing?)");
-                return;
+            // Update the fileConfig object with current settings before saving
+            // This preserves comments around the values.
+            fileConfig.set("version", getCurrentExtensionVersion());
+            
+            CommentedConfig settingsMap = fileConfig.get("settings");
+            if (settingsMap != null) {
+                settingsMap.set("workers", settings.getWorkers());
+                settingsMap.set("in_scope_only", settings.isInScopeOnly());
+                settingsMap.set("logging_enabled", settings.isLoggingEnabled());
+                settingsMap.set("randomness_algorithm_enabled", settings.isRandomnessAlgorithmEnabled());
+                settingsMap.set("generic_secret_min_length", settings.getGenericSecretMinLength());
+                settingsMap.set("generic_secret_max_length", settings.getGenericSecretMaxLength());
+                settingsMap.set("duplicate_threshold", settings.getDuplicateThreshold());
+                settingsMap.set("max_highlights_per_secret", settings.getMaxHighlightsPerSecret());
+                settingsMap.set("excluded_file_extensions", new ArrayList<>(settings.getExcludedFileExtensions()));
+                
+                List<String> enabledToolsStr = settings.getEnabledTools().stream()
+                    .map(ToolType::name).sorted().collect(Collectors.toList());
+                settingsMap.set("enabled_tools", enabledToolsStr);
             }
-            // Convert current configuration to TOML format (thread-safe, preserves order)
-            CommentedConfig configMap = createEmptyConfig();
-            
-            // Add version (use current extension version)
-            configMap.set("version", getCurrentExtensionVersion());
-            
-            // Add settings
-            CommentedConfig settingsMap = createEmptyConfig();
-            settingsMap.set("workers", settings.getWorkers());
-            settingsMap.set("in_scope_only", settings.isInScopeOnly());
-            settingsMap.set("logging_enabled", settings.isLoggingEnabled());
-            settingsMap.set("randomness_algorithm_enabled", settings.isRandomnessAlgorithmEnabled());
-            settingsMap.set("generic_secret_min_length", settings.getGenericSecretMinLength());
-            settingsMap.set("generic_secret_max_length", settings.getGenericSecretMaxLength());
-            settingsMap.set("duplicate_threshold", settings.getDuplicateThreshold());
-            settingsMap.set("max_highlights_per_secret", settings.getMaxHighlightsPerSecret());
-            settingsMap.set("excluded_file_extensions", new ArrayList<>(settings.getExcludedFileExtensions()));
-            
-            List<String> enabledToolsStr = new ArrayList<>();
-            for (ToolType tool : settings.getEnabledTools()) {
-                enabledToolsStr.add(tool.name());
-            }
-            settingsMap.set("enabled_tools", enabledToolsStr);
-            
-            configMap.set("settings", settingsMap);
-            
-            // Add patterns (ensure patterns is not null)
+
+            // Update patterns in fileConfig. This is tricky for preserving comments.
+            // We assume the list of patterns itself (the PatternConfig objects) is the source of truth
+            // and we rewrite the whole list. This means comments between pattern blocks will be lost,
+            // but comments *inside* a pattern block should be preserved if we modify them carefully.
+            // For now, rewriting the whole list is the most reliable way to save changes from the UI.
             List<CommentedConfig> patternsList = new ArrayList<>();
             if (patterns != null) {
-                Logger.logCritical("Saving config with " + patterns.size() + " patterns");
                 for (PatternConfig pattern : patterns) {
-                    if (pattern != null) {
-                        // Use config with preserved field order: name, prefix, pattern, suffix
-                        CommentedConfig patternMap = createEmptyConfig();
-                        patternMap.set("name", pattern.getName());
-                        patternMap.set("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
-                        patternMap.set("pattern", pattern.getPattern());
-                        patternMap.set("suffix", pattern.getSuffix() != null ? pattern.getSuffix() : "");
-                        patternsList.add(patternMap);
-                    }
+                    CommentedConfig patternMap = TomlFormat.newConcurrentConfig();
+                    patternMap.set("name", pattern.getName());
+                    patternMap.set("prefix", pattern.getPrefix());
+                    patternMap.set("pattern", pattern.getPattern());
+                    patternMap.set("suffix", pattern.getSuffix());
+                    patternsList.add(patternMap);
                 }
-            } else {
-                Logger.logCritical("Warning: Saving config with null patterns list");
             }
-            configMap.set("patterns", patternsList);
+            fileConfig.set("patterns", patternsList);
+
+            // Save the file using our custom writer to preserve formatting
+            createConfiguredTomlWriter().write(fileConfig, fileConfig.getFile(), WritingMode.REPLACE);
             
-            // Convert to TOML string
-            TomlWriter writer = createConfiguredTomlWriter();
-            StringWriter stringWriter = new StringWriter();
-            writer.write(configMap, stringWriter);
-            String tomlString = stringWriter.toString();
-            
-            // Save to persistence
-            PersistedObject persistedData = api.persistence().extensionData();
-            persistedData.setString(CONFIG_KEY, tomlString);
-            
-            // Also auto-sync to external config file
-            autoSyncExternalConfigFile(tomlString);
+            Logger.logMsg("Configuration saved to " + fileConfig.getNioPath());
             
             // Notify of config change
             if (onConfigChangedCallback != null) {
@@ -609,112 +602,41 @@ public class Config {
     }
     
     /**
-     * Automatically sync the external config.toml file when settings change
-     * NightConfig generates proper TOML sections with setHideRedundantLevels(false)
-     * @param tomlString The TOML content to write (we use this directly now)
+     * Resets the configuration file to the default state by overwriting it.
      */
-    private void autoSyncExternalConfigFile(String tomlString) {
+    public void resetToDefaults() {
         try {
             String configFilePath = getDefaultConfigFilePath();
             Path configPath = Paths.get(configFilePath);
             
-            // Create directory if it doesn't exist
-            Files.createDirectories(configPath.getParent());
-            
-            // Use the properly formatted TOML string from NightConfig
-            Files.write(configPath, tomlString.getBytes());
-            
-            Logger.logMsg("Auto-synced configuration to " + configFilePath);
-            
-        } catch (Exception e) {
-            Logger.logErrorMsg("Failed to auto-sync config file: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Generate proper TOML content with correct formatting and triple-quote literals
-     * This method is kept for backwards compatibility but now uses NightConfig's proper formatting
-     * @return Properly formatted TOML string
-     */
-    private String generateProperTomlContent() {
-        try {
-            // Create config using NightConfig (thread-safe, preserves order)
-            CommentedConfig configMap = createEmptyConfig();
-            
-            // Add version
-            configMap.set("version", getCurrentExtensionVersion());
-            
-            // Add settings
-            CommentedConfig settingsMap = createEmptyConfig();
-            settingsMap.set("excluded_file_extensions", new ArrayList<>(settings.getExcludedFileExtensions()));
-            settingsMap.set("workers", settings.getWorkers());
-            settingsMap.set("in_scope_only", settings.isInScopeOnly());
-            settingsMap.set("logging_enabled", settings.isLoggingEnabled());
-            settingsMap.set("randomness_algorithm_enabled", settings.isRandomnessAlgorithmEnabled());
-            settingsMap.set("generic_secret_min_length", settings.getGenericSecretMinLength());
-            settingsMap.set("generic_secret_max_length", settings.getGenericSecretMaxLength());
-            settingsMap.set("duplicate_threshold", settings.getDuplicateThreshold());
-            settingsMap.set("max_highlights_per_secret", settings.getMaxHighlightsPerSecret());
-            
-            List<String> enabledToolsStr = new ArrayList<>();
-            for (ToolType tool : settings.getEnabledTools()) {
-                enabledToolsStr.add(tool.name());
-            }
-            settingsMap.set("enabled_tools", enabledToolsStr);
-            
-            configMap.set("settings", settingsMap);
-            
-            // Add patterns
-            List<CommentedConfig> patternsList = new ArrayList<>();
-            if (patterns != null) {
-                for (PatternConfig pattern : patterns) {
-                    // Use config with preserved field order: name, prefix, pattern, suffix
-                    CommentedConfig patternMap = createEmptyConfig();
-                    patternMap.set("name", pattern.getName());
-                    patternMap.set("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
-                    patternMap.set("pattern", pattern.getPattern());
-                    patternMap.set("suffix", pattern.getSuffix() != null ? pattern.getSuffix() : "");
-                    patternsList.add(patternMap);
+            try (InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH)) {
+                if (defaultConfigStream == null) {
+                    throw new IOException("Default config resource not found.");
                 }
+                Files.copy(defaultConfigStream, configPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
-            configMap.set("patterns", patternsList);
             
-            // Convert to TOML string using NightConfig
-            TomlWriter writer = createConfiguredTomlWriter();
-            StringWriter stringWriter = new StringWriter();
-            writer.write(configMap, stringWriter);
-            return stringWriter.toString();
+            // Reload the configuration from the newly reset file
+            loadConfig();
             
-        } catch (Exception e) {
-            Logger.logCriticalError("Failed to generate proper TOML content: " + e.getMessage());
-            return "# Error generating TOML content\n";
-        }
-    }
-    
-    public void resetToDefaults() {
-        loadDefaultConfig();
-        applyDynamicPatterns();
-        saveConfig(); // This will also auto-sync to external file
-    }
-    
-    /**
-     * Reset configuration to defaults: default-config -> config.toml -> persistence
-     * Overwrites both persistence and external config file
-     */
-    public void resetToDefaultsComplete() {
-        try {
-            // Load default config
-            loadDefaultConfig();
-            applyDynamicPatterns();
+            Logger.logCritical("Configuration has been reset to defaults.");
             
-            // Save to persistence and auto-sync to external file (uses template approach)
-            saveConfig();
-            
-            Logger.logCritical("Configuration reset to defaults");
+            // Notify listeners about the change
+            if (onConfigChangedCallback != null) {
+                onConfigChangedCallback.run();
+            }
             
         } catch (Exception e) {
             Logger.logCriticalError("Failed to reset configuration to defaults: " + e.getMessage());
         }
+    }
+
+    /**
+     * This method is deprecated. Use resetToDefaults() instead.
+     * @deprecated
+     */
+    public void resetToDefaultsComplete() {
+        resetToDefaults();
     }
     
     /**
@@ -789,10 +711,6 @@ public class Config {
     
     public void reloadConfig() {
         loadConfig();
-        // Notify of config change
-        if (onConfigChangedCallback != null) {
-            onConfigChangedCallback.run();
-        }
     }
     
     public Settings getSettings() {
@@ -863,57 +781,12 @@ public class Config {
      * @throws IOException If file operations fail
      */
     public void exportConfigToFile(String filePath) throws IOException {
-        // Generate TOML content using NightConfig (thread-safe, preserves order)
-        CommentedConfig configMap = createEmptyConfig();
-        
-        // Add version (use current extension version)
-        configMap.set("version", getCurrentExtensionVersion());
-        
-        // Add settings
-        CommentedConfig settingsMap = createEmptyConfig();
-        settingsMap.set("workers", settings.getWorkers());
-        settingsMap.set("in_scope_only", settings.isInScopeOnly());
-        settingsMap.set("logging_enabled", settings.isLoggingEnabled());
-        settingsMap.set("randomness_algorithm_enabled", settings.isRandomnessAlgorithmEnabled());
-        settingsMap.set("generic_secret_min_length", settings.getGenericSecretMinLength());
-        settingsMap.set("generic_secret_max_length", settings.getGenericSecretMaxLength());
-        settingsMap.set("duplicate_threshold", settings.getDuplicateThreshold());
-        settingsMap.set("max_highlights_per_secret", settings.getMaxHighlightsPerSecret());
-        settingsMap.set("excluded_file_extensions", new ArrayList<>(settings.getExcludedFileExtensions()));
-        
-        List<String> enabledToolsStr = new ArrayList<>();
-        for (ToolType tool : settings.getEnabledTools()) {
-            enabledToolsStr.add(tool.name());
+        if (fileConfig == null) {
+            throw new IOException("Configuration is not loaded, cannot export.");
         }
-        settingsMap.set("enabled_tools", enabledToolsStr);
-        
-        configMap.set("settings", settingsMap);
-        
-        // Add patterns
-        List<CommentedConfig> patternsList = new ArrayList<>();
-        if (patterns != null) {
-            Logger.logCritical("Exporting config with " + patterns.size() + " patterns");
-            for (PatternConfig pattern : patterns) {
-                if (pattern != null) {
-                    CommentedConfig patternMap = TomlFormat.newConcurrentConfig();
-                    patternMap.set("name", pattern.getName());
-                    patternMap.set("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
-                    patternMap.set("pattern", pattern.getPattern());
-                    patternMap.set("suffix", pattern.getSuffix() != null ? pattern.getSuffix() : "");
-                    patternsList.add(patternMap);
-                }
-            }
-        } else {
-            Logger.logCritical("Warning: Exporting config with null patterns list");
-        }
-        configMap.set("patterns", patternsList);
-        
-        // Convert to TOML string and write to file
-        TomlWriter writer = createConfiguredTomlWriter();
-        StringWriter stringWriter = new StringWriter();
-        writer.write(configMap, stringWriter);
-        String tomlString = stringWriter.toString();
-        Files.write(Paths.get(filePath), tomlString.getBytes());
+        Path destination = Paths.get(filePath);
+        Files.createDirectories(destination.getParent());
+        Files.copy(fileConfig.getNioPath(), destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
     }
     
     /**
@@ -922,30 +795,19 @@ public class Config {
      * @throws IOException If file operations fail
      */
     public void importConfigFromFile(String filePath) throws IOException {
-        File file = new File(filePath);
-        if (!file.exists()) {
+        Path sourcePath = Paths.get(filePath);
+        if (!Files.exists(sourcePath)) {
             throw new IOException("Config file not found: " + filePath);
         }
         
-        try (FileReader fileReader = new FileReader(file)) {
-            // Parse the TOML file
-            TomlParser parser = TomlFormat.instance().createParser();
-            this.config = parser.parse(fileReader);
-            
-            // Parse the loaded config
-            parseConfig();
-            
-            // Apply dynamic patterns
-            applyDynamicPatterns();
-            
-            // Save to Burp persistence (primary storage)
-            saveConfig();
-            
-            // Notify of config change
-            if (onConfigChangedCallback != null) {
-                onConfigChangedCallback.run();
-            }
-        }
+        String configFilePath = getDefaultConfigFilePath();
+        Path destinationPath = Paths.get(configFilePath);
+        
+        Files.createDirectories(destinationPath.getParent());
+        Files.copy(sourcePath, destinationPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        
+        // Reload config from the newly imported file
+        loadConfig();
     }
     
     /**
@@ -964,7 +826,7 @@ public class Config {
             configDir = Paths.get(userHome, "burp-ai-secrets-detector").toString();
         } else {
             // Linux/Mac: ~/burp-ai-secrets-detector/
-            configDir = Paths.get(userHome, "burp-ai-secrets-detector").toString();
+            configDir = Paths.get(userHome, ".config", "burp-ai-secrets-detector").toString();
         }
         
         // Ensure directory exists
@@ -986,51 +848,35 @@ public class Config {
     }
     
     /**
-     * Create and configure a TomlWriter with proper settings for regex patterns
+     * Create and configure a TomlWriter with proper settings for regex patterns.
+     * This writer ensures that pattern fields are written as literal (triple-quote) strings.
      * @return Configured TomlWriter instance
      */
     private TomlWriter createConfiguredTomlWriter() {
-        TomlWriter writer = TomlFormat.instance().createWriter();
+        TomlWriter writer = new TomlWriter();
         writer.setHideRedundantLevels(false); // Generate proper TOML sections!
-        writer.setIndent(""); // No indentation - flat TOML format
         
-        // Configure writer to use literal strings (triple quotes) for ALL pattern fields
-        // This ensures consistent formatting like the default-config.toml
+        // This predicate decides whether a string should be written as a literal string (''')
+        // We apply it to any string that looks like a regex or is an empty string.
         writer.setWriteStringLiteralPredicate(str -> {
-            // Use triple quotes for all strings in patterns (including empty strings)
-            // This matches the format in default-config.toml exactly
-            return true; // Use triple quotes for everything to match default format
+            if (str == null) {
+                return false;
+            }
+            // Use triple quotes for empty strings and strings containing regex-like characters
+            // to preserve them correctly, just like in default-config.toml.
+            return str.isEmpty() ||
+                   str.contains("\\") ||
+                   str.contains("|") ||
+                   str.contains("(") || str.contains(")") ||
+                   str.contains("[") || str.contains("]") ||
+                   str.contains("{") || str.contains("}") ||
+                   str.contains("*") || str.contains("+") ||
+                   str.contains("?") ||
+                   str.contains("^") || str.contains("$");
         });
         
         return writer;
     }
-    
-    /**
-     * Initialize external config file on first install
-     * Creates config.toml only if it doesn't exist
-     */
-    public void initializeExternalConfigFile() {
-        String configFilePath = getDefaultConfigFilePath();
-        
-        // Only create if config.toml doesn't exist (first install)
-        if (!Files.exists(Paths.get(configFilePath))) {
-            try {
-                // Ensure patterns are loaded before exporting
-                if (patterns == null || patterns.isEmpty()) {
-                    Logger.logCritical("Warning: Patterns not loaded, re-parsing config before export");
-                    parseConfig(); // Re-parse to ensure patterns are loaded
-                }
-                
-                // Export current config to create initial config file
-                exportConfigToFile(configFilePath);
-                Logger.logCritical("First install: Created config file at " + configFilePath + " with " + 
-                    (patterns != null ? patterns.size() : 0) + " patterns");
-            } catch (IOException e) {
-                Logger.logCriticalError("Failed to create initial config file: " + e.getMessage());
-            }
-        }
-    }
-    
 
-    
+    // initializeExternalConfigFile is no longer needed as the builder handles it.
 } 
