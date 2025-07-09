@@ -36,13 +36,15 @@ enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
 # Secret detection patterns
 # Each pattern has:
 # - name: Human-readable name for the secret type
-# - prefix: Regex pattern that appears before the secret (use '''regexpattern''' for literal strings)
-# - pattern: Main regex pattern that captures the secret (use capture groups)
-# - suffix: Regex pattern that appears after the secret
+# - prefix: Regex pattern that is prepended, usually non-capturing groups (use '''regexpattern''' for literal expressions)
+# - pattern: Main regex pattern that captures the secret (use capture groups) (use '''regexpattern''' for literal expressions)
+# - suffix: Regex pattern that is appended, usually non-capturing groups (use '''regexpattern''' for literal expressions)
 
 # Note that you do not need to double escape the regex
 # (e.g., use \S instead of \\s, \b instead of \\b, etc.)
 # because TOML triple-quoted strings preserve backslashes as-is.
+
+# Empty patterns are accepted as '' or ''''''
 
 [[patterns]]
 name = "URL with Credentials"
