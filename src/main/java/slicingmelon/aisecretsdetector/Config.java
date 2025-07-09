@@ -12,6 +12,7 @@ import burp.api.montoya.persistence.PersistedObject;
 import burp.api.montoya.core.ToolType;
 import com.electronwill.nightconfig.core.CommentedConfig;
 import com.electronwill.nightconfig.core.file.FileConfig;
+import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.toml.TomlFormat;
 import com.electronwill.nightconfig.toml.TomlParser;
 import com.electronwill.nightconfig.toml.TomlWriter;
@@ -228,12 +229,24 @@ public class Config {
         }
     }
     
+    /**
+     * Create an empty CommentedConfig with proper settings for TOML format
+     * Preserves insertion order and supports comments
+     */
+    private static CommentedConfig createEmptyConfig() {
+        // Enable insertion order preservation globally
+        System.setProperty("nightconfig.preserveInsertionOrder", "true");
+        
+        // Create a commented config with TOML format and insertion order preserved
+        return TomlFormat.newConcurrentConfig();
+    }
+    
     private Config(MontoyaApi api, Runnable onConfigChangedCallback) {
         this.api = api;
         this.onConfigChangedCallback = onConfigChangedCallback;
         this.patterns = new ArrayList<>();
         this.settings = new Settings(); // Always initialize settings first
-        this.config = TomlFormat.newConfig(); // Always initialize config to prevent null
+        this.config = createEmptyConfig(); // Always initialize config to prevent null
         
         // Only load config if we have an API instance
         if (api != null) {
@@ -294,7 +307,7 @@ public class Config {
             Config minimalConfig = new Config(null, null);
             minimalConfig.patterns = new ArrayList<>();
             minimalConfig.settings = new Settings();
-            minimalConfig.config = TomlFormat.newConfig();
+            minimalConfig.config = createEmptyConfig();
             minimalConfig.api = null;
             minimalConfig.onConfigChangedCallback = null;
             return minimalConfig;
@@ -303,7 +316,7 @@ public class Config {
             Config emergency = new Config(null, null);
             emergency.patterns = new ArrayList<>();
             emergency.settings = new Settings();
-            emergency.config = TomlFormat.newConfig();
+            emergency.config = createEmptyConfig();
             return emergency;
         }
     }
@@ -367,12 +380,12 @@ public class Config {
             } else {
                 Logger.logCriticalError("Default config file not found in resources");
                 // Create empty config to avoid null pointer exceptions
-                this.config = TomlFormat.newConfig();
+                this.config = createEmptyConfig();
             }
         } catch (Exception e) {
             Logger.logCriticalError("Failed to load default configuration: " + e.getMessage());
             // Create empty config to avoid null pointer exceptions
-            this.config = TomlFormat.newConfig();
+            this.config = createEmptyConfig();
         }
     }
     
@@ -525,14 +538,14 @@ public class Config {
                 Logger.logCriticalError("Cannot save config: config object is null (still initializing?)");
                 return;
             }
-            // Convert current configuration to TOML format (thread-safe)
-            CommentedConfig configMap = TomlFormat.newConcurrentConfig();
+            // Convert current configuration to TOML format (thread-safe, preserves order)
+            CommentedConfig configMap = createEmptyConfig();
             
             // Add version (use current extension version)
             configMap.set("version", getCurrentExtensionVersion());
             
             // Add settings
-            CommentedConfig settingsMap = TomlFormat.newConcurrentConfig();
+            CommentedConfig settingsMap = createEmptyConfig();
             settingsMap.set("workers", settings.getWorkers());
             settingsMap.set("in_scope_only", settings.isInScopeOnly());
             settingsMap.set("logging_enabled", settings.isLoggingEnabled());
@@ -557,8 +570,8 @@ public class Config {
                 Logger.logCritical("Saving config with " + patterns.size() + " patterns");
                 for (PatternConfig pattern : patterns) {
                     if (pattern != null) {
-                        // Use concurrent config to preserve field order: name, prefix, pattern, suffix
-                        CommentedConfig patternMap = TomlFormat.newConcurrentConfig();
+                        // Use config with preserved field order: name, prefix, pattern, suffix
+                        CommentedConfig patternMap = createEmptyConfig();
                         patternMap.set("name", pattern.getName());
                         patternMap.set("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
                         patternMap.set("pattern", pattern.getPattern());
@@ -625,14 +638,14 @@ public class Config {
      */
     private String generateProperTomlContent() {
         try {
-            // Create config using NightConfig (thread-safe)
-            CommentedConfig configMap = TomlFormat.newConcurrentConfig();
+            // Create config using NightConfig (thread-safe, preserves order)
+            CommentedConfig configMap = createEmptyConfig();
             
             // Add version
             configMap.set("version", getCurrentExtensionVersion());
             
             // Add settings
-            CommentedConfig settingsMap = TomlFormat.newConcurrentConfig();
+            CommentedConfig settingsMap = createEmptyConfig();
             settingsMap.set("excluded_file_extensions", new ArrayList<>(settings.getExcludedFileExtensions()));
             settingsMap.set("workers", settings.getWorkers());
             settingsMap.set("in_scope_only", settings.isInScopeOnly());
@@ -655,8 +668,8 @@ public class Config {
             List<CommentedConfig> patternsList = new ArrayList<>();
             if (patterns != null) {
                 for (PatternConfig pattern : patterns) {
-                    // Use concurrent config with LinkedHashMap to preserve field order: name, prefix, pattern, suffix
-                    CommentedConfig patternMap = TomlFormat.newConcurrentConfig();
+                    // Use config with preserved field order: name, prefix, pattern, suffix
+                    CommentedConfig patternMap = createEmptyConfig();
                     patternMap.set("name", pattern.getName());
                     patternMap.set("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
                     patternMap.set("pattern", pattern.getPattern());
@@ -850,14 +863,14 @@ public class Config {
      * @throws IOException If file operations fail
      */
     public void exportConfigToFile(String filePath) throws IOException {
-        // Generate TOML content using NightConfig (thread-safe)
-        CommentedConfig configMap = TomlFormat.newConcurrentConfig();
+        // Generate TOML content using NightConfig (thread-safe, preserves order)
+        CommentedConfig configMap = createEmptyConfig();
         
         // Add version (use current extension version)
         configMap.set("version", getCurrentExtensionVersion());
         
         // Add settings
-        CommentedConfig settingsMap = TomlFormat.newConcurrentConfig();
+        CommentedConfig settingsMap = createEmptyConfig();
         settingsMap.set("workers", settings.getWorkers());
         settingsMap.set("in_scope_only", settings.isInScopeOnly());
         settingsMap.set("logging_enabled", settings.isLoggingEnabled());
