@@ -35,7 +35,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Set;
-import java.util.Arrays;
 import burp.api.montoya.core.ByteArray;
 
 public class AISecretsDetector implements BurpExtension {
@@ -53,32 +52,7 @@ public class AISecretsDetector implements BurpExtension {
     // Static instance for accessing from Config
     private static AISecretsDetector instance;
     
-    // Predefined set of file extensions to skip for performance (O(1) lookup)
-    // IMPORTANT: Only include extensions that are VERY unlikely to contain secrets
-    private static final Set<String> SKIP_FILE_EXTENSIONS = new HashSet<>(Arrays.asList(
-        // Media files (audio/video)
-        "3g2", "3gp", "aac", "aif", "aifc", "aiff", "au", "avi", "flac", "flv", "m3u", "m4a", "m4v", "mid", "midi", 
-        "mkv", "mov", "mp2", "mp3", "mp4", "mpa", "mpe", "mpeg", "mpg", "mpv2", "oga", "ogg", "ogv", "ogx", 
-        "ra", "ram", "rmi", "snd", "wav", "weba", "webm", "wma", "wmv",
-        // Image files (including raw formats)
-        "bmp", "gif", "ico", "ief", "jfif", "jpe", "jpeg", "jpg", "pbm", "pgm", "png", "pnm", "ppm", "ras", 
-        "raw", "rgb", "svg", "tiff", "webp", "xbm", "xpm", "xwd", "psd", "ai", "eps", "cmx",
-        // Archive files  
-        "7z", "arc", "bz", "bz2", "gz", "rar", "tar", "zip", "zipx", "xz", "lz", "lzma",
-        // Application packages
-        "apk", "jar", "war", "ear", "mpkg",
-        // Binary/Executable files
-        "bin", "cod", "com", "exe", "msi", "dll", "so", "dylib", "app", "deb", "rpm", "pkg", "dmg", "iso", "img",
-        // Document files (binary formats only)
-        "abw", "azw", "doc", "docx", "epub", "mpp", "odp", "ods", "odt", "pages", "numbers", "keynote", 
-        "pdf", "ppt", "pptx", "rtf", "vsd", "xls", "xlsx",
-        // Font files
-        "eot", "otf", "ttf", "woff", "woff2",
-        // Other truly binary formats
-        "dat", "mdb", "accdb", "o", "obj", "swf", "fla", "xul",
-        // CSS ?
-        "css"
-    ));
+
     
     @Override
     public void initialize(MontoyaApi api) {
@@ -669,7 +643,7 @@ public class AISecretsDetector implements BurpExtension {
 
     /**
      * Skip file extensions that are unlikely to contain secrets (binary files, media, etc.)
-     * Uses a predefined HashSet for O(1) lookup performance
+     * Uses the config's excluded file extensions for O(1) lookup performance
      * @param fileExtension The file extension to check (can be null or empty)
      * @return true if the file extension should be skipped, false otherwise
      */
@@ -686,7 +660,8 @@ public class AISecretsDetector implements BurpExtension {
             ext = ext.substring(1);
         }
         
-        return SKIP_FILE_EXTENSIONS.contains(ext);
+        // Use the config's excluded file extensions
+        return config != null && config.getSettings().getExcludedFileExtensions().contains(ext);
     }
 
     // helper function to log normal messages - only UI logging
