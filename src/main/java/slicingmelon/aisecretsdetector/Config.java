@@ -554,6 +554,7 @@ public class Config {
             // Add patterns (ensure patterns is not null)
             List<CommentedConfig> patternsList = new ArrayList<>();
             if (patterns != null) {
+                Logger.logCritical("Saving config with " + patterns.size() + " patterns");
                 for (PatternConfig pattern : patterns) {
                     if (pattern != null) {
                         CommentedConfig patternMap = TomlFormat.newConfig();
@@ -564,12 +565,15 @@ public class Config {
                         patternsList.add(patternMap);
                     }
                 }
+            } else {
+                Logger.logCritical("Warning: Saving config with null patterns list");
             }
             configMap.set("patterns", patternsList);
             
             // Convert to TOML string
             TomlWriter writer = TomlFormat.instance().createWriter();
             writer.setHideRedundantLevels(false); // This generates proper TOML sections!
+            writer.setIndent(""); // No indentation - flat TOML format
             StringWriter stringWriter = new StringWriter();
             writer.write(configMap, stringWriter);
             String tomlString = stringWriter.toString();
@@ -665,6 +669,7 @@ public class Config {
             // Convert to TOML string using NightConfig
             TomlWriter writer = TomlFormat.instance().createWriter();
             writer.setHideRedundantLevels(false); // Generate proper TOML sections!
+            writer.setIndent(""); // No indentation - flat TOML format
             StringWriter stringWriter = new StringWriter();
             writer.write(configMap, stringWriter);
             return stringWriter.toString();
@@ -674,50 +679,6 @@ public class Config {
             return "# Error generating TOML content\n";
         }
     }
-    
-    /**
-     * Append a string array in TOML format
-     */
-    private void appendStringArray(StringBuilder toml, Set<String> strings) {
-        toml.append("[");
-        if (strings != null && !strings.isEmpty()) {
-            String[] array = strings.toArray(new String[0]);
-            for (int i = 0; i < array.length; i++) {
-                if (i > 0) toml.append(", ");
-                toml.append("\"").append(escapeTomlString(array[i])).append("\"");
-            }
-        }
-        toml.append("]");
-    }
-    
-    /**
-     * Append tools array in TOML format
-     */
-    private void appendToolsArray(StringBuilder toml, Set<ToolType> tools) {
-        toml.append("[");
-        if (tools != null && !tools.isEmpty()) {
-            ToolType[] array = tools.toArray(new ToolType[0]);
-            for (int i = 0; i < array.length; i++) {
-                if (i > 0) toml.append(", ");
-                toml.append("\"").append(array[i].name()).append("\"");
-            }
-        }
-        toml.append("]");
-    }
-    
-    /**
-     * Escape strings for TOML basic strings (inside double quotes)
-     */
-    private String escapeTomlString(String str) {
-        if (str == null) return "";
-        return str.replace("\\", "\\\\")
-                  .replace("\"", "\\\"")
-                  .replace("\n", "\\n")
-                  .replace("\r", "\\r")
-                  .replace("\t", "\\t");
-    }
-    
-
     
     public void resetToDefaults() {
         loadDefaultConfig();
@@ -919,19 +880,27 @@ public class Config {
         
         // Add patterns
         List<CommentedConfig> patternsList = new ArrayList<>();
-        for (PatternConfig pattern : patterns) {
-            CommentedConfig patternMap = TomlFormat.newConfig();
-            patternMap.set("name", pattern.getName());
-            patternMap.set("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
-            patternMap.set("pattern", pattern.getPattern());
-            patternMap.set("suffix", pattern.getSuffix() != null ? pattern.getSuffix() : "");
-            patternsList.add(patternMap);
+        if (patterns != null) {
+            Logger.logCritical("Exporting config with " + patterns.size() + " patterns");
+            for (PatternConfig pattern : patterns) {
+                if (pattern != null) {
+                    CommentedConfig patternMap = TomlFormat.newConfig();
+                    patternMap.set("name", pattern.getName());
+                    patternMap.set("prefix", pattern.getPrefix() != null ? pattern.getPrefix() : "");
+                    patternMap.set("pattern", pattern.getPattern());
+                    patternMap.set("suffix", pattern.getSuffix() != null ? pattern.getSuffix() : "");
+                    patternsList.add(patternMap);
+                }
+            }
+        } else {
+            Logger.logCritical("Warning: Exporting config with null patterns list");
         }
         configMap.set("patterns", patternsList);
         
         // Convert to TOML string and write to file
         TomlWriter writer = TomlFormat.instance().createWriter();
         writer.setHideRedundantLevels(false); // Generate proper TOML sections!
+        writer.setIndent(""); // No indentation - flat TOML format
         StringWriter stringWriter = new StringWriter();
         writer.write(configMap, stringWriter);
         String tomlString = stringWriter.toString();
@@ -1017,9 +986,16 @@ public class Config {
         // Only create if config.toml doesn't exist (first install)
         if (!Files.exists(Paths.get(configFilePath))) {
             try {
+                // Ensure patterns are loaded before exporting
+                if (patterns == null || patterns.isEmpty()) {
+                    Logger.logCritical("Warning: Patterns not loaded, re-parsing config before export");
+                    parseConfig(); // Re-parse to ensure patterns are loaded
+                }
+                
                 // Export current config to create initial config file
                 exportConfigToFile(configFilePath);
-                Logger.logCritical("First install: Created config file at " + configFilePath);
+                Logger.logCritical("First install: Created config file at " + configFilePath + " with " + 
+                    (patterns != null ? patterns.size() : 0) + " patterns");
             } catch (IOException e) {
                 Logger.logCriticalError("Failed to create initial config file: " + e.getMessage());
             }
