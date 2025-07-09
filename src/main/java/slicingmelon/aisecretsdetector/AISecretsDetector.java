@@ -95,14 +95,9 @@ public class AISecretsDetector implements BurpExtension {
             // Initialize config first and ensure it's fully loaded
             config = Config.initialize(api, this::updateWorkers);
             
-            // Verify config is properly initialized
-            if (config == null || config.getSettings() == null) {
-                api.logging().logToError("Config initialization failed, creating minimal config");
-                config = Config.getInstance(); // This will create a minimal instance
-            }
-            
-            // Now create UI after config is ready
+            // Now create UI and SecretScanner after config is confirmed to be ready
             ui = new UI(api);
+            secretScanner = new SecretScanner(api);
             
         } catch (Exception e) {
             // Log the error but continue with minimal functionality
@@ -111,15 +106,15 @@ public class AISecretsDetector implements BurpExtension {
             
             // Ensure we have minimal working components
             if (config == null) {
-                config = Config.getInstance();
+                config = Config.getInstance(); // This will create a minimal instance
             }
             if (ui == null) {
                 ui = new UI(api);
             }
+            if (secretScanner == null) {
+                secretScanner = new SecretScanner(api);
+            }
         }
-        
-        // Initialize secret scanner
-        secretScanner = new SecretScanner(api);
         
         // Load persistent secret counters
         loadSecretCounters();

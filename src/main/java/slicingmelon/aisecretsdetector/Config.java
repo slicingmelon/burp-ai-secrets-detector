@@ -350,7 +350,7 @@ public class Config {
         }
     }
     
-    private void saveConfig() {
+    public void saveConfig() {
         try {
             Path configPath = Paths.get(System.getProperty("user.home"), ".burp-ai-secrets-detector", "config.toml");
             Files.createDirectories(configPath.getParent());
@@ -362,20 +362,18 @@ public class Config {
 
             tomlMapper.writeValue(configPath.toFile(), tomlRoot);
 
+        } catch (IOException e) {
+            Logger.logCriticalError("Error saving config: " + e.getMessage());
+        } finally {
             if (onConfigChangedCallback != null) {
                 onConfigChangedCallback.run();
             }
-        } catch (IOException e) {
-            Logger.logCriticalError("Error saving config: " + e.getMessage());
         }
     }
     
     public void resetToDefaults() {
         loadDefaultConfig();
         saveConfig(); // Persist the default configuration
-        if (onConfigChangedCallback != null) {
-            onConfigChangedCallback.run();
-        }
     }
 
     @Deprecated

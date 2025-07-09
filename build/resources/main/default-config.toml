@@ -1,0 +1,21 @@
+# AI Secrets Detector Configuration
+# Version of this config file - should match extension version
+version = "1.7.1"
+
+[settings]
+excluded_file_extensions = ["3g2", "3gp", "aac", "aif", "aifc", "aiff", "au", "avi", "flac", "flv", "m3u", "m4a", "m4v", "mid", "midi", "mkv", "mov", "mp2", "mp3", "mp4", "mpa", "mpe", "mpeg", "mpg", "mpv2", "oga", "ogg", "ogv", "ogx", "ra", "ram", "rmi", "snd", "wav", "weba", "webm", "wma", "wmv", "bmp", "gif", "ico", "ief", "jfif", "jpe", "jpeg", "jpg", "pbm", "pgm", "png", "pnm", "ppm", "ras", "raw", "rgb", "svg", "tiff", "webp", "xbm", "xpm", "xwd", "psd", "ai", "eps", "cmx", "7z", "arc", "bz", "bz2", "gz", "rar", "tar", "zip", "zipx", "xz", "lz", "lzma", "apk", "jar", "war", "ear", "mpkg", "bin", "cod", "com", "exe", "msi", "dll", "so", "dylib", "app", "deb", "rpm", "pkg", "dmg", "iso", "img", "abw", "azw", "doc", "docx", "epub", "mpp", "odp", "ods", "odt", "pages", "numbers", "keynote", "pdf", "ppt", "pptx", "rtf", "vsd", "xls", "xlsx", "eot", "otf", "ttf", "woff", "woff2", "dat", "mdb", "accdb", "o", "obj", "swf", "fla", "xul", "css"]
+workers = 15
+in_scope_only = true
+logging_enabled = false
+randomness_algorithm_enabled = true
+generic_secret_min_length = 15
+generic_secret_max_length = 80
+duplicate_threshold = 5
+max_highlights_per_secret = 3
+enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
+
+[[patterns]]
+name = "Age Secret Key"
+prefix = ''''''
+pattern = '''(AGE-SECRET-KEY-1[\dA-Z]{58})'''
+suffix = ''''''
