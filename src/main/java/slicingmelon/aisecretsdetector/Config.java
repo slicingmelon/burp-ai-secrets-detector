@@ -11,11 +11,8 @@ import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.core.ToolType;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.toml.TomlFactory;
 import com.fasterxml.jackson.dataformat.toml.TomlMapper;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -26,13 +23,13 @@ import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
-import java.util.Map;
+//import java.util.Map;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CopyOnWriteArraySet;
+// import java.util.concurrent.CopyOnWriteArraySet;
 
 public class Config {
     private static final String DEFAULT_CONFIG_PATH = "/default-config.toml";
