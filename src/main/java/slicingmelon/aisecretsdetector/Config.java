@@ -10,11 +10,11 @@ package slicingmelon.aisecretsdetector;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.core.ToolType;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.toml.TomlFactory;
 import com.fasterxml.jackson.dataformat.toml.TomlMapper;
+import com.fasterxml.jackson.dataformat.toml.TomlWriteFeature;
 
 import java.io.File;
 import java.io.IOException;
@@ -35,6 +35,8 @@ import java.util.concurrent.CopyOnWriteArraySet;
 
 public class Config {
     private static final String DEFAULT_CONFIG_PATH = "/default-config.toml";
+    private static final String PERSISTENCE_CONFIG_KEY = "ai_secrets_detector_config";
+    private static final String PERSISTENCE_VERSION_KEY = "ai_secrets_detector_version";
 
     private MontoyaApi api;
     private static Config instance;
@@ -119,6 +121,22 @@ public class Config {
 
         public Pattern getCompiledPattern() {
             return compiledPattern;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public void setPrefix(String prefix) {
+            this.prefix = prefix;
+        }
+
+        public void setPattern(String pattern) {
+            this.pattern = pattern;
+        }
+
+        public void setSuffix(String suffix) {
+            this.suffix = suffix;
         }
     }
 
@@ -263,10 +281,15 @@ public class Config {
         this.onConfigChangedCallback = onConfigChangedCallback;
         this.patterns = new ArrayList<>();
         this.settings = new Settings(); // Always initialize settings first
-        this.tomlMapper = TomlMapper.builder()
-                .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
-                .build();
+        this.tomlMapper = createTomlMapper();
         loadConfig();
+    }
+
+    private TomlMapper createTomlMapper() {
+        return TomlMapper.builder()
+                .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
+                .configure(SerializationFeature.INDENT_OUTPUT, true)
+                .build();
     }
 
     public static Config getInstance() {
@@ -297,7 +320,6 @@ public class Config {
         return new Config();
     }
 
-
     /**
      * Private constructor for minimal instance
      */
@@ -306,25 +328,77 @@ public class Config {
         this.onConfigChangedCallback = null;
         this.patterns = new CopyOnWriteArrayList<>();
         this.settings = new Settings();
-        this.tomlMapper = TomlMapper.builder()
-                .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
-                .build();
+        this.tomlMapper = createTomlMapper();
         loadDefaultConfig();
     }
 
     private void loadConfig() {
-        try {
-            Path configPath = Paths.get(System.getProperty("user.home"), ".burp-ai-secrets-detector", "config.toml");
-            if (Files.exists(configPath)) {
+        // 1. Try to load from Burp persistence first (primary source of truth)
+        if (api != null && loadFromBurpPersistence()) {
+            return;
+        }
+
+        // 2. If not available, try to load from external config.toml
+        Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
+        if (Files.exists(configPath)) {
+            try {
                 TomlRoot tomlRoot = tomlMapper.readValue(configPath.toFile(), TomlRoot.class);
                 parseTomlRoot(tomlRoot);
-            } else {
-                loadDefaultConfig();
-                saveConfig(); // Save the default config to the user's home directory
+                saveToBurpPersistence(); // Save to Burp persistence for future use
+                return;
+            } catch (IOException e) {
+                Logger.logCriticalError("Error loading config from file: " + e.getMessage());
             }
-        } catch (IOException e) {
-            Logger.logCriticalError("Error loading config: " + e.getMessage());
-            loadDefaultConfig();
+        }
+
+        // 3. If neither available, load defaults and save to both
+        loadDefaultConfig();
+        saveToBurpPersistence();
+        saveToConfigFile();
+    }
+
+    private boolean loadFromBurpPersistence() {
+        if (api == null) {
+            return false;
+        }
+
+        try {
+            String configData = api.persistence().extensionData().getString(PERSISTENCE_CONFIG_KEY);
+            String versionData = api.persistence().extensionData().getString(PERSISTENCE_VERSION_KEY);
+            
+            if (configData != null && !configData.isEmpty()) {
+                TomlRoot tomlRoot = tomlMapper.readValue(configData, TomlRoot.class);
+                parseTomlRoot(tomlRoot);
+                
+                // Use persisted version if available, otherwise use the version from the config
+                if (versionData != null && !versionData.isEmpty()) {
+                    this.configVersion = versionData;
+                }
+                
+                return true;
+            }
+        } catch (Exception e) {
+            Logger.logCriticalError("Error loading config from Burp persistence: " + e.getMessage());
+        }
+        return false;
+    }
+
+    private void saveToBurpPersistence() {
+        if (api == null) {
+            return;
+        }
+
+        try {
+            TomlRoot tomlRoot = new TomlRoot();
+            tomlRoot.version = this.configVersion;
+            tomlRoot.settings = this.settings;
+            tomlRoot.patterns = this.patterns;
+
+            String configData = tomlMapper.writeValueAsString(tomlRoot);
+            api.persistence().extensionData().setString(PERSISTENCE_CONFIG_KEY, configData);
+            api.persistence().extensionData().setString(PERSISTENCE_VERSION_KEY, this.configVersion);
+        } catch (Exception e) {
+            Logger.logCriticalError("Error saving config to Burp persistence: " + e.getMessage());
         }
     }
 
@@ -344,36 +418,47 @@ public class Config {
     private void parseTomlRoot(TomlRoot tomlRoot) {
         if (tomlRoot != null) {
             this.configVersion = tomlRoot.version;
-            this.settings = tomlRoot.settings;
-            this.patterns = new CopyOnWriteArrayList<>(tomlRoot.patterns);
+            this.settings = tomlRoot.settings != null ? tomlRoot.settings : new Settings();
+            this.patterns = tomlRoot.patterns != null ? new CopyOnWriteArrayList<>(tomlRoot.patterns) : new CopyOnWriteArrayList<>();
             this.patterns.forEach(PatternConfig::compile);
         }
     }
     
     public void saveConfig() {
+        // Update version to current extension version
+        this.configVersion = getCurrentExtensionVersion();
+        
+        // Save to Burp persistence (primary)
+        saveToBurpPersistence();
+        
+        // Auto-save to config.toml file as well
+        saveToConfigFile();
+        
+        // Notify callback
+        if (onConfigChangedCallback != null) {
+            onConfigChangedCallback.run();
+        }
+    }
+
+    private void saveToConfigFile() {
         try {
-            Path configPath = Paths.get(System.getProperty("user.home"), ".burp-ai-secrets-detector", "config.toml");
+            Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
             Files.createDirectories(configPath.getParent());
 
             TomlRoot tomlRoot = new TomlRoot();
-            tomlRoot.version = getCurrentExtensionVersion();
+            tomlRoot.version = this.configVersion;
             tomlRoot.settings = this.settings;
             tomlRoot.patterns = this.patterns;
 
             tomlMapper.writeValue(configPath.toFile(), tomlRoot);
-
         } catch (IOException e) {
-            Logger.logCriticalError("Error saving config: " + e.getMessage());
-        } finally {
-            if (onConfigChangedCallback != null) {
-                onConfigChangedCallback.run();
-            }
+            Logger.logCriticalError("Error saving config to file: " + e.getMessage());
         }
     }
     
     public void resetToDefaults() {
         loadDefaultConfig();
-        saveConfig(); // Persist the default configuration
+        saveConfig(); // This will save to both Burp persistence and config.toml
     }
 
     @Deprecated
@@ -383,14 +468,63 @@ public class Config {
     }
     
     public void updateAndMergeWithDefaults() {
-        // Jackson handles this more cleanly by deserializing. This might not be needed.
-        // For now, let's keep it simple and just reload the config.
-        loadConfig();
+        try {
+            // Load the current default config
+            TomlRoot defaultTomlRoot = null;
+            try (InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH)) {
+                if (defaultConfigStream != null) {
+                    defaultTomlRoot = tomlMapper.readValue(defaultConfigStream, TomlRoot.class);
+                }
+            }
+
+            if (defaultTomlRoot == null) {
+                Logger.logCriticalError("Could not load default config for merging");
+                return;
+            }
+
+            // Merge logic: keep user settings but add new default patterns
+            String oldVersion = this.configVersion;
+            Settings userSettings = this.settings;
+            List<PatternConfig> userPatterns = new ArrayList<>(this.patterns);
+
+            // Parse new defaults
+            parseTomlRoot(defaultTomlRoot);
+
+            // Restore user settings
+            this.settings = userSettings;
+
+            // Merge patterns: keep user patterns and add new default ones
+            List<PatternConfig> newPatterns = new ArrayList<>(userPatterns);
+            Set<String> userPatternNames = userPatterns.stream()
+                    .map(PatternConfig::getName)
+                    .collect(Collectors.toSet());
+
+            // Add new default patterns that user doesn't have
+            for (PatternConfig defaultPattern : defaultTomlRoot.patterns) {
+                if (!userPatternNames.contains(defaultPattern.getName())) {
+                    newPatterns.add(defaultPattern);
+                }
+            }
+
+            this.patterns = new CopyOnWriteArrayList<>(newPatterns);
+            this.patterns.forEach(PatternConfig::compile);
+
+            // Update version to current
+            this.configVersion = getCurrentExtensionVersion();
+
+            // Save the merged config
+            saveConfig();
+
+            Logger.logCritical("Config updated from version " + oldVersion + " to " + this.configVersion);
+        } catch (Exception e) {
+            Logger.logCriticalError("Error updating and merging config: " + e.getMessage());
+        }
     }
 
     public void reloadConfig() {
         loadConfig();
     }
+
     public Settings getSettings() {
         if (settings == null) {
             return new Settings();
@@ -430,9 +564,14 @@ public class Config {
     }
 
     private int compareVersions(String version1, String version2) {
+        if (version1 == null && version2 == null) return 0;
+        if (version1 == null) return -1;
+        if (version2 == null) return 1;
+        
         String[] parts1 = version1.split("\\.");
         String[] parts2 = version2.split("\\.");
         int length = Math.max(parts1.length, parts2.length);
+        
         for (int i = 0; i < length; i++) {
             int v1 = i < parts1.length ? Integer.parseInt(parts1[i]) : 0;
             int v2 = i < parts2.length ? Integer.parseInt(parts2[i]) : 0;
@@ -468,25 +607,19 @@ public class Config {
         if (Files.exists(sourcePath)) {
             TomlRoot tomlRoot = tomlMapper.readValue(sourcePath.toFile(), TomlRoot.class);
             parseTomlRoot(tomlRoot);
-            saveConfig();
+            saveConfig(); // This will save to both Burp persistence and config.toml
         } else {
             throw new IOException("File not found: " + filePath);
         }
     }
 
     public String getDefaultConfigFilePath() {
-        Path configPath = Paths.get(System.getProperty("user.home"), ".burp-ai-secrets-detector", "config.toml");
-        if (Files.exists(configPath)) {
-            return configPath.toString();
-        } else {
-            // If it doesn't exist, we can indicate that it will be created on next save.
-            // Or return the path where it's expected to be.
-            return configPath.toAbsolutePath().toString();
-        }
+        Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
+        return configPath.toAbsolutePath().toString();
     }
     
     public boolean hasExportedConfigFile() {
-        Path configPath = Paths.get(System.getProperty("user.home"), ".burp-ai-secrets-detector", "config.toml");
+        Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
         return Files.exists(configPath);
     }
 } 

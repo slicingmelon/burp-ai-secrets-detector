@@ -16,6 +16,6 @@ enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
 
 [[patterns]]
 name = "Age Secret Key"
-prefix = ''''''
+prefix = ''
 pattern = '''(AGE-SECRET-KEY-1[\dA-Z]{58})'''
-suffix = ''''''
+suffix = ''
