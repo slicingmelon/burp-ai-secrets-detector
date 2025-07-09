@@ -187,10 +187,10 @@ public class UI {
         JSpinner minLengthSpinner = new JSpinner(minLengthModel);
         minLengthSpinner.addChangeListener(e -> {
             if (config != null) {
-                config.getSettings().setGenericSecretMinLength((Integer) minLengthSpinner.getValue());
-                config.saveConfig();
-                AISecretsDetector.getInstance().logMsg("Configuration updated - Min Secret Length: " +
-                        config.getSettings().getGenericSecretMinLength());
+                int newMinLength = (Integer) minLengthSpinner.getValue();
+                int currentMaxLength = config.getSettings().getGenericSecretMaxLength();
+                config.updateGenericSecretLengths(newMinLength, currentMaxLength);
+                AISecretsDetector.getInstance().logMsg("Configuration updated - Min Secret Length: " + newMinLength);
             }
         });
         
@@ -219,10 +219,10 @@ public class UI {
         JSpinner maxLengthSpinner = new JSpinner(maxLengthModel);
         maxLengthSpinner.addChangeListener(e -> {
             if (config != null) {
-                config.getSettings().setGenericSecretMaxLength((Integer) maxLengthSpinner.getValue());
-                config.saveConfig();
-                AISecretsDetector.getInstance().logMsg("Configuration updated - Max Secret Length: " +
-                        config.getSettings().getGenericSecretMaxLength());
+                int currentMinLength = config.getSettings().getGenericSecretMinLength();
+                int newMaxLength = (Integer) maxLengthSpinner.getValue();
+                config.updateGenericSecretLengths(currentMinLength, newMaxLength);
+                AISecretsDetector.getInstance().logMsg("Configuration updated - Max Secret Length: " + newMaxLength);
             }
         });
         

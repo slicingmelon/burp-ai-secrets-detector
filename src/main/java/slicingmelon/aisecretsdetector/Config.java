@@ -79,11 +79,15 @@ public class Config {
             this.prefix = prefix;
             this.pattern = pattern;
             this.suffix = suffix;
-            compile();
+            // Don't compile here - will be compiled later with proper config values
         }
 
         public void compile() {
-            String fullPattern = buildFullPattern(prefix, pattern, suffix);
+            compile(15, 80); // Default values if called without parameters
+        }
+        
+        public void compile(int minLength, int maxLength) {
+            String fullPattern = buildFullPattern(prefix, pattern, suffix, minLength, maxLength);
             try {
                 this.compiledPattern = Pattern.compile(fullPattern);
             } catch (Exception e) {
@@ -91,18 +95,33 @@ public class Config {
             }
         }
 
-        private String buildFullPattern(String prefix, String pattern, String suffix) {
+        private String buildFullPattern(String prefix, String pattern, String suffix, int minLength, int maxLength) {
             StringBuilder fullPattern = new StringBuilder();
             if (prefix != null && !prefix.isEmpty()) {
-                fullPattern.append(prefix);
+                fullPattern.append(replacePlaceholders(prefix, minLength, maxLength));
             }
             if (pattern != null && !pattern.isEmpty()) {
-                fullPattern.append(pattern);
+                fullPattern.append(replacePlaceholders(pattern, minLength, maxLength));
             }
             if (suffix != null && !suffix.isEmpty()) {
-                fullPattern.append(suffix);
+                fullPattern.append(replacePlaceholders(suffix, minLength, maxLength));
             }
             return fullPattern.toString();
+        }
+        
+        /**
+         * Replace placeholders in regex patterns with actual config values
+         * Performs strict exact replacement to avoid messing up the regex
+         */
+        private String replacePlaceholders(String text, int minLength, int maxLength) {
+            if (text == null) return text;
+            
+            // Replace generic_secret_min_length and generic_secret_max_length with actual values
+            // Use exact string replacement to be super strict
+            String result = text.replace("generic_secret_min_length", String.valueOf(minLength));
+            result = result.replace("generic_secret_max_length", String.valueOf(maxLength));
+            
+            return result;
         }
 
         public String getName() {
@@ -422,7 +441,11 @@ public class Config {
             this.configVersion = tomlRoot.version;
             this.settings = tomlRoot.settings != null ? tomlRoot.settings : new Settings();
             this.patterns = tomlRoot.patterns != null ? new CopyOnWriteArrayList<>(tomlRoot.patterns) : new CopyOnWriteArrayList<>();
-            this.patterns.forEach(PatternConfig::compile);
+            
+            // Compile patterns with actual config values
+            int minLength = this.settings.getGenericSecretMinLength();
+            int maxLength = this.settings.getGenericSecretMaxLength();
+            this.patterns.forEach(pattern -> pattern.compile(minLength, maxLength));
             
         }
     }
@@ -431,6 +454,9 @@ public class Config {
         
         // Update version to current extension version
         this.configVersion = getCurrentExtensionVersion();
+        
+        // Recompile patterns with current config values
+        recompilePatterns();
         
         // Save to Burp persistence (primary)
         saveToBurpPersistence();
@@ -625,7 +651,11 @@ public class Config {
             }
 
             this.patterns = new CopyOnWriteArrayList<>(newPatterns);
-            this.patterns.forEach(PatternConfig::compile);
+            
+            // Compile patterns with actual config values
+            int minLength = this.settings.getGenericSecretMinLength();
+            int maxLength = this.settings.getGenericSecretMaxLength();
+            this.patterns.forEach(pattern -> pattern.compile(minLength, maxLength));
 
             // Update version to current
             this.configVersion = getCurrentExtensionVersion();
@@ -707,7 +737,22 @@ public class Config {
         if (settings != null) {
             settings.setGenericSecretMinLength(minLength);
             settings.setGenericSecretMaxLength(maxLength);
+            
+            // Recompile all patterns with new length values
+            recompilePatterns();
+            
             saveConfig();
+        }
+    }
+    
+    /**
+     * Recompile all patterns with current config values
+     */
+    private void recompilePatterns() {
+        if (patterns != null && settings != null) {
+            int minLength = settings.getGenericSecretMinLength();
+            int maxLength = settings.getGenericSecretMaxLength();
+            patterns.forEach(pattern -> pattern.compile(minLength, maxLength));
         }
     }
     
