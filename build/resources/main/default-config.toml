@@ -341,6 +341,12 @@ pattern = '''(?i)(-----BEGIN[ A-Z0-9_-]{0,100}PRIVATE KEY(?: BLOCK)?-----[\\s\\S
 suffix = ''''''
 
 [[patterns]]
+name = "TEST PATTERN - HTTP"
+prefix = ''''''
+pattern = '''(http[s]?://[a-zA-Z0-9.-]+)'''
+suffix = ''''''
+
+[[patterns]]
 name = "Generic Secret"
 prefix = '''(?i:auth|credential|key|token|secret|pass|passwd|password)\\w*["']?]?\\s*(?:[:=]|:=|=>|<-|>)\\s*[\\t "'`]?'''
 pattern = '''([\\w+./=~\\\\`^]{generic_secret_min_length,generic_secret_max_length})'''
