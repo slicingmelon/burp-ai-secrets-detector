@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
@@ -541,7 +542,7 @@ public class Config {
     private void copyDefaultConfigToUserDirectory(Path configPath) throws IOException {
         try (InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH)) {
             if (defaultConfigStream != null) {
-                Files.copy(defaultConfigStream, configPath);
+                Files.copy(defaultConfigStream, configPath, StandardCopyOption.REPLACE_EXISTING);
                 Logger.logCritical("Copied default config to: " + configPath);
             } else {
                 Logger.logCriticalError("Default config resource not found: " + DEFAULT_CONFIG_PATH);
