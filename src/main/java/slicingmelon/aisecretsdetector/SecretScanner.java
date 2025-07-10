@@ -219,6 +219,151 @@ public class SecretScanner {
         }
     }
     
+    /**
+     * Check if response should be excluded from scanning based on exclusion rules
+     */
+    private boolean shouldExcludeResponse(HttpResponse response, String baseUrl, String responseString) {
+        if (config == null) {
+            return false;
+        }
+        
+        List<Config.ExclusionConfig> exclusions = config.getExclusions();
+        if (exclusions == null || exclusions.isEmpty()) {
+            return false;
+        }
+        
+        // Extract URL from response - this is a simplified approach
+        // In a real implementation, we'd need the full request URL
+        String requestUrl = baseUrl; // For now, use baseUrl as approximation
+        
+        // Extract host from baseUrl
+        String host = extractHost(baseUrl);
+        
+        for (Config.ExclusionConfig exclusion : exclusions) {
+            try {
+                boolean matches = false;
+                
+                switch (exclusion.getType()) {
+                    case "url":
+                        matches = exclusion.matches(requestUrl);
+                        break;
+                    case "host":
+                        matches = exclusion.matches(host);
+                        break;
+                    case "context":
+                        matches = exclusion.matches(responseString);
+                        break;
+                    case "path":
+                        String path = extractPath(baseUrl);
+                        matches = exclusion.matches(path);
+                        break;
+                    default:
+                        Logger.logCritical("SecretScanner.shouldExcludeResponse: Unknown exclusion type: " + exclusion.getType());
+                        continue;
+                }
+                
+                if (matches) {
+                    Logger.logCritical("SecretScanner.shouldExcludeResponse: Response excluded by " + exclusion.getType() + " rule: " + exclusion.getRegex());
+                    return true;
+                }
+            } catch (Exception e) {
+                Logger.logCriticalError("SecretScanner.shouldExcludeResponse: Error checking exclusion: " + e.getMessage());
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Check if a specific pattern should be excluded for a given context
+     */
+    private boolean shouldExcludePattern(String patternName, String context, String baseUrl) {
+        if (config == null) {
+            return false;
+        }
+        
+        List<Config.ExclusionConfig> exclusions = config.getExclusions();
+        if (exclusions == null || exclusions.isEmpty()) {
+            return false;
+        }
+        
+        for (Config.ExclusionConfig exclusion : exclusions) {
+            try {
+                // Check if this exclusion applies to this pattern
+                if (!exclusion.matchesPattern(patternName)) {
+                    continue;
+                }
+                
+                // Check if exclusion matches the context
+                if ("context".equals(exclusion.getType()) && exclusion.matches(context)) {
+                    Logger.logCritical("SecretScanner.shouldExcludePattern: Pattern " + patternName + " excluded by context rule");
+                    return true;
+                }
+            } catch (Exception e) {
+                Logger.logCriticalError("SecretScanner.shouldExcludePattern: Error checking pattern exclusion: " + e.getMessage());
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Extract host from URL
+     */
+    private String extractHost(String url) {
+        try {
+            if (url == null || url.isEmpty()) {
+                return "";
+            }
+            
+            // Remove protocol
+            String withoutProtocol = url.replaceAll("^https?://", "");
+            
+            // Extract host part (before first slash or colon for port)
+            int slashIndex = withoutProtocol.indexOf('/');
+            int colonIndex = withoutProtocol.indexOf(':');
+            
+            int endIndex = withoutProtocol.length();
+            if (slashIndex != -1 && colonIndex != -1) {
+                endIndex = Math.min(slashIndex, colonIndex);
+            } else if (slashIndex != -1) {
+                endIndex = slashIndex;
+            } else if (colonIndex != -1) {
+                endIndex = colonIndex;
+            }
+            
+            return withoutProtocol.substring(0, endIndex);
+        } catch (Exception e) {
+            Logger.logCriticalError("SecretScanner.extractHost: Error extracting host from URL: " + e.getMessage());
+            return "";
+        }
+    }
+    
+    /**
+     * Extract path from URL
+     */
+    private String extractPath(String url) {
+        try {
+            if (url == null || url.isEmpty()) {
+                return "";
+            }
+            
+            // Remove protocol
+            String withoutProtocol = url.replaceAll("^https?://", "");
+            
+            // Find first slash (start of path)
+            int slashIndex = withoutProtocol.indexOf('/');
+            if (slashIndex == -1) {
+                return "/";
+            }
+            
+            return withoutProtocol.substring(slashIndex);
+        } catch (Exception e) {
+            Logger.logCriticalError("SecretScanner.extractPath: Error extracting path from URL: " + e.getMessage());
+            return "";
+        }
+    }
+    
     public SecretScanResult scanResponse(HttpResponse response, String baseUrl, Map<String, Integer> persistedCounts) {
         List<Secret> foundSecrets = new ArrayList<>();
         Map<String, Set<String>> uniqueSecretsPerPattern = new HashMap<>();
@@ -235,6 +380,12 @@ public class SecretScanner {
             // Use ByteArray for fast, byte-accurate searching of found secrets
             ByteArray responseBytes = response.toByteArray();
             
+            // Check exclusions before scanning
+            if (shouldExcludeResponse(response, baseUrl, responseString)) {
+                Logger.logCritical("SecretScanner.scanResponse: Response excluded by exclusion rules");
+                return new SecretScanResult(response, foundSecrets);
+            }
+            
             Logger.logCritical("SecretScanner.scanResponse: Response length: " + responseString.length() + " characters");
             
             // Declare variables outside loops for efficiency
@@ -247,6 +398,12 @@ public class SecretScanner {
                     
                     if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2") || pattern.getName().equals("Generic Secret v3")) && !SecretScannerUtils.isRandomnessAlgorithmEnabled()) {
                         Logger.logCritical("SecretScanner.scanResponse: Skipping pattern " + pattern.getName() + " - randomness algorithm disabled");
+                        continue;
+                    }
+                    
+                    // Check if this pattern should be excluded
+                    if (shouldExcludePattern(pattern.getName(), responseString, baseUrl)) {
+                        Logger.logCritical("SecretScanner.scanResponse: Skipping pattern " + pattern.getName() + " - excluded by exclusion rules");
                         continue;
                     }
 

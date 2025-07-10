@@ -43,6 +43,7 @@ public class Config {
     private Runnable onConfigChangedCallback;
     private Settings settings;
     private List<PatternConfig> patterns;
+    private List<ExclusionConfig> exclusions;
     private String rawTomlContent; // Store raw TOML content to avoid double-escaping
 
     private final TomlMapper tomlMapper;
@@ -55,6 +56,8 @@ public class Config {
         public Settings settings;
         @JsonProperty("patterns")
         public List<PatternConfig> patterns;
+        @JsonProperty("exclusions")
+        public List<ExclusionConfig> exclusions;
     }
 
     // Configuration classes
@@ -159,6 +162,72 @@ public class Config {
 
         public void setSuffix(String suffix) {
             this.suffix = suffix;
+        }
+    }
+
+    public static class ExclusionConfig {
+        @JsonProperty("type")
+        private String type;
+        @JsonProperty("regex")
+        private String regex;
+        @JsonProperty("pattern_name")
+        private String patternName;
+        
+        @JsonIgnore
+        private Pattern compiledRegex;
+
+        public ExclusionConfig() {}
+
+        public ExclusionConfig(String type, String regex, String patternName) {
+            this.type = type;
+            this.regex = regex;
+            this.patternName = patternName;
+            compile();
+        }
+
+        public void compile() {
+            try {
+                this.compiledRegex = Pattern.compile(regex);
+            } catch (Exception e) {
+                Logger.logCriticalError("FAILED to compile exclusion regex: " + regex + " - Error: " + e.getMessage());
+                throw new IllegalArgumentException("Invalid regex in exclusion: " + e.getMessage(), e);
+            }
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public String getRegex() {
+            return regex;
+        }
+
+        public String getPatternName() {
+            return patternName;
+        }
+
+        public Pattern getCompiledRegex() {
+            return compiledRegex;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public void setRegex(String regex) {
+            this.regex = regex;
+        }
+
+        public void setPatternName(String patternName) {
+            this.patternName = patternName;
+        }
+
+        public boolean matchesPattern(String patternName) {
+            return "*".equals(this.patternName) || this.patternName.equals(patternName);
+        }
+
+        public boolean matches(String input) {
+            return compiledRegex != null && compiledRegex.matcher(input).find();
         }
     }
 
@@ -527,6 +596,7 @@ public class Config {
             this.configVersion = tomlRoot.version;
             this.settings = tomlRoot.settings != null ? tomlRoot.settings : new Settings();
             this.patterns = tomlRoot.patterns != null ? new CopyOnWriteArrayList<>(tomlRoot.patterns) : new CopyOnWriteArrayList<>();
+            this.exclusions = tomlRoot.exclusions != null ? new CopyOnWriteArrayList<>(tomlRoot.exclusions) : new CopyOnWriteArrayList<>();
             
             // Ensure all settings fields have proper defaults (handles missing fields from older configs)
             if (this.settings.getExcludedFileExtensions() == null) {
@@ -546,6 +616,9 @@ public class Config {
             int minLength = this.settings.getGenericSecretMinLength();
             int maxLength = this.settings.getGenericSecretMaxLength();
             this.patterns.forEach(pattern -> pattern.compile(minLength, maxLength));
+            
+            // Compile exclusions
+            this.exclusions.forEach(exclusion -> exclusion.compile());
             
         }
     }
@@ -667,6 +740,17 @@ public class Config {
             updatedLines.add(""); // Empty line before patterns section
         }
         
+        // Write all current exclusions first
+        if (this.exclusions != null && !this.exclusions.isEmpty()) {
+            for (ExclusionConfig exclusion : this.exclusions) {
+                updatedLines.add("[[exclusions]]");
+                updatedLines.add("type = \"" + exclusion.getType() + "\"");
+                updatedLines.add("regex = '''" + (exclusion.getRegex() != null ? exclusion.getRegex() : "") + "'''");
+                updatedLines.add("pattern_name = \"" + (exclusion.getPatternName() != null ? exclusion.getPatternName() : "*") + "\"");
+                updatedLines.add(""); // Empty line after each exclusion
+            }
+        }
+        
         // Write all current patterns with their current content (this ensures updated patterns are saved)
         for (PatternConfig pattern : this.patterns) {
             updatedLines.add("[[patterns]]");
@@ -772,12 +856,14 @@ public class Config {
             String oldVersion = this.configVersion;
             Settings userSettings = this.settings;
             List<PatternConfig> userPatterns = new ArrayList<>(this.patterns);
+            List<ExclusionConfig> userExclusions = new ArrayList<>(this.exclusions != null ? this.exclusions : new ArrayList<>());
 
             // Parse new defaults
             parseTomlRoot(defaultTomlRoot);
 
-            // Restore user settings
+            // Restore user settings and exclusions
             this.settings = userSettings;
+            this.exclusions = new CopyOnWriteArrayList<>(userExclusions);
 
             // Merge patterns: keep user patterns and add new default ones
             List<PatternConfig> newPatterns = new ArrayList<>(userPatterns);
@@ -832,6 +918,76 @@ public class Config {
             return new ArrayList<>();
         }
         return new ArrayList<>(patterns); // Return a copy
+    }
+
+    public List<ExclusionConfig> getExclusions() {
+        if (exclusions == null) {
+            return new ArrayList<>();
+        }
+        return new ArrayList<>(exclusions); // Return a copy
+    }
+    
+    /**
+     * Add a new exclusion configuration
+     */
+    public void addExclusion(String type, String regex, String patternName) {
+        if (exclusions == null) {
+            exclusions = new CopyOnWriteArrayList<>();
+        }
+        
+        ExclusionConfig exclusion = new ExclusionConfig(type, regex, patternName);
+        exclusions.add(exclusion);
+        
+        Logger.logCritical("Config.addExclusion: Added exclusion - type: " + type + ", pattern: " + patternName);
+        
+        // Save configuration
+        saveConfig();
+    }
+    
+    /**
+     * Add host exclusion
+     */
+    public void addHostExclusion(String host) {
+        String regex = "^" + Pattern.quote(host) + "$";
+        addExclusion("host", regex, "*");
+    }
+    
+    /**
+     * Add URL exclusion
+     */
+    public void addUrlExclusion(String url) {
+        String regex = "^" + Pattern.quote(url) + "$";
+        addExclusion("url", regex, "*");
+    }
+    
+    /**
+     * Add context exclusion for a specific pattern
+     */
+    public void addContextExclusion(String context, String patternName) {
+        // Escape special regex characters in the context
+        String regex = Pattern.quote(context);
+        addExclusion("context", regex, patternName);
+    }
+    
+    /**
+     * Generate smart context exclusion from selected text and matching pattern
+     */
+    public void addSmartContextExclusion(String selectedText, String patternName) {
+        // For now, use the selected text as-is
+        // In the future, we can implement smart pattern generation
+        // that extracts the variable part and creates a more flexible regex
+        addContextExclusion(selectedText, patternName);
+    }
+    
+    /**
+     * Remove an exclusion by index
+     */
+    public void removeExclusion(int index) {
+        if (exclusions != null && index >= 0 && index < exclusions.size()) {
+            ExclusionConfig removed = exclusions.remove(index);
+            Logger.logCritical("Config.removeExclusion: Removed exclusion - type: " + removed.getType() + ", pattern: " + removed.getPatternName());
+            saveConfig();
+        }
     }
 
     public String getConfigVersion() {
@@ -913,6 +1069,11 @@ public class Config {
             int maxLength = settings.getGenericSecretMaxLength();
             patterns.forEach(pattern -> pattern.compile(minLength, maxLength));
         }
+        
+        // Also recompile exclusions
+        if (exclusions != null) {
+            exclusions.forEach(exclusion -> exclusion.compile());
+        }
     }
     
     public void exportConfigToFile(String filePath) throws IOException {
@@ -923,6 +1084,7 @@ public class Config {
         tomlRoot.version = this.configVersion;
         tomlRoot.settings = this.settings;
         tomlRoot.patterns = this.patterns;
+        tomlRoot.exclusions = this.exclusions;
         
         tomlMapper.writeValue(destinationPath.toFile(), tomlRoot);
     }
