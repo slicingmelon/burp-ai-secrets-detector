@@ -250,40 +250,19 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
         try {
             api.logging().logToOutput("=== generateDynamicExclusion called ===");
             
-            // Get the full match
-            String fullMatch = matcher.group(0);
-            int matchStart = matcher.start();
-            int matchEnd = matcher.end();
+            // Get the matched secret (group 1)
+            String matchedSecret = matcher.group(1);
             
-            api.logging().logToOutput("Full match: " + fullMatch);
-            api.logging().logToOutput("Match start: " + matchStart + ", Match end: " + matchEnd);
-            api.logging().logToOutput("Selected text length: " + selectedText.length());
-            
-            // Split the selected text into: before match + match + after match
-            String before = selectedText.substring(0, matchStart);
-            String after = selectedText.substring(matchEnd);
-            
-            api.logging().logToOutput("Before: '" + before + "'");
-            api.logging().logToOutput("After: '" + after + "'");
-            
-            // Escape special regex characters in the before and after parts
-            String escapedBefore = Pattern.quote(before);
-            String escapedAfter = Pattern.quote(after);
-            
-            api.logging().logToOutput("Escaped before: " + escapedBefore);
-            api.logging().logToOutput("Escaped after: " + escapedAfter);
+            api.logging().logToOutput("Selected text: " + selectedText);
+            api.logging().logToOutput("Matched secret: " + matchedSecret);
             api.logging().logToOutput("Secret pattern: " + secretPattern);
             
-            // Build dynamic exclusion: literal before + secret pattern + literal after
-            StringBuilder exclusionRegex = new StringBuilder();
-            exclusionRegex.append(escapedBefore);
-            exclusionRegex.append(secretPattern); // Use the secret pattern from config
-            exclusionRegex.append(escapedAfter);
+            // Simple replacement: replace the actual secret with the pattern
+            String exclusionRegex = selectedText.replace(matchedSecret, secretPattern);
             
-            String result = exclusionRegex.toString();
-            api.logging().logToOutput("Final exclusion regex: " + result);
+            api.logging().logToOutput("Final exclusion regex: " + exclusionRegex);
             
-            return result;
+            return exclusionRegex;
             
         } catch (Exception ex) {
             api.logging().logToError("Error generating dynamic exclusion: " + ex.getMessage());
