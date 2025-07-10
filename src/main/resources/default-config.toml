@@ -64,16 +64,10 @@ pattern = '''(AGE-SECRET-KEY-1[0-9A-Z]{58})'''
 suffix = ''''''
 
 [[patterns]]
-name = "Algolia ID"
-prefix = '''(?i)(?:algolia|docsearch|appId)(?:.|[\n\r\t]){0,40}?'''
-pattern = '''\b([A-Z0-9]{10})\b'''
-suffix = ''''''
-
-[[patterns]]
 name = "Algolia Key"
 prefix = '''(?i)(?:algolia|docsearch|apiKey)(?:.|[\n\r\t]){0,40}?'''
-pattern = '''\b([a-zA-Z0-9]{32})\b'''
-suffix = ''''''
+pattern = '''\b([a-zA-Z0-9]{32})'''
+suffix = '''(?:[\x60'"\s;]|\\[nrt]|\\"|</|$)'''
 
 [[patterns]]
 name = "Azure Storage Account Key"
