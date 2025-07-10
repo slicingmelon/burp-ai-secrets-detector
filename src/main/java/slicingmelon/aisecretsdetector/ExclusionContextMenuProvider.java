@@ -36,30 +36,37 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
     public List<java.awt.Component> provideMenuItems(ContextMenuEvent event) {
         List<java.awt.Component> menuItems = new ArrayList<>();
         
-        // Only show menu items for HTTP message editor contexts
-        if (event.invocationType() == InvocationType.MESSAGE_EDITOR_REQUEST || 
-            event.invocationType() == InvocationType.MESSAGE_EDITOR_RESPONSE) {
-            
-            // Check if there's a selection
+        try {
+            // Check if this is a message editor context (request or response)
             if (event.messageEditorRequestResponse().isPresent()) {
                 MessageEditorHttpRequestResponse messageEditor = event.messageEditorRequestResponse().get();
                 
-                // For response context with selection
-                if (event.invocationType() == InvocationType.MESSAGE_EDITOR_RESPONSE && 
-                    messageEditor.selectionContext() == MessageEditorHttpRequestResponse.SelectionContext.RESPONSE &&
-                    messageEditor.selectionOffsets().isPresent()) {
-                    
+                // Check if there's a selection with actual content
+                if (messageEditor.selectionOffsets().isPresent()) {
                     Range selection = messageEditor.selectionOffsets().get();
-                    String selectedText = messageEditor.requestResponse().response().bodyToString()
-                            .substring(selection.startIndexInclusive(), selection.endIndexExclusive());
                     
-                    if (!selectedText.trim().isEmpty()) {
+                    // Get the selected text based on the context (request or response)
+                    String selectedText = null;
+                    
+                    if (messageEditor.selectionContext() == MessageEditorHttpRequestResponse.SelectionContext.REQUEST) {
+                        selectedText = messageEditor.requestResponse().request().toString()
+                                .substring(selection.startIndexInclusive(), selection.endIndexExclusive());
+                    } else if (messageEditor.selectionContext() == MessageEditorHttpRequestResponse.SelectionContext.RESPONSE) {
+                        selectedText = messageEditor.requestResponse().response().toString()
+                                .substring(selection.startIndexInclusive(), selection.endIndexExclusive());
+                    }
+                    
+                    // Only show menu item if we have actual selected text
+                    if (selectedText != null && !selectedText.trim().isEmpty()) {
                         JMenuItem excludeMenuItem = new JMenuItem("Exclude findings matching selected context");
                         excludeMenuItem.addActionListener(new ExclusionActionListener(selectedText));
                         menuItems.add(excludeMenuItem);
                     }
                 }
             }
+        } catch (Exception e) {
+            // Log error but don't break the context menu
+            api.logging().logToError("Error in context menu provider: " + e.getMessage());
         }
         
         return menuItems;
