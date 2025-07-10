@@ -971,8 +971,6 @@ public class Config {
         return Files.exists(configPath);
     }
 
-
-
     /**
      * Updates the raw TOML content with current settings values to avoid double-escaping
      * This method directly modifies the TOML string instead of serializing Java objects
