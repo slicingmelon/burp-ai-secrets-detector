@@ -241,7 +241,8 @@ public class AISecretsDetector implements BurpExtension {
                     // Apply all the markers to the HttpRequestResponse to create the actual RED highlights
                     // that will be visible in Burp's response panel when viewing the audit issue
                     HttpRequestResponse markedRequestResponse = requestResponse
-                        .withResponseMarkers(responseMarkers);
+                        .withResponseMarkers(responseMarkers)
+                        .copyToTempFile();
                     
                     // Count total secrets to report
                     int totalSecrets = secretsToReportByType.values().stream().mapToInt(Set::size).sum();
