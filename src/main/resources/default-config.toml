@@ -55,10 +55,10 @@ enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
 # pattern_name = "Generic Secret v2"
 
 # Working example (remove the # to activate):
-# [[exclusions]]
-# type = "context"
-# regex = '''<meta name="csrf-token" content="[^"]+">'''
-# pattern_name = "Generic Secret v2"
+[[exclusions]]
+type = "context"
+regex = '''<meta name=\"csrf-token\" content=\"([\w+./=~\\`^]{15,80})\">'''
+pattern_name = "Generic Secret v2"
 
 # Secret detection patterns
 # Each pattern has:
