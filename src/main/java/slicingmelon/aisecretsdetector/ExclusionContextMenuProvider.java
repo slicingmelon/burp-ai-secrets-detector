@@ -147,7 +147,7 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
                         api.logging().logToOutput("Pattern '" + patternName + "' MATCHED! Full match: " + matcher.group(0));
                         // Generate dynamic exclusion
                         api.logging().logToOutput("Generating dynamic exclusion for pattern: " + patternName);
-                        String exclusionRegex = generateDynamicExclusion(selectedText, matcher, pattern);
+                        String exclusionRegex = generateDynamicExclusion(selectedText, matcher, pattern, fullPattern);
                         
                         api.logging().logToOutput("Generated exclusion regex: " + exclusionRegex);
                         
@@ -243,22 +243,22 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
     }
     
     /**
-     * Generate a dynamic exclusion regex by replacing the secret portion
-     * with the pattern that would match it
+     * Generate a dynamic exclusion regex by replacing the full match
+     * with the full pattern
      */
-    private String generateDynamicExclusion(String selectedText, Matcher matcher, String secretPattern) {
+    private String generateDynamicExclusion(String selectedText, Matcher matcher, String secretPattern, String fullPattern) {
         try {
             api.logging().logToOutput("=== generateDynamicExclusion called ===");
             
-            // Get the matched secret (group 1)
-            String matchedSecret = matcher.group(1);
+            // Get the full match (group 0)
+            String fullMatch = matcher.group(0);
             
             api.logging().logToOutput("Selected text: " + selectedText);
-            api.logging().logToOutput("Matched secret: " + matchedSecret);
-            api.logging().logToOutput("Secret pattern: " + secretPattern);
+            api.logging().logToOutput("Full match: " + fullMatch);
+            api.logging().logToOutput("Full pattern: " + fullPattern);
             
-            // Simple replacement: replace the actual secret with the pattern
-            String exclusionRegex = selectedText.replace(matchedSecret, secretPattern);
+            // Replace the full match with the full pattern
+            String exclusionRegex = selectedText.replace(fullMatch, fullPattern);
             
             api.logging().logToOutput("Final exclusion regex: " + exclusionRegex);
             
