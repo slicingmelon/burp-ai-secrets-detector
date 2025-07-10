@@ -971,21 +971,7 @@ public class Config {
         return Files.exists(configPath);
     }
 
-    private TomlRoot loadFromConfigFile() {
-        try {
-            Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
-            if (Files.exists(configPath)) {
-                // Read raw TOML content from file
-                this.rawTomlContent = Files.readString(configPath, StandardCharsets.UTF_8);
-                
-                // Parse and return the TOML root
-                return tomlMapper.readValue(this.rawTomlContent, TomlRoot.class);
-            }
-        } catch (IOException e) {
-            Logger.logCriticalError("Error loading config from file: " + e.getMessage());
-        }
-        return null;
-    }
+
 
     /**
      * Updates the raw TOML content with current settings values to avoid double-escaping
