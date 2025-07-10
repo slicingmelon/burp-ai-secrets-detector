@@ -78,7 +78,6 @@ public class Config {
             this.prefix = prefix;
             this.pattern = pattern;
             this.suffix = suffix;
-            // Don't compile here - will be compiled later with proper config values
         }
 
         public void compile() {
