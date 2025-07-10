@@ -44,6 +44,7 @@ public class AISecretsDetector implements BurpExtension {
     private Config config;
     private UI ui;
     private SecretScanner secretScanner;
+    private ExclusionContextMenuProvider contextMenuProvider;
     
     // Persistent secret counter map stored as JSON in Burp's extension data
     private Map<String, Map<String, Integer>> secretCounters = new ConcurrentHashMap<>();
@@ -72,6 +73,7 @@ public class AISecretsDetector implements BurpExtension {
             // Now create UI and SecretScanner after config is confirmed to be ready
             ui = new UI(api);
             secretScanner = new SecretScanner(api);
+            contextMenuProvider = new ExclusionContextMenuProvider(api, config, secretScanner);
             
         } catch (Exception e) {
             // Log the error but continue with minimal functionality
@@ -87,6 +89,9 @@ public class AISecretsDetector implements BurpExtension {
             }
             if (secretScanner == null) {
                 secretScanner = new SecretScanner(api);
+            }
+            if (contextMenuProvider == null) {
+                contextMenuProvider = new ExclusionContextMenuProvider(api, config, secretScanner);
             }
         }
         
@@ -142,6 +147,9 @@ public class AISecretsDetector implements BurpExtension {
             JComponent configPanel = ui.createConfigPanel();
             api.userInterface().registerSuiteTab("AI Secrets Detector", configPanel);
         });
+        
+        // Register context menu provider
+        api.userInterface().registerContextMenuItemsProvider(contextMenuProvider);
         
         api.extension().registerUnloadingHandler(() -> {
             api.logging().logToOutput("AI Secrets Detector extension unloading...");
