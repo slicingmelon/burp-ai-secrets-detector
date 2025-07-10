@@ -39,26 +39,46 @@ max_highlights_per_secret = 3
 enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
 
 # Exclusions - Skip scanning for specific patterns/contexts
-# type: "host", "url", "context", "path", "parameter"
-# regex: Pattern to match against the specified scope
-# pattern_name: "*" for all patterns, or specific pattern name
+# New format supports url/context arrays and AND logic
+# 
+# Structure:
+# url = '''pattern'''           # Single URL pattern
+# urls = ['''p1''', '''p2''']   # Multiple URL patterns (OR logic)
+# context = '''pattern'''       # Single context pattern
+# contexts = ['''p1''', '''p2'''] # Multiple context patterns (OR logic)
+#
+# Logic:
+# - If both url/urls AND context/contexts are present: URL AND Context (both must match)
+# - If only url/urls: applies to all contexts in those URLs
+# - If only context/contexts: applies to all URLs
 
 # Example exclusions (uncomment and modify as needed):
-# [[exclusions]]
-# type = "host"
-# regex = '''^.*\.example\.com$'''
-# pattern_name = "*"
 
+# URL-only exclusion (applies to all contexts in matching URLs)
 # [[exclusions]]
-# type = "context"
-# regex = '''<meta name="csrf-token" content="[^"]{32}">'''
-# pattern_name = "Generic Secret v2"
+# url = '''.*\.example\.com.*'''
 
-# Working example (remove the # to activate):
-#[[exclusions]]
-#type = "context"
-#regex = '''<meta name=\"csrf-token\" content=\"([\w+./=~\\`^]{15,80})\">'''
-#pattern_name = "Generic Secret v2"
+# Context-only exclusion (applies to all URLs)
+# [[exclusions]]
+# context = '''<meta name="csrf-token" content="[^"]{32}">'''
+
+# URL + Context exclusion (both must match)
+# [[exclusions]]
+# url = '''.*\.example\.com.*'''
+# context = '''<meta name="csrf-token" content="[^"]{32}">'''
+
+# Multiple contexts exclusion (any context matches)
+# [[exclusions]]
+# contexts = [
+#   '''<meta name="csrf-token" content="[^"]{32}">''',
+#   '''<input type="hidden" name="_token" value="[^"]{40}">''',
+#   '''window\.csrfToken = "[^"]{32}";'''
+# ]
+
+# Multiple URLs with single context
+# [[exclusions]]
+# urls = ['''.*\.example\.com.*''', '''.*\.test\.com.*''']
+# context = '''<meta name="csrf-token" content="[^"]{32}">'''
 
 # Secret detection patterns
 # Each pattern has:
