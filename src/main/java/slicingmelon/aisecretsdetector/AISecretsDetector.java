@@ -188,7 +188,7 @@ public class AISecretsDetector implements BurpExtension {
             HttpResponse tempResponse = responseReceived.copyToTempFile();
             
             // Extract base URL early to pass to scanner
-            String url = responseReceived.initiatingRequest().url().toString();
+            String url = responseReceived.initiatingRequest().url();
             String baseUrl = extractBaseUrl(url);
             
             Logger.logCritical("AISecretsDetector.processHttpResponse: Calling secretScanner.scanResponse for baseUrl: " + baseUrl);
