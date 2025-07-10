@@ -1009,7 +1009,7 @@ public class Config {
                     continue;
                 }
                 
-                // Skip pattern content - we'll rebuild it
+                // Skip pattern content
                 if (inPatternsSection) {
                     continue;
                 }
