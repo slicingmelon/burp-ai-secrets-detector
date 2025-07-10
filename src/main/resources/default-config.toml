@@ -67,19 +67,25 @@ suffix = ''''''
 name = "Algolia Key"
 prefix = '''(?i)(?:algolia|docsearch|apiKey)(?:.|[\n\r\t]){0,40}?'''
 pattern = '''\b([a-zA-Z0-9]{32})'''
-suffix = '''(?:[\x60'"\s;]|\\[nrt]|\\"|</|$)'''
+suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
+
+[[patterns]]
+name = "Anthropic API Key"
+prefix = ''''''
+pattern = '''\b(sk-ant-(?:admin01|api03)-[\w\-]{93}AA)\b'''
+suffix = ''''''
 
 [[patterns]]
 name = "Azure Storage Account Key"
 prefix = '''(?i)(?:account)?key\s*[:=]\s*'''
 pattern = '''([0-9+/=A-Za-z]{88})'''
-suffix = '''(?:[\x60'"\s;]|\\[nrt]|\\"|</|$)'''
+suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
 
 [[patterns]]
 name = "Azure AD Client Secret"
 prefix = ''''''
 pattern = '''\b([a-zA-Z0-9_~.]{3}\dQ~[a-zA-Z0-9_~.-]{31,34})'''
-suffix = '''(?:[\x60'"\s;]|\\[nrt]|\\"|</|$)'''
+suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
 
 [[patterns]]
 name = "AWS Access Key"
@@ -95,33 +101,33 @@ suffix = ''''''
 
 [[patterns]]
 name = "Fastly API Key"
-prefix = '''(?i)[\w.-]{0,50}?(?:fastly)(?:[ \t\w.-]{0,20})[\s'"]{0,3}(?:=|>|:{1,3}=|\|\||:|=>|\?=|,)[\x60'"\s=]{0,5}'''
+prefix = '''(?i)[\w.-]{0,50}?(?:fastly)(?:[ \t\w.-]{0,20})[\s'"]{0,3}(?:=|>|:{1,3}=|\|\||:|=>|\?=|,)[`'"\s=]{0,5}'''
 pattern = '''([a-z0-9=_\-]{32})'''
-suffix = '''(?:[^\w]|$)'''
+suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
 
 [[patterns]]
 name = "GitHub Personal Access Token"
 prefix = ''''''
 pattern = '''((?:gh[oprsu]|github_pat)_[0-9A-Za-z_]{36})'''
-suffix = ''''''
+suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
 
 [[patterns]]
 name = "GitLab Token"
 prefix = ''''''
 pattern = '''(glpat-[0-9A-Za-z_=-]{20,22})'''
-suffix = ''''''
+suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
 
 [[patterns]]
 name = "Cloudflare API Token"
 prefix = '''(?i)(?:cloudflare)(?:.|[\n\r\t]){0,40}?'''
-pattern = '''\b([A-Za-z0-9_-]{40})\b'''
-suffix = ''''''
+pattern = '''\b([A-Za-z0-9_-]{40})'''
+suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
 
 [[patterns]]
 name = "Cloudflare Global API Key"
 prefix = '''(?i)(?:cloudflare)(?:.|[\n\r\t]){0,40}?'''
-pattern = '''\b([A-Za-z0-9_-]{37})\b'''
-suffix = ''''''
+pattern = '''\b([A-Za-z0-9_-]{37})'''
+suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
 
 [[patterns]]
 name = "Cloudflare Origin CA Key"
@@ -149,13 +155,13 @@ suffix = ''''''
 
 [[patterns]]
 name = "Mailgun Signing Key"
-prefix = '''(?i)[\w.-]{0,50}?(?:mailgun)(?:[ \t\w.-]{0,20})[\s'"]{0,3}(?:=|>|:{1,3}=|\|\||:|=>|\?=|,)[\x60'"\s=]{0,5}'''
+prefix = '''(?i)[\w.-]{0,50}?(?:mailgun)(?:[ \t\w.-]{0,20})[\s'"]{0,3}(?:=|>|:{1,3}=|\|\||:|=>|\?=|,)[`'"\s=]{0,5}'''
 pattern = '''([a-h0-9]{32}-[a-h0-9]{8}-[a-h0-9]{8})'''
 suffix = '''\b'''
 
 [[patterns]]
 name = "Mailgun Private API Token"
-prefix = '''(?i)[\w.-]{0,50}?(?:mailgun)(?:[ \t\w.-]{0,20})[\s'"]{0,3}(?:=|>|:{1,3}=|\|\||:|=>|\?=|,)[\x60'"\s=]{0,5}'''
+prefix = '''(?i)[\w.-]{0,50}?(?:mailgun)(?:[ \t\w.-]{0,20})[\s'"]{0,3}(?:=|>|:{1,3}=|\|\||:|=>|\?=|,)[`'"\s=]{0,5}'''
 pattern = '''(key-[a-f0-9]{32})'''
 suffix = '''\b'''
 
@@ -193,7 +199,7 @@ suffix = ''''''
 name = "Google reCAPTCHA Key"
 prefix = '''\b'''
 pattern = '''(6[LM][A-Za-z0-9_-]{38})'''
-suffix = '''(?:[\x60'"\s;]|\\[nrt]|\\"|</|$)'''
+suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
 
 [[patterns]]
 name = "Slack Token"
@@ -277,11 +283,11 @@ suffix = ''''''
 name = "Square Access Token"
 prefix = ''''''
 pattern = '''\b((?:EAAA|sq0atp-)[\w-]{22,60})'''
-suffix = '''(?:[\x60'"\s;]|\\[nrt]|\\"|</|$)'''
+suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
 
 [[patterns]]
 name = "Squarespace Access Token"
-prefix = '''(?i)[\w.-]{0,50}?(?:squarespace)(?:[ \t\w.-]{0,20})[\s'"]{0,3}(?:=|>|:{1,3}=|\|\||:|=>|\?=|,)[\x60'"\s=]{0,5}'''
+prefix = '''(?i)[\w.-]{0,50}?(?:squarespace)(?:[ \t\w.-]{0,20})[\s'"]{0,3}(?:=|>|:{1,3}=|\|\||:|=>|\?=|,)[`'"\s=]{0,5}'''
 pattern = '''([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})'''
 suffix = '''\b'''
 
@@ -335,7 +341,7 @@ suffix = ''''''
 
 [[patterns]]
 name = "Zendesk Secret Key"
-prefix = '''(?i)[\w.-]{0,50}?(?:zendesk)(?:[ \t\w.-]{0,20})[\s'"]{0,3}(?:=|>|:{1,3}=|\|\||:|=>|\?=|,)[\x60'"\s=]{0,5}'''
+prefix = '''(?i)[\w.-]{0,50}?(?:zendesk)(?:[ \t\w.-]{0,20})[\s'"]{0,3}(?:=|>|:{1,3}=|\|\||:|=>|\?=|,)[`'"\s=]{0,5}'''
 pattern = '''([a-z0-9]{40})'''
 suffix = '''\b'''
 
@@ -347,12 +353,18 @@ suffix = ''''''
 
 [[patterns]]
 name = "Generic Secret"
-prefix = '''(?i:auth|credential|key|token|secret|pass|passwd|password)\w*[\"']?]?\s*(?:[:=]|:=|=>|<-|>)\s*(?:[\t "'`]|\\")?'''
+prefix = '''(?i:auth|credential|key|token|secret|pass|passwd|password)\w*[\"']?]?\s*(?:[:=]|:=|=>|<-|>|,)\s*(?:[\t "'`]|\\")?'''
 pattern = '''([\w+./=~\-\\`^]{generic_secret_min_length,generic_secret_max_length})'''
-suffix = '''(?:[\x60'"\s;]|\\[nrt]|\\"|</|$)'''
+suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
 
 [[patterns]]
 name = "Generic Secret v2"
 prefix = '''(?i:auth|credential|key|token|secret|pass|passwd|password)(?:.|[\n\r\t]){0,15}?'''
 pattern = '''\b([\w+./=~\-\\`\^!@#$%&\*_<>;]{generic_secret_min_length,generic_secret_max_length})'''
-suffix = '''(?:[\x60'"\s;]|\\[nrt]|\\"|</|$)'''
+suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
+
+[[patterns]]
+name = "Generic Secret v3"
+prefix = '''(?i:auth|credential|key|token|secret|pass|passwd|password)(?:.|[\n\r\t]){0,25}?'''
+pattern = '''\b([\w+./=~\-\\`^]{generic_secret_min_length,generic_secret_max_length})'''
+suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
