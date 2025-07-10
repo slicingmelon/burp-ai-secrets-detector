@@ -211,7 +211,7 @@ public class AISecretsDetector implements BurpExtension {
                 HttpRequestResponse requestResponse = HttpRequestResponse.httpRequestResponse(
                     responseReceived.initiatingRequest(),
                     tempResponse
-                );
+                ).copyToTempFile();
                 
                 // *** STEP 2: MARKER CREATION ***
                 // Create markers to highlight where the secrets are in the response
