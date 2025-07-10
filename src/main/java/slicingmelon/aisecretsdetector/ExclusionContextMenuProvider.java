@@ -146,13 +146,19 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
                     if (matcher.find()) {
                         api.logging().logToOutput("Pattern '" + patternName + "' MATCHED! Full match: " + matcher.group(0));
                         // Generate dynamic exclusion
+                        api.logging().logToOutput("Generating dynamic exclusion for pattern: " + patternName);
                         String exclusionRegex = generateDynamicExclusion(selectedText, matcher, pattern);
+                        
+                        api.logging().logToOutput("Generated exclusion regex: " + exclusionRegex);
                         
                         if (exclusionRegex != null) {
                             // Add exclusion to config
                             config.addExclusion("context", exclusionRegex, patternName);
                             generatedExclusions.add(String.format("Pattern '%s': %s", patternName, exclusionRegex));
                             exclusionCount++;
+                            api.logging().logToOutput("Successfully added exclusion for pattern: " + patternName);
+                        } else {
+                            api.logging().logToOutput("Failed to generate exclusion regex for pattern: " + patternName);
                         }
                     } else {
                         api.logging().logToOutput("Pattern '" + patternName + "' did NOT match");
@@ -242,18 +248,31 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
      */
     private String generateDynamicExclusion(String selectedText, Matcher matcher, String secretPattern) {
         try {
+            api.logging().logToOutput("=== generateDynamicExclusion called ===");
+            
             // Get the full match
             String fullMatch = matcher.group(0);
             int matchStart = matcher.start();
             int matchEnd = matcher.end();
             
+            api.logging().logToOutput("Full match: " + fullMatch);
+            api.logging().logToOutput("Match start: " + matchStart + ", Match end: " + matchEnd);
+            api.logging().logToOutput("Selected text length: " + selectedText.length());
+            
             // Split the selected text into: before match + match + after match
             String before = selectedText.substring(0, matchStart);
             String after = selectedText.substring(matchEnd);
             
+            api.logging().logToOutput("Before: '" + before + "'");
+            api.logging().logToOutput("After: '" + after + "'");
+            
             // Escape special regex characters in the before and after parts
             String escapedBefore = Pattern.quote(before);
             String escapedAfter = Pattern.quote(after);
+            
+            api.logging().logToOutput("Escaped before: " + escapedBefore);
+            api.logging().logToOutput("Escaped after: " + escapedAfter);
+            api.logging().logToOutput("Secret pattern: " + secretPattern);
             
             // Build dynamic exclusion: literal before + secret pattern + literal after
             StringBuilder exclusionRegex = new StringBuilder();
@@ -261,10 +280,14 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
             exclusionRegex.append(secretPattern); // Use the secret pattern from config
             exclusionRegex.append(escapedAfter);
             
-            return exclusionRegex.toString();
+            String result = exclusionRegex.toString();
+            api.logging().logToOutput("Final exclusion regex: " + result);
+            
+            return result;
             
         } catch (Exception ex) {
             api.logging().logToError("Error generating dynamic exclusion: " + ex.getMessage());
+            ex.printStackTrace();
             return null;
         }
     }
