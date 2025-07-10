@@ -12,6 +12,7 @@ Author: Petru Surugiu <[pedro_infosec](https://x.com/pedro_infosec)>
   - [Configuration](#configuration)
   - [Optimizations](#optimizations)
   - [Results](#results)
+  - [Profiling](#profiling)
   - [Changelog](#changelog)
   - [TO DO](#to-do)
   - [Credits](#credits)
@@ -88,6 +89,9 @@ Results comparison vs Trufflehog:
 
 ![Results](./images/burp-secrets-detector-vs-trufflehog.jpg)
 
+## Profiling 
+
+Check [PERFORMANCE.md](./PERFORMANCE.md) for more details.
 
 ## Changelog
 
