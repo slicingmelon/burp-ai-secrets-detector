@@ -36,14 +36,21 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
     public List<java.awt.Component> provideMenuItems(ContextMenuEvent event) {
         List<java.awt.Component> menuItems = new ArrayList<>();
         
+        // Debug logging
+        api.logging().logToOutput("ExclusionContextMenuProvider: provideMenuItems called");
+        api.logging().logToOutput("Invocation type: " + event.invocationType());
+        api.logging().logToOutput("Message editor present: " + event.messageEditorRequestResponse().isPresent());
+        
         try {
             // Check if this is a message editor context (request or response)
             if (event.messageEditorRequestResponse().isPresent()) {
                 MessageEditorHttpRequestResponse messageEditor = event.messageEditorRequestResponse().get();
                 
-                // Check if there's a selection with actual content
-                if (messageEditor.selectionOffsets().isPresent()) {
-                    Range selection = messageEditor.selectionOffsets().get();
+                                 // Check if there's a selection with actual content
+                 api.logging().logToOutput("Selection present: " + messageEditor.selectionOffsets().isPresent());
+                 if (messageEditor.selectionOffsets().isPresent()) {
+                     Range selection = messageEditor.selectionOffsets().get();
+                     api.logging().logToOutput("Selection range: " + selection.startIndexInclusive() + "-" + selection.endIndexExclusive());
                     
                     // Get the selected text based on the context (request or response)
                     String selectedText = null;
@@ -56,12 +63,16 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
                                 .substring(selection.startIndexInclusive(), selection.endIndexExclusive());
                     }
                     
-                    // Only show menu item if we have actual selected text
-                    if (selectedText != null && !selectedText.trim().isEmpty()) {
-                        JMenuItem excludeMenuItem = new JMenuItem("Exclude findings matching selected context");
-                        excludeMenuItem.addActionListener(new ExclusionActionListener(selectedText));
-                        menuItems.add(excludeMenuItem);
-                    }
+                                         // Only show menu item if we have actual selected text
+                     if (selectedText != null && !selectedText.trim().isEmpty()) {
+                         api.logging().logToOutput("Creating context menu item for selected text: " + selectedText.substring(0, Math.min(50, selectedText.length())));
+                         JMenuItem excludeMenuItem = new JMenuItem("Exclude findings matching selected context");
+                         excludeMenuItem.addActionListener(new ExclusionActionListener(selectedText));
+                         menuItems.add(excludeMenuItem);
+                         api.logging().logToOutput("Menu item added to list");
+                     } else {
+                         api.logging().logToOutput("No valid selected text found");
+                     }
                 }
             }
         } catch (Exception e) {
