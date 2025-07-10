@@ -125,18 +125,4 @@ public class SecretScannerUtils {
         
         return patterns;
     }
-    
-    /**
-     * Update excluded file extensions from Config
-     * @param fileExtension The file extension to check
-     * @return True if the file extension should be skipped
-     */
-    public static boolean shouldSkipFileExtension(String fileExtension) {
-        Config config = Config.getInstance();
-        if (config == null) {
-            return false;
-        }
-        
-        return config.getSettings().getExcludedFileExtensions().contains(fileExtension.toLowerCase());
-    }
 }
