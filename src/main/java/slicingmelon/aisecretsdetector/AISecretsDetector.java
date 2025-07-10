@@ -214,6 +214,18 @@ public class AISecretsDetector implements BurpExtension {
                     String secretType = secret.getType();
                     
                     if (secretValue != null && !secretValue.isEmpty()) {
+                        // *** DIAGNOSTIC: VALIDATE SECRET POSITION ***
+                        // Check if the calculated positions actually match the expected secret value
+                        if (!validateSecretPosition(tempResponse.toByteArray(), secretValue, secret.getStartIndex(), secret.getEndIndex())) {
+                            ByteArray actualBytes = tempResponse.toByteArray().subArray(secret.getStartIndex(), secret.getEndIndex());
+                            String actualFound = actualBytes.toString();
+                            Logger.logCritical("POSITION MISMATCH DETECTED:");
+                            Logger.logCritical("  Expected secret: '" + secretValue + "'");
+                            Logger.logCritical("  Actually found at " + secret.getStartIndex() + "-" + secret.getEndIndex() + ": '" + actualFound + "'");
+                            Logger.logCritical("  Secret type: " + secretType);
+                            Logger.logCritical("  Response length: " + tempResponse.toByteArray().length() + " bytes");
+                        }
+                        
                         // *** STEP 2: CREATE INDIVIDUAL MARKER ***
                         // Use pre-calculated start and end positions from scanner to create each RED marker
                         responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
@@ -690,5 +702,20 @@ public class AISecretsDetector implements BurpExtension {
         secretCounters.clear();
         saveSecretCounters();
         logMsg("All secret counters cleared");
+    }
+    
+    /**
+     * Validate that the secret position matches the expected secret value
+     * This is for diagnostic purposes to detect UTF-8 encoding position mismatches
+     */
+    private boolean validateSecretPosition(ByteArray responseBytes, String expectedSecret, int startPos, int endPos) {
+        if (startPos < 0 || endPos > responseBytes.length() || startPos >= endPos) {
+            return false;
+        }
+        
+        ByteArray actualBytes = responseBytes.subArray(startPos, endPos);
+        String actualSecret = actualBytes.toString();
+        
+        return expectedSecret.equals(actualSecret);
     }
 }
