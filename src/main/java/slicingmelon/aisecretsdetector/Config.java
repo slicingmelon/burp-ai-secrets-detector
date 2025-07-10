@@ -477,11 +477,71 @@ public class Config {
         }
     }
 
+    /**
+     * Get default excluded file extensions from the default config file
+     */
+    private Set<String> getDefaultExcludedFileExtensions() {
+        try {
+            TomlRoot defaultConfig = loadDefaultTomlRoot();
+            if (defaultConfig != null && defaultConfig.settings != null && defaultConfig.settings.getExcludedFileExtensions() != null) {
+                return new HashSet<>(defaultConfig.settings.getExcludedFileExtensions());
+            }
+        } catch (Exception e) {
+            Logger.logCriticalError("Error reading default excluded file extensions: " + e.getMessage());
+        }
+        return new HashSet<>(); // Fallback to empty set
+    }
+
+    /**
+     * Get default excluded MIME types from the default config file
+     */
+    private Set<String> getDefaultExcludedMimeTypes() {
+        try {
+            TomlRoot defaultConfig = loadDefaultTomlRoot();
+            if (defaultConfig != null && defaultConfig.settings != null && defaultConfig.settings.getExcludedMimeTypes() != null) {
+                return new HashSet<>(defaultConfig.settings.getExcludedMimeTypes());
+            }
+        } catch (Exception e) {
+            Logger.logCriticalError("Error reading default excluded MIME types: " + e.getMessage());
+        }
+        return new HashSet<>(); // Fallback to empty set
+    }
+
+    /**
+     * Load and parse the default TOML configuration without affecting current state
+     */
+    private TomlRoot loadDefaultTomlRoot() {
+        try (InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH)) {
+            if (defaultConfigStream != null) {
+                byte[] rawBytes = defaultConfigStream.readAllBytes();
+                String defaultRawToml = new String(rawBytes, StandardCharsets.UTF_8);
+                return tomlMapper.readValue(defaultRawToml, TomlRoot.class);
+            }
+        } catch (Exception e) {
+            Logger.logCriticalError("Error loading default TOML root: " + e.getMessage());
+        }
+        return null;
+    }
+
     private void parseTomlRoot(TomlRoot tomlRoot) {
         if (tomlRoot != null) {
             this.configVersion = tomlRoot.version;
             this.settings = tomlRoot.settings != null ? tomlRoot.settings : new Settings();
             this.patterns = tomlRoot.patterns != null ? new CopyOnWriteArrayList<>(tomlRoot.patterns) : new CopyOnWriteArrayList<>();
+            
+            // Ensure all settings fields have proper defaults (handles missing fields from older configs)
+            if (this.settings.getExcludedFileExtensions() == null) {
+                this.settings.setExcludedFileExtensions(getDefaultExcludedFileExtensions());
+            }
+            if (this.settings.getExcludedMimeTypes() == null) {
+                this.settings.setExcludedMimeTypes(getDefaultExcludedMimeTypes());
+            }
+            if (this.settings.getEnabledTools() == null) {
+                Set<ToolType> defaultTools = new HashSet<>(Arrays.asList(
+                    ToolType.TARGET, ToolType.PROXY, ToolType.SCANNER, ToolType.EXTENSIONS
+                ));
+                this.settings.setEnabledTools(defaultTools);
+            }
             
             // Compile patterns with actual config values
             int minLength = this.settings.getGenericSecretMinLength();

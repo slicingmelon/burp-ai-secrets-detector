@@ -7,6 +7,10 @@ version = "1.7.1"
 # Categories: Media files, Image files, Archive files, Application packages, Executables, Document formats, Fonts, Binary/misc formats, Stylesheets
 excluded_file_extensions = ["3g2", "3gp", "aac", "aif", "aifc", "aiff", "au", "avi", "flac", "flv", "m3u", "m4a", "m4v", "mid", "midi", "mkv", "mov", "mp2", "mp3", "mp4", "mpa", "mpe", "mpeg", "mpg", "mpv2", "oga", "ogg", "ogv", "ogx", "ra", "ram", "rmi", "snd", "wav", "weba", "webm", "wma", "wmv", "bmp", "gif", "ico", "ief", "jfif", "jpe", "jpeg", "jpg", "pbm", "pgm", "png", "pnm", "ppm", "ras", "raw", "rgb", "svg", "tiff", "webp", "xbm", "xpm", "xwd", "psd", "ai", "eps", "cmx", "7z", "arc", "bz", "bz2", "gz", "rar", "tar", "zip", "zipx", "xz", "lz", "lzma", "apk", "jar", "war", "ear", "mpkg", "bin", "cod", "com", "exe", "msi", "dll", "so", "dylib", "app", "deb", "rpm", "pkg", "dmg", "iso", "img", "abw", "azw", "doc", "docx", "epub", "mpp", "odp", "ods", "odt", "pages", "numbers", "keynote", "pdf", "ppt", "pptx", "rtf", "vsd", "xls", "xlsx", "eot", "otf", "ttf", "woff", "woff2", "dat", "mdb", "accdb", "o", "obj", "swf", "fla", "xul", "css"]
 
+# MIME types to skip during scanning (binary/media content unlikely to contain secrets)
+# Categories: Images, Fonts, Media, Applications, Documents
+excluded_mime_types = ["IMAGE_BMP", "IMAGE_GIF", "IMAGE_JPEG", "IMAGE_PNG", "IMAGE_SVG_XML", "IMAGE_TIFF", "IMAGE_UNKNOWN", "FONT_WOFF", "FONT_WOFF2", "SOUND", "VIDEO", "APPLICATION_FLASH", "RTF", "CSS", "APPLICATION_UNKNOWN", "UNRECOGNIZED"]
+
 # Number of worker threads for processing HTTP responses
 workers = 15
 
@@ -60,28 +64,22 @@ pattern = '''(AGE-SECRET-KEY-1[0-9A-Z]{58})'''
 suffix = ''''''
 
 [[patterns]]
-name = "Algolia ID"
-prefix = '''(?i)(?:algolia|docsearch|appId)(?:.|[\n\r\t]){0,40}?'''
-pattern = '''\b([A-Z0-9]{10})\b'''
-suffix = ''''''
-
-[[patterns]]
 name = "Algolia Key"
 prefix = '''(?i)(?:algolia|docsearch|apiKey)(?:.|[\n\r\t]){0,40}?'''
-pattern = '''\b([a-zA-Z0-9]{32})\b'''
-suffix = ''''''
+pattern = '''\b([a-zA-Z0-9]{32})'''
+suffix = '''(?:[\x60'"\s;]|\\[nrt]|\\"|</|$)'''
 
 [[patterns]]
 name = "Azure Storage Account Key"
 prefix = '''(?i)(?:account)?key\s*[:=]\s*'''
 pattern = '''([0-9+/=A-Za-z]{88})'''
-suffix = '''(?:[^\w]|$)'''
+suffix = '''(?:[\x60'"\s;]|\\[nrt]|\\"|</|$)'''
 
 [[patterns]]
 name = "Azure AD Client Secret"
 prefix = ''''''
 pattern = '''\b([a-zA-Z0-9_~.]{3}\dQ~[a-zA-Z0-9_~.-]{31,34})'''
-suffix = '''(?:[^\w]|$)'''
+suffix = '''(?:[\x60'"\s;]|\\[nrt]|\\"|</|$)'''
 
 [[patterns]]
 name = "AWS Access Key"
@@ -352,6 +350,7 @@ name = "Generic Secret"
 prefix = '''(?i:auth|credential|key|token|secret|pass|passwd|password)\w*["']?]?\s*(?:[:=]|:=|=>|<-|>)\s*[\t "'`]?'''
 pattern = '''([\w+./=~\\`^]{generic_secret_min_length,generic_secret_max_length})'''
 suffix = '''(?:[\x60'"\s;]|\\[nrt]|\\"|</|$)'''
+# better??  (?i:auth|credential|key|token|secret|pass|passwd|password)\w*[\"']?]?\s*(?:[:=]|:=|=>|<-|>)\s*(?:[\t "'`]|\\")?
 
 [[patterns]]
 name = "Generic Secret v2"
