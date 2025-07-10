@@ -219,7 +219,7 @@ public class SecretScanner {
         }
     }
     
-    public SecretScanResult scanResponse(HttpResponse response, String baseUrl, Map<String, Integer> mergedCounts) {
+    public SecretScanResult scanResponse(HttpResponse response, String baseUrl, Map<String, Integer> persistedCounts) {
         List<Secret> foundSecrets = new ArrayList<>();
         Map<String, Set<String>> uniqueSecretsPerPattern = new HashMap<>();
         
@@ -227,7 +227,7 @@ public class SecretScanner {
         int duplicateThreshold = config.getSettings().getDuplicateThreshold();
         
         Logger.logCritical("SecretScanner.scanResponse: Starting scan with " + secretPatterns.size() + " patterns, threshold: " + duplicateThreshold);
-        Logger.logCritical("SecretScanner.scanResponse: Received " + mergedCounts.size() + " pre-calculated secret counts for baseUrl: " + baseUrl);
+        Logger.logCritical("SecretScanner.scanResponse: Received " + persistedCounts.size() + " persisted secret counts for baseUrl: " + baseUrl);
         
         try {
             // Use String for reliable regex matching
@@ -282,7 +282,7 @@ public class SecretScanner {
                         }
 
                         // STEP 2: CHECK THRESHOLD BEFORE CREATING ANY OBJECTS
-                        int currentCount = mergedCounts.getOrDefault(secretValue, 0);
+                        int currentCount = persistedCounts.getOrDefault(secretValue, 0);
                         if (currentCount >= duplicateThreshold) {
                             Logger.logCritical("SecretScanner.scanResponse: Skipping secret due to threshold: " + secretValue + " (seen " + currentCount + " times, threshold: " + duplicateThreshold + ")");
                             continue;

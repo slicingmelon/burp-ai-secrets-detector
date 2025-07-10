@@ -193,26 +193,12 @@ public class AISecretsDetector implements BurpExtension {
             
             Logger.logCritical("AISecretsDetector.processHttpResponse: Calling secretScanner.scanResponse for baseUrl: " + baseUrl);
             
-            // Calculate counts once before scanning
-            Map<String, Integer> existingCounts = getExistingSecretCounts(baseUrl);
+            // Use only persistent counters - they already contain all we need!
             Map<String, Integer> persistedCounts = getPersistedSecretCounts(baseUrl);
             
-            // Merge the counts giving precedence to the higher count
-            Map<String, Integer> mergedCounts = new HashMap<>();
-            Set<String> allSecrets = new HashSet<>();
-            allSecrets.addAll(existingCounts.keySet());
-            allSecrets.addAll(persistedCounts.keySet());
+            Logger.logCritical("AISecretsDetector.processHttpResponse: Using " + persistedCounts.size() + " persisted secret counts for baseUrl: " + baseUrl);
             
-            for (String secret : allSecrets) {
-                int existingCount = existingCounts.getOrDefault(secret, 0);
-                int persistedCount = persistedCounts.getOrDefault(secret, 0);
-                int finalCount = Math.max(existingCount, persistedCount);
-                mergedCounts.put(secret, finalCount);
-            }
-            
-            Logger.logCritical("AISecretsDetector.processHttpResponse: Loaded " + mergedCounts.size() + " existing secrets for baseUrl: " + baseUrl);
-            
-            SecretScanner.SecretScanResult result = secretScanner.scanResponse(tempResponse, baseUrl, mergedCounts);
+            SecretScanner.SecretScanResult result = secretScanner.scanResponse(tempResponse, baseUrl, persistedCounts);
             
             Logger.logCritical("AISecretsDetector.processHttpResponse: Scanner returned " + result.getSecretCount() + " secrets");
             
@@ -328,111 +314,7 @@ public class AISecretsDetector implements BurpExtension {
         return secretCounters.getOrDefault(baseUrl, new HashMap<>());
     }
     
-    /**
-    * Count secrets in existing issues
-    */
-    private Map<String, Integer> getExistingSecretCounts(String baseUrl) {
-        Map<String, Integer> secretCounts = new HashMap<>();
-        
-        try {
-            SiteMapFilter baseUrlFilter = new SiteMapFilter() {
-                @Override
-                public boolean matches(SiteMapNode node) {
-                    String nodeBaseUrl = extractBaseUrl(node.url());
-                    
-                    // Match base URLs and only our issue type
-                    if (!nodeBaseUrl.equals(baseUrl)) {
-                        return false;
-                    }
-                    
-                    for (AuditIssue issue : node.issues()) {
-                        if (issue.name().equals("Exposed Secrets Detected")) {
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-            };
-            
-            List<AuditIssue> existingIssues = api.siteMap().issues(baseUrlFilter);
-            logMsg("Found " + existingIssues.size() + " existing issues for base URL: " + baseUrl);
-            
-            // Process each issue to count secret occurrences - BUT ONLY OUR ISSUE TYPE
-            for (AuditIssue issue : existingIssues) {
-                // Only process "Exposed Secrets Detected" issues created by this extension
-                if (!issue.name().equals("Exposed Secrets Detected")) {
-                    continue;
-                }
-                
-                for (HttpRequestResponse evidence : issue.requestResponses()) {
-                    Set<String> secretsFromMarkers = extractSecretsFromMarkers(evidence);
-                    logMsg("Extracted " + secretsFromMarkers.size() + " secrets from markers in issue: " + issue.name());
-                    
-                    // Count each found secret
-                    for (String secret : secretsFromMarkers) {
-                        int count = secretCounts.getOrDefault(secret, 0);
-                        secretCounts.put(secret, count + 1);
-                        logMsg("Counted existing secret: " + secret + " (count=" + (count + 1) + ")");
-                    }
-                }
-            }
-            
-        } catch (Exception e) {
-            logMsgError("Error counting existing secrets: " + e.getMessage());
-            e.printStackTrace();
-        }
-        
-        return secretCounts;
-    }
-    
-    /**
-    * Extract actual secrets from response markers
-    */
-    private Set<String> extractSecretsFromMarkers(HttpRequestResponse requestResponse) {
-        Set<String> extractedSecrets = new HashSet<>();
-    
-        if (requestResponse == null || requestResponse.response() == null) {
-            logMsg("No response to extract markers from");
-            return extractedSecrets;
-        }
-        
-        List<Marker> markers = requestResponse.responseMarkers();
-        
-        if (markers == null || markers.isEmpty()) {
-            logMsg("No markers found in response");
-            return extractedSecrets;
-        }
-        
-        // Get full response as ByteArray
-        ByteArray responseBytes = requestResponse.response().toByteArray();
-        
-        for (Marker marker : markers) {
-            try {
-                int startPos = marker.range().startIndexInclusive();
-                int endPos = marker.range().endIndexExclusive();
-                
-                // Simple bounds checking
-                if (startPos >= 0 && endPos <= responseBytes.length() && startPos < endPos) {
-                    // Extract bytes directly from the full response
-                    ByteArray secretBytes = responseBytes.subArray(startPos, endPos);
-                    String secret = secretBytes.toString();
-                    
-                    if (secret != null && !secret.isEmpty()) {
-                        // Only store non-empty secrets
-                        extractedSecrets.add(secret);
-                        logMsg("Extracted secret from marker: " + secret);
-                    }
-                } else {
-                    logMsg("Invalid marker position: " + startPos + "-" + endPos + 
-                          " (response length: " + responseBytes.length() + ")");
-                }
-            } catch (Exception e) {
-                logMsg("Error extracting secret from marker: " + e.getMessage());
-            }
-        }
-        
-        return extractedSecrets;
-    }
+
     
     /**
     * Increment the counter for a specific secret at a base URL
