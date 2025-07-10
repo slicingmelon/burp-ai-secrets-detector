@@ -166,68 +166,211 @@ public class Config {
     }
 
     public static class ExclusionConfig {
-        @JsonProperty("type")
-        private String type;
-        @JsonProperty("regex")
-        private String regex;
-        @JsonProperty("pattern_name")
-        private String patternName;
+        // URL patterns - single string or array
+        @JsonProperty("url")
+        private String url;
+        @JsonProperty("urls")
+        private List<String> urls;
+        
+        // Context patterns - single string or array  
+        @JsonProperty("context")
+        private String context;
+        @JsonProperty("contexts")
+        private List<String> contexts;
         
         @JsonIgnore
-        private Pattern compiledRegex;
+        private List<Pattern> compiledUrlPatterns;
+        @JsonIgnore
+        private List<Pattern> compiledContextPatterns;
 
-        public ExclusionConfig() {}
+        public ExclusionConfig() {
+            this.urls = new ArrayList<>();
+            this.contexts = new ArrayList<>();
+        }
 
-        public ExclusionConfig(String type, String regex, String patternName) {
-            this.type = type;
-            this.regex = regex;
-            this.patternName = patternName;
+        public ExclusionConfig(String url, String context) {
+            this();
+            this.url = url;
+            this.context = context;
+            compile();
+        }
+
+        public ExclusionConfig(List<String> urls, List<String> contexts) {
+            this();
+            this.urls = urls != null ? new ArrayList<>(urls) : new ArrayList<>();
+            this.contexts = contexts != null ? new ArrayList<>(contexts) : new ArrayList<>();
             compile();
         }
 
         public void compile() {
-            try {
-                this.compiledRegex = Pattern.compile(regex);
-            } catch (Exception e) {
-                Logger.logCriticalError("FAILED to compile exclusion regex: " + regex + " - Error: " + e.getMessage());
-                throw new IllegalArgumentException("Invalid regex in exclusion: " + e.getMessage(), e);
+            compiledUrlPatterns = new ArrayList<>();
+            compiledContextPatterns = new ArrayList<>();
+            
+            // Compile URL patterns
+            List<String> allUrls = getAllUrls();
+            for (String urlPattern : allUrls) {
+                try {
+                    compiledUrlPatterns.add(Pattern.compile(urlPattern));
+                } catch (Exception e) {
+                    Logger.logCriticalError("FAILED to compile URL exclusion regex: " + urlPattern + " - Error: " + e.getMessage());
+                    throw new IllegalArgumentException("Invalid URL regex in exclusion: " + e.getMessage(), e);
+                }
+            }
+            
+            // Compile Context patterns
+            List<String> allContexts = getAllContexts();
+            for (String contextPattern : allContexts) {
+                try {
+                    compiledContextPatterns.add(Pattern.compile(contextPattern));
+                } catch (Exception e) {
+                    Logger.logCriticalError("FAILED to compile Context exclusion regex: " + contextPattern + " - Error: " + e.getMessage());
+                    throw new IllegalArgumentException("Invalid Context regex in exclusion: " + e.getMessage(), e);
+                }
             }
         }
 
+        // Get all URL patterns (single + array)
+        public List<String> getAllUrls() {
+            List<String> allUrls = new ArrayList<>();
+            if (url != null && !url.trim().isEmpty()) {
+                allUrls.add(url);
+            }
+            if (urls != null) {
+                allUrls.addAll(urls);
+            }
+            return allUrls;
+        }
+
+        // Get all context patterns (single + array)
+        public List<String> getAllContexts() {
+            List<String> allContexts = new ArrayList<>();
+            if (context != null && !context.trim().isEmpty()) {
+                allContexts.add(context);
+            }
+            if (contexts != null) {
+                allContexts.addAll(contexts);
+            }
+            return allContexts;
+        }
+
+        /**
+         * Check if this exclusion matches the given URL and context
+         * Logic: URL AND Context (both must match if both are specified)
+         */
+        public boolean matches(String targetUrl, String targetContext) {
+            boolean urlMatches = matchesUrl(targetUrl);
+            boolean contextMatches = matchesContext(targetContext);
+            
+            // If both URL and Context are specified, both must match (AND)
+            List<String> allUrls = getAllUrls();
+            List<String> allContexts = getAllContexts();
+            
+            if (!allUrls.isEmpty() && !allContexts.isEmpty()) {
+                return urlMatches && contextMatches;
+            }
+            // If only URL is specified
+            else if (!allUrls.isEmpty()) {
+                return urlMatches;
+            }
+            // If only Context is specified
+            else if (!allContexts.isEmpty()) {
+                return contextMatches;
+            }
+            
+            return false;
+        }
+
+        private boolean matchesUrl(String targetUrl) {
+            if (targetUrl == null || compiledUrlPatterns.isEmpty()) {
+                return compiledUrlPatterns.isEmpty(); // No URL patterns = match all URLs
+            }
+            
+            for (Pattern pattern : compiledUrlPatterns) {
+                if (pattern.matcher(targetUrl).find()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private boolean matchesContext(String targetContext) {
+            if (targetContext == null || compiledContextPatterns.isEmpty()) {
+                return compiledContextPatterns.isEmpty(); // No context patterns = match all contexts
+            }
+            
+            for (Pattern pattern : compiledContextPatterns) {
+                if (pattern.matcher(targetContext).find()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Getters and setters
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
+        }
+
+        public List<String> getUrls() {
+            return urls;
+        }
+
+        public void setUrls(List<String> urls) {
+            this.urls = urls;
+        }
+
+        public String getContext() {
+            return context;
+        }
+
+        public void setContext(String context) {
+            this.context = context;
+        }
+
+        public List<String> getContexts() {
+            return contexts;
+        }
+
+        public void setContexts(List<String> contexts) {
+            this.contexts = contexts;
+        }
+
+        public List<Pattern> getCompiledUrlPatterns() {
+            return compiledUrlPatterns;
+        }
+
+        public List<Pattern> getCompiledContextPatterns() {
+            return compiledContextPatterns;
+        }
+
+        // Backward compatibility methods
+        @Deprecated
         public String getType() {
-            return type;
+            return "context"; // Legacy compatibility
         }
 
+        @Deprecated
         public String getRegex() {
-            return regex;
+            return context; // Legacy compatibility
         }
 
+        @Deprecated
         public String getPatternName() {
-            return patternName;
+            return "*"; // Legacy compatibility
         }
 
-        public Pattern getCompiledRegex() {
-            return compiledRegex;
-        }
-
-        public void setType(String type) {
-            this.type = type;
-        }
-
-        public void setRegex(String regex) {
-            this.regex = regex;
-        }
-
-        public void setPatternName(String patternName) {
-            this.patternName = patternName;
-        }
-
+        @Deprecated
         public boolean matchesPattern(String patternName) {
-            return "*".equals(this.patternName) || this.patternName.equals(patternName);
+            return true; // New design applies to all patterns
         }
 
+        @Deprecated
         public boolean matches(String input) {
-            return compiledRegex != null && compiledRegex.matcher(input).find();
+            return matchesContext(input); // Legacy compatibility
         }
     }
 
@@ -618,11 +761,11 @@ public class Config {
             int maxLength = this.settings.getGenericSecretMaxLength();
             this.patterns.forEach(pattern -> pattern.compile(minLength, maxLength));
             
-            // Compile exclusions
-            this.exclusions.forEach(exclusion -> {
-                exclusion.compile();
-                Logger.logCritical("Config.parseTomlRoot: Compiled exclusion - type: " + exclusion.getType() + ", pattern: " + exclusion.getPatternName() + ", regex: " + exclusion.getRegex());
-            });
+                    // Compile exclusions
+        this.exclusions.forEach(exclusion -> {
+            exclusion.compile();
+            Logger.logCritical("Config.parseTomlRoot: Compiled exclusion - URLs: " + exclusion.getAllUrls() + ", Contexts: " + exclusion.getAllContexts());
+        });
             
         }
     }
@@ -748,9 +891,35 @@ public class Config {
         if (this.exclusions != null && !this.exclusions.isEmpty()) {
             for (ExclusionConfig exclusion : this.exclusions) {
                 updatedLines.add("[[exclusions]]");
-                updatedLines.add("type = \"" + exclusion.getType() + "\"");
-                updatedLines.add("regex = '''" + (exclusion.getRegex() != null ? exclusion.getRegex() : "") + "'''");
-                updatedLines.add("pattern_name = \"" + (exclusion.getPatternName() != null ? exclusion.getPatternName() : "*") + "\"");
+                
+                // Write URL patterns
+                List<String> allUrls = exclusion.getAllUrls();
+                if (allUrls.size() == 1) {
+                    updatedLines.add("url = '''" + allUrls.get(0) + "'''");
+                } else if (allUrls.size() > 1) {
+                    updatedLines.add("urls = [");
+                    for (int i = 0; i < allUrls.size(); i++) {
+                        String prefix = i == 0 ? "  '''" : "  '''";
+                        String suffix = i == allUrls.size() - 1 ? "'''" : "''',";
+                        updatedLines.add(prefix + allUrls.get(i) + suffix);
+                    }
+                    updatedLines.add("]");
+                }
+                
+                // Write Context patterns
+                List<String> allContexts = exclusion.getAllContexts();
+                if (allContexts.size() == 1) {
+                    updatedLines.add("context = '''" + allContexts.get(0) + "'''");
+                } else if (allContexts.size() > 1) {
+                    updatedLines.add("contexts = [");
+                    for (int i = 0; i < allContexts.size(); i++) {
+                        String prefix = i == 0 ? "  '''" : "  '''";
+                        String suffix = i == allContexts.size() - 1 ? "'''" : "''',";
+                        updatedLines.add(prefix + allContexts.get(i) + suffix);
+                    }
+                    updatedLines.add("]");
+                }
+                
                 updatedLines.add(""); // Empty line after each exclusion
             }
         }
@@ -930,42 +1099,78 @@ public class Config {
     }
     
     /**
-     * Add a new exclusion configuration
+     * Add a new exclusion configuration (new format)
      */
+    public void addExclusion(String url, String context) {
+        if (exclusions == null) {
+            exclusions = new CopyOnWriteArrayList<>();
+        }
+        
+        ExclusionConfig exclusion = new ExclusionConfig(url, context);
+        exclusions.add(exclusion);
+        
+        Logger.logCritical("Config.addExclusion: Added exclusion - url: " + url + ", context: " + context);
+        
+        // Save configuration
+        saveConfig();
+    }
+
+    /**
+     * Add a new exclusion configuration with arrays (new format)
+     */
+    public void addExclusion(List<String> urls, List<String> contexts) {
+        if (exclusions == null) {
+            exclusions = new CopyOnWriteArrayList<>();
+        }
+        
+        ExclusionConfig exclusion = new ExclusionConfig(urls, contexts);
+        exclusions.add(exclusion);
+        
+        Logger.logCritical("Config.addExclusion: Added exclusion - urls: " + urls + ", contexts: " + contexts);
+        
+        // Save configuration
+        saveConfig();
+    }
+
+    /**
+     * Add a new exclusion configuration (backward compatibility)
+     */
+    @Deprecated
     public void addExclusion(String type, String regex, String patternName) {
         if (exclusions == null) {
             exclusions = new CopyOnWriteArrayList<>();
         }
         
-        ExclusionConfig exclusion = new ExclusionConfig(type, regex, patternName);
-        exclusions.add(exclusion);
-        
-        Logger.logCritical("Config.addExclusion: Added exclusion - type: " + type + ", pattern: " + patternName);
-        
-        // Save configuration
-        saveConfig();
+        // Convert old format to new format
+        if ("context".equals(type)) {
+            addExclusion(null, regex); // No URL, just context
+        } else if ("url".equals(type)) {
+            addExclusion(regex, null); // Just URL, no context
+        } else {
+            addExclusion(null, regex); // Default to context
+        }
     }
     
     /**
-     * Add host exclusion
+     * Add host exclusion (convenience method)
      */
     public void addHostExclusion(String host) {
-        addExclusion("host", host, "*");
+        addExclusion(".*" + host + ".*", null); // URL pattern for host
     }
     
     /**
-     * Add URL exclusion  
+     * Add URL exclusion (convenience method)
      */
     public void addUrlExclusion(String url) {
-        addExclusion("url", url, "*");
+        addExclusion(url, null); // URL-only exclusion
     }
     
     /**
-     * Add context exclusion - uses pattern as-is for flexible matching
+     * Add context exclusion (convenience method)
      */
     public void addContextExclusion(String context, String patternName) {
         // Use context as regex pattern directly - more flexible
-        addExclusion("context", context, patternName);
+        addExclusion(null, context); // Context-only exclusion
     }
     
 
@@ -986,7 +1191,7 @@ public class Config {
     public void removeExclusion(int index) {
         if (exclusions != null && index >= 0 && index < exclusions.size()) {
             ExclusionConfig removed = exclusions.remove(index);
-            Logger.logCritical("Config.removeExclusion: Removed exclusion - type: " + removed.getType() + ", pattern: " + removed.getPatternName());
+            Logger.logCritical("Config.removeExclusion: Removed exclusion - URLs: " + removed.getAllUrls() + ", Contexts: " + removed.getAllContexts());
             saveConfig();
         }
     }

@@ -151,15 +151,15 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
                         
                         api.logging().logToOutput("Generated exclusion regex: " + exclusionRegex);
                         
-                        if (exclusionRegex != null) {
-                            // Add exclusion to config
-                            config.addExclusion("context", exclusionRegex, patternName);
-                            generatedExclusions.add(String.format("Pattern '%s': %s", patternName, exclusionRegex));
-                            exclusionCount++;
-                            api.logging().logToOutput("Successfully added exclusion for pattern: " + patternName);
-                        } else {
-                            api.logging().logToOutput("Failed to generate exclusion regex for pattern: " + patternName);
-                        }
+                                        if (exclusionRegex != null) {
+                    // Add exclusion to config using new format (context-only)
+                    config.addExclusion(null, exclusionRegex);
+                    generatedExclusions.add(String.format("Pattern '%s': %s", patternName, exclusionRegex));
+                    exclusionCount++;
+                    api.logging().logToOutput("Successfully added exclusion for pattern: " + patternName);
+                } else {
+                    api.logging().logToOutput("Failed to generate exclusion regex for pattern: " + patternName);
+                }
                     } else {
                         api.logging().logToOutput("Pattern '" + patternName + "' did NOT match");
                     }

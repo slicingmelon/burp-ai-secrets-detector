@@ -232,41 +232,23 @@ public class SecretScanner {
             return false;
         }
         
-        // Extract URL from response - this is a simplified approach
-        // In a real implementation, we'd need the full request URL
-        String requestUrl = baseUrl; // For now, use baseUrl as approximation
-        
-        // Extract host from baseUrl
-        String host = extractHost(baseUrl);
+        // Use full URL for matching
+        String targetUrl = baseUrl;
+        String targetContext = responseString;
         
         for (Config.ExclusionConfig exclusion : exclusions) {
             try {
-                boolean matches = false;
-                
-                switch (exclusion.getType()) {
-                    case "url":
-                        matches = exclusion.matches(requestUrl);
-                        break;
-                    case "host":
-                        matches = exclusion.matches(host);
-                        break;
-                    case "path":
-                        String path = extractPath(baseUrl);
-                        matches = exclusion.matches(path);
-                        break;
-                    case "context":
-                        // Context exclusions should NOT be checked at response level
-                        // They are pattern-specific and checked in shouldExcludePattern
-                        continue;
-                    default:
-                        Logger.logCritical("SecretScanner.shouldExcludeResponse: Unknown exclusion type: " + exclusion.getType());
-                        continue;
+                // Check if this exclusion applies to URL-only exclusions (no context patterns)
+                List<String> contextPatterns = exclusion.getAllContexts();
+                if (contextPatterns.isEmpty()) {
+                    // URL-only exclusion, check if URL matches
+                    if (exclusion.matches(targetUrl, null)) {
+                        Logger.logCritical("SecretScanner.shouldExcludeResponse: Response excluded by URL-only rule");
+                        return true;
+                    }
                 }
+                // Context-only and URL+Context exclusions are handled at pattern level
                 
-                if (matches) {
-                    Logger.logCritical("SecretScanner.shouldExcludeResponse: Response excluded by " + exclusion.getType() + " rule: " + exclusion.getRegex());
-                    return true;
-                }
             } catch (Exception e) {
                 Logger.logCriticalError("SecretScanner.shouldExcludeResponse: Error checking exclusion: " + e.getMessage());
             }
@@ -288,18 +270,21 @@ public class SecretScanner {
             return false;
         }
         
+        String targetUrl = baseUrl;
+        String targetContext = context;
+        
         for (Config.ExclusionConfig exclusion : exclusions) {
             try {
-                // Check if this exclusion applies to this pattern
-                if (!exclusion.matchesPattern(patternName)) {
-                    continue;
+                // Check if this exclusion has context patterns (context-only or URL+context)
+                List<String> contextPatterns = exclusion.getAllContexts();
+                if (!contextPatterns.isEmpty()) {
+                    // This exclusion has context patterns, check if it matches
+                    if (exclusion.matches(targetUrl, targetContext)) {
+                        Logger.logCritical("SecretScanner.shouldExcludePattern: Pattern " + patternName + " excluded by context rule");
+                        return true;
+                    }
                 }
                 
-                // Check if exclusion matches the context
-                if ("context".equals(exclusion.getType()) && exclusion.matches(context)) {
-                    Logger.logCritical("SecretScanner.shouldExcludePattern: Pattern " + patternName + " excluded by context rule");
-                    return true;
-                }
             } catch (Exception e) {
                 Logger.logCriticalError("SecretScanner.shouldExcludePattern: Error checking pattern exclusion: " + e.getMessage());
             }
