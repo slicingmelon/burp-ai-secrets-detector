@@ -604,29 +604,25 @@ public class Config {
         List<String> updatedLines = new ArrayList<>();
         
         boolean inSettingsSection = false;
-        boolean inPatternsSection = false;
         boolean foundPatternsSection = false;
         
         for (String line : lines) {
             String trimmed = line.trim();
             
-            // Detect sections
-            if (trimmed.equals("[settings]")) {
-                inSettingsSection = true;
-                inPatternsSection = false;
-                updatedLines.add(line);
-                continue;
-            } else if (trimmed.startsWith("[[patterns]]")) {
-                inSettingsSection = false;
-                inPatternsSection = true;
-                foundPatternsSection = true;
-                break; // Stop processing here, we'll append our patterns
-            } else if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-                inSettingsSection = false;
-                inPatternsSection = false;
-                updatedLines.add(line);
-                continue;
-            }
+                    // Detect sections
+        if (trimmed.equals("[settings]")) {
+            inSettingsSection = true;
+            updatedLines.add(line);
+            continue;
+        } else if (trimmed.startsWith("[[patterns]]")) {
+            inSettingsSection = false;
+            foundPatternsSection = true;
+            break; // Stop processing here, we'll append our patterns
+        } else if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            inSettingsSection = false;
+            updatedLines.add(line);
+            continue;
+        }
             
             // Update version
             if (trimmed.startsWith("version = ")) {
