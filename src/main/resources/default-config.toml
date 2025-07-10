@@ -4,38 +4,8 @@ version = "1.7.1"
 
 [settings]
 # File extensions to skip during scanning (binary/media files unlikely to contain secrets)
-excluded_file_extensions = [
-  # Media files (audio/video)
-  "3g2", "3gp", "aac", "aif", "aifc", "aiff", "au", "avi", "flac", "flv", "m3u", "m4a", "m4v", "mid", "midi", 
-  "mkv", "mov", "mp2", "mp3", "mp4", "mpa", "mpe", "mpeg", "mpg", "mpv2", "oga", "ogg", "ogv", "ogx", 
-  "ra", "ram", "rmi", "snd", "wav", "weba", "webm", "wma", "wmv",
-
-  # Image files
-  "bmp", "gif", "ico", "ief", "jfif", "jpe", "jpeg", "jpg", "pbm", "pgm", "png", "pnm", "ppm", "ras", 
-  "raw", "rgb", "svg", "tiff", "webp", "xbm", "xpm", "xwd", "psd", "ai", "eps", "cmx",
-
-  # Archive files
-  "7z", "arc", "bz", "bz2", "gz", "rar", "tar", "zip", "zipx", "xz", "lz", "lzma",
-
-  # Application packages
-  "apk", "jar", "war", "ear", "mpkg",
-
-  # Executables
-  "bin", "cod", "com", "exe", "msi", "dll", "so", "dylib", "app", "deb", "rpm", "pkg", "dmg", "iso", "img",
-
-  # Document formats
-  "abw", "azw", "doc", "docx", "epub", "mpp", "odp", "ods", "odt", "pages", "numbers", "keynote", 
-  "pdf", "ppt", "pptx", "rtf", "vsd", "xls", "xlsx",
-
-  # Fonts
-  "eot", "otf", "ttf", "woff", "woff2",
-
-  # Binary/misc formats
-  "dat", "mdb", "accdb", "o", "obj", "swf", "fla", "xul",
-
-  # Stylesheets
-  "css"
-]
+# Categories: Media files, Image files, Archive files, Application packages, Executables, Document formats, Fonts, Binary/misc formats, Stylesheets
+excluded_file_extensions = ["3g2", "3gp", "aac", "aif", "aifc", "aiff", "au", "avi", "flac", "flv", "m3u", "m4a", "m4v", "mid", "midi", "mkv", "mov", "mp2", "mp3", "mp4", "mpa", "mpe", "mpeg", "mpg", "mpv2", "oga", "ogg", "ogv", "ogx", "ra", "ram", "rmi", "snd", "wav", "weba", "webm", "wma", "wmv", "bmp", "gif", "ico", "ief", "jfif", "jpe", "jpeg", "jpg", "pbm", "pgm", "png", "pnm", "ppm", "ras", "raw", "rgb", "svg", "tiff", "webp", "xbm", "xpm", "xwd", "psd", "ai", "eps", "cmx", "7z", "arc", "bz", "bz2", "gz", "rar", "tar", "zip", "zipx", "xz", "lz", "lzma", "apk", "jar", "war", "ear", "mpkg", "bin", "cod", "com", "exe", "msi", "dll", "so", "dylib", "app", "deb", "rpm", "pkg", "dmg", "iso", "img", "abw", "azw", "doc", "docx", "epub", "mpp", "odp", "ods", "odt", "pages", "numbers", "keynote", "pdf", "ppt", "pptx", "rtf", "vsd", "xls", "xlsx", "eot", "otf", "ttf", "woff", "woff2", "dat", "mdb", "accdb", "o", "obj", "swf", "fla", "xul", "css"]
 
 # Number of worker threads for processing HTTP responses
 workers = 15
