@@ -231,7 +231,7 @@ public class SecretScanner {
                 try {
                     Logger.logCritical("SecretScanner.scanResponse: Testing pattern: " + pattern.getName());
                     
-                    if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2")) && !SecretScannerUtils.isRandomnessAlgorithmEnabled()) {
+                    if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2") || pattern.getName().equals("Generic Secret v3")) && !SecretScannerUtils.isRandomnessAlgorithmEnabled()) {
                         Logger.logCritical("SecretScanner.scanResponse: Skipping pattern " + pattern.getName() + " - randomness algorithm disabled");
                         continue;
                     }
@@ -244,7 +244,7 @@ public class SecretScanner {
                         Logger.logCritical("SecretScanner.scanResponse: Found match #" + matchCount + " for pattern " + pattern.getName());
                         
                         // STEP 1: IDENTIFY secret value using Java's regex engine (Burp's API indexOf pattern not working properly)
-                        if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2")) && matcher.groupCount() >= 1) {
+                        if ((pattern.getName().equals("Generic Secret") || pattern.getName().equals("Generic Secret v2") || pattern.getName().equals("Generic Secret v3")) && matcher.groupCount() >= 1) {
                             secretValue = matcher.group(1);
                             Logger.logCritical("SecretScanner.scanResponse: Extracted potential secret for pattern " + pattern.getName() + ": " + secretValue);
                             
