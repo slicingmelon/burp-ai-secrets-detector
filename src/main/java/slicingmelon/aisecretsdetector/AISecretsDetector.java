@@ -214,43 +214,10 @@ public class AISecretsDetector implements BurpExtension {
                     String secretType = secret.getType();
                     
                     if (secretValue != null && !secretValue.isEmpty()) {
-                        // *** POSITION VALIDATION AND CORRECTION ***
-                        // Check if the calculated positions actually match the expected secret value
-                        int finalStartPos = secret.getStartIndex();
-                        int finalEndPos = secret.getEndIndex();
-                        
-                        if (!validateSecretPosition(tempResponse.toByteArray(), secretValue, finalStartPos, finalEndPos)) {
-                            ByteArray actualBytes = tempResponse.toByteArray().subArray(finalStartPos, finalEndPos);
-                            String actualFound = actualBytes.toString();
-                            Logger.logCritical("POSITION MISMATCH DETECTED:");
-                            Logger.logCritical("  Expected secret: '" + secretValue + "'");
-                            Logger.logCritical("  Actually found at " + finalStartPos + "-" + finalEndPos + ": '" + actualFound + "'");
-                            Logger.logCritical("  Secret type: " + secretType);
-                            Logger.logCritical("  Response length: " + tempResponse.toByteArray().length() + " bytes");
-                            
-                            // *** ATTEMPT POSITION CORRECTION ***
-                            int[] correctedPos = findCorrectSecretPosition(tempResponse.toByteArray(), secretValue, finalStartPos, finalEndPos);
-                            if (correctedPos[0] != finalStartPos || correctedPos[1] != finalEndPos) {
-                                // Verify the correction worked
-                                if (validateSecretPosition(tempResponse.toByteArray(), secretValue, correctedPos[0], correctedPos[1])) {
-                                    Logger.logCritical("POSITION CORRECTED:");
-                                    Logger.logCritical("  Original position: " + finalStartPos + "-" + finalEndPos);
-                                    Logger.logCritical("  Corrected position: " + correctedPos[0] + "-" + correctedPos[1]);
-                                    Logger.logCritical("  Correction successful for secret: '" + secretValue + "'");
-                                    finalStartPos = correctedPos[0];
-                                    finalEndPos = correctedPos[1];
-                                } else {
-                                    Logger.logCritical("POSITION CORRECTION FAILED - using original positions");
-                                }
-                            } else {
-                                Logger.logCritical("POSITION CORRECTION: No alternative position found");
-                            }
-                        }
-                        
                         // *** STEP 2: CREATE INDIVIDUAL MARKER ***
-                        // Use corrected positions (or original if no correction needed/possible)
-                        responseMarkers.add(Marker.marker(finalStartPos, finalEndPos));
-                        Logger.logCritical("AISecretsDetector.processHttpResponse: Found exact position for " + secretType + " at " + finalStartPos + "-" + finalEndPos);
+                        // Use pre-calculated start and end positions from scanner to create each RED marker
+                        responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
+                        Logger.logCritical("AISecretsDetector.processHttpResponse: Found exact position for " + secretType + " at " + secret.getStartIndex() + "-" + secret.getEndIndex());
                         
                         newSecrets.add(secretValue);
                         
@@ -723,54 +690,5 @@ public class AISecretsDetector implements BurpExtension {
         secretCounters.clear();
         saveSecretCounters();
         logMsg("All secret counters cleared");
-    }
-    
-    /**
-     * Validate that the secret position matches the expected secret value
-     * This is for diagnostic purposes to detect UTF-8 encoding position mismatches
-     */
-    private boolean validateSecretPosition(ByteArray responseBytes, String expectedSecret, int startPos, int endPos) {
-        if (startPos < 0 || endPos > responseBytes.length() || startPos >= endPos) {
-            return false;
-        }
-        
-        ByteArray actualBytes = responseBytes.subArray(startPos, endPos);
-        String actualSecret = actualBytes.toString();
-        
-        return expectedSecret.equals(actualSecret);
-    }
-    
-    /**
-     * Find the correct position of a secret in the response bytes
-     * Used to correct position mismatches caused by Burp's character encoding interpretation
-     */
-    private int[] findCorrectSecretPosition(ByteArray responseBytes, String secretValue, int originalStartPos, int originalEndPos) {
-        try {
-            // Convert secret to bytes using the same encoding as ByteArray
-            ByteArray secretBytes = ByteArray.byteArray(secretValue);
-            
-            // Search in a reasonable range around the original position
-            int searchStart = Math.max(0, originalStartPos - 200);
-            int searchEnd = Math.min(responseBytes.length(), originalEndPos + 200);
-            
-            // First try exact search from the beginning of search range
-            int foundPos = responseBytes.indexOf(secretBytes, true, searchStart, searchEnd);
-            if (foundPos >= 0) {
-                return new int[]{foundPos, foundPos + secretBytes.length()};
-            }
-            
-            // If not found, try a more comprehensive search in the entire response
-            foundPos = responseBytes.indexOf(secretBytes, true);
-            if (foundPos >= 0) {
-                return new int[]{foundPos, foundPos + secretBytes.length()};
-            }
-            
-            // If still not found, return original positions
-            return new int[]{originalStartPos, originalEndPos};
-            
-        } catch (Exception e) {
-            logMsg("Error finding correct secret position: " + e.getMessage());
-            return new int[]{originalStartPos, originalEndPos};
-        }
     }
 }
