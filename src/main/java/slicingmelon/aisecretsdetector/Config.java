@@ -597,6 +597,7 @@ public class Config {
             this.settings = tomlRoot.settings != null ? tomlRoot.settings : new Settings();
             this.patterns = tomlRoot.patterns != null ? new CopyOnWriteArrayList<>(tomlRoot.patterns) : new CopyOnWriteArrayList<>();
             this.exclusions = tomlRoot.exclusions != null ? new CopyOnWriteArrayList<>(tomlRoot.exclusions) : new CopyOnWriteArrayList<>();
+            Logger.logCritical("Config.parseTomlRoot: Loaded " + (this.exclusions != null ? this.exclusions.size() : 0) + " exclusions");
             
             // Ensure all settings fields have proper defaults (handles missing fields from older configs)
             if (this.settings.getExcludedFileExtensions() == null) {
@@ -618,7 +619,10 @@ public class Config {
             this.patterns.forEach(pattern -> pattern.compile(minLength, maxLength));
             
             // Compile exclusions
-            this.exclusions.forEach(exclusion -> exclusion.compile());
+            this.exclusions.forEach(exclusion -> {
+                exclusion.compile();
+                Logger.logCritical("Config.parseTomlRoot: Compiled exclusion - type: " + exclusion.getType() + ", pattern: " + exclusion.getPatternName() + ", regex: " + exclusion.getRegex());
+            });
             
         }
     }
@@ -687,10 +691,10 @@ public class Config {
             inSettingsSection = true;
             updatedLines.add(line);
             continue;
-        } else if (trimmed.startsWith("[[patterns]]")) {
+        } else if (trimmed.startsWith("[[patterns]]") || trimmed.startsWith("[[exclusions]]")) {
             inSettingsSection = false;
             foundPatternsSection = true;
-            break; // Stop processing here, we'll append our patterns
+            break; // Stop processing here, we'll append our exclusions and patterns
         } else if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
             inSettingsSection = false;
             updatedLines.add(line);
@@ -888,11 +892,9 @@ public class Config {
             // Update version to current
             this.configVersion = getCurrentExtensionVersion();
 
-            // Use the default raw TOML content as our base
-            if (defaultRawToml != null) {
-                this.rawTomlContent = defaultRawToml;
-            }
-
+            // DO NOT overwrite rawTomlContent with defaults - keep user's content!
+            // The rawTomlContent should preserve user's exclusions and formatting
+            
             // Save the merged config
             saveConfig();
 
@@ -1211,6 +1213,18 @@ public class Config {
                     }
                 } else {
                     updatedLines.add(line);
+                }
+            }
+            
+            // Rebuild exclusions section first
+            if (this.exclusions != null && !this.exclusions.isEmpty()) {
+                updatedLines.add("");
+                for (ExclusionConfig exclusion : this.exclusions) {
+                    updatedLines.add("[[exclusions]]");
+                    updatedLines.add("type = \"" + (exclusion.getType() != null ? exclusion.getType() : "") + "\"");
+                    updatedLines.add("regex = '''" + (exclusion.getRegex() != null ? exclusion.getRegex() : "") + "'''");
+                    updatedLines.add("pattern_name = \"" + (exclusion.getPatternName() != null ? exclusion.getPatternName() : "*") + "\"");
+                    updatedLines.add("");
                 }
             }
             

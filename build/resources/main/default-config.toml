@@ -12,7 +12,7 @@ excluded_file_extensions = ["3g2", "3gp", "aac", "aif", "aifc", "aiff", "au", "a
 excluded_mime_types = ["IMAGE_BMP", "IMAGE_GIF", "IMAGE_JPEG", "IMAGE_PNG", "IMAGE_SVG_XML", "IMAGE_TIFF", "IMAGE_UNKNOWN", "FONT_WOFF", "FONT_WOFF2", "SOUND", "VIDEO", "APPLICATION_FLASH", "RTF", "CSS", "APPLICATION_UNKNOWN", "UNRECOGNIZED"]
 
 # Number of worker threads for processing HTTP responses
-workers = 15
+workers = 20
 
 # Only scan requests/responses that are in the defined scope in Burp
 in_scope_only = true
@@ -37,6 +37,28 @@ max_highlights_per_secret = 3
 
 # Tools from which to process messages
 enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
+
+# Exclusions - Skip scanning for specific patterns/contexts
+# type: "host", "url", "context", "path", "parameter"
+# regex: Pattern to match against the specified scope
+# pattern_name: "*" for all patterns, or specific pattern name
+
+# Example exclusions (uncomment and modify as needed):
+# [[exclusions]]
+# type = "host"
+# regex = '''^.*\.example\.com$'''
+# pattern_name = "*"
+
+# [[exclusions]]
+# type = "context"
+# regex = '''<meta name="csrf-token" content="[^"]{32}">'''
+# pattern_name = "Generic Secret v2"
+
+# Add a working example to test the functionality:
+[[exclusions]]
+type = "context"
+regex = '''<meta name="csrf-token" content="[^"]+">'''
+pattern_name = "Generic Secret v2"
 
 # Secret detection patterns
 # Each pattern has:
