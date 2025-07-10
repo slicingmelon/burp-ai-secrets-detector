@@ -182,6 +182,8 @@ public class Config {
         private int maxHighlightsPerSecret;
         @JsonProperty("excluded_file_extensions")
         private Set<String> excludedFileExtensions;
+        @JsonProperty("excluded_mime_types")
+        private Set<String> excludedMimeTypes;
         @JsonProperty("enabled_tools")
         private Set<ToolType> enabledTools;
 
@@ -196,6 +198,7 @@ public class Config {
             this.duplicateThreshold = 5;
             this.maxHighlightsPerSecret = 3;
             this.excludedFileExtensions = new HashSet<>();
+            this.excludedMimeTypes = new HashSet<>();
             this.enabledTools = new HashSet<>();
 
             // Set default enabled tools
@@ -276,6 +279,14 @@ public class Config {
 
         public void setExcludedFileExtensions(Set<String> excludedFileExtensions) {
             this.excludedFileExtensions = excludedFileExtensions;
+        }
+
+        public Set<String> getExcludedMimeTypes() {
+            return excludedMimeTypes;
+        }
+
+        public void setExcludedMimeTypes(Set<String> excludedMimeTypes) {
+            this.excludedMimeTypes = excludedMimeTypes;
         }
 
         public Set<ToolType> getEnabledTools() {
@@ -584,6 +595,8 @@ public class Config {
                     updatedLines.add("max_highlights_per_secret = " + this.settings.getMaxHighlightsPerSecret());
                 } else if (trimmed.startsWith("excluded_file_extensions = ")) {
                     updatedLines.add("excluded_file_extensions = " + formatStringArray(this.settings.getExcludedFileExtensions()));
+                } else if (trimmed.startsWith("excluded_mime_types = ")) {
+                    updatedLines.add("excluded_mime_types = " + formatStringArray(this.settings.getExcludedMimeTypes()));
                 } else if (trimmed.startsWith("enabled_tools = ")) {
                     updatedLines.add("enabled_tools = " + formatToolArray(this.settings.getEnabledTools()));
                 } else {
@@ -988,6 +1001,8 @@ public class Config {
                         updatedLines.add("max_highlights_per_secret = " + settings.getMaxHighlightsPerSecret());
                     } else if (trimmed.startsWith("excluded_file_extensions = ")) {
                         updatedLines.add("excluded_file_extensions = " + formatStringArrayForToml(settings.getExcludedFileExtensions()));
+                    } else if (trimmed.startsWith("excluded_mime_types = ")) {
+                        updatedLines.add("excluded_mime_types = " + formatStringArrayForToml(settings.getExcludedMimeTypes()));
                     } else if (trimmed.startsWith("enabled_tools = ")) {
                         updatedLines.add("enabled_tools = " + formatToolArrayForToml(settings.getEnabledTools()));
                     } else {

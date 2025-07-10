@@ -616,29 +616,17 @@ public class AISecretsDetector implements BurpExtension {
     }
 
     // Skip binary content types that are unlikely to contain secrets
+    // Uses the config's excluded MIME types for O(1) lookup performance
     public boolean shouldSkipMimeType(MimeType mimeType) {
-        switch (mimeType) {
-            case IMAGE_BMP:
-            case IMAGE_GIF:
-            case IMAGE_JPEG:
-            case IMAGE_PNG:
-            case IMAGE_SVG_XML:
-            case IMAGE_TIFF:
-            case IMAGE_UNKNOWN:
-            case FONT_WOFF:
-            case FONT_WOFF2:
-            case SOUND:
-            case VIDEO:
-            case APPLICATION_FLASH:
-            case RTF:
-            case CSS:
-            case APPLICATION_UNKNOWN: // risky but burp does not detect enough useless mime types (e.g font/ttf etc)
-            case UNRECOGNIZED: // risky but burp does not detect enough useless mime types (e.g font/ttf etc)
-                return true;
-            // Process all other MIME types
-            default:
-                return false;
+        if (mimeType == null) {
+            return false; // Process unknown MIME types
         }
+        
+        // Convert MimeType enum to string representation for lookup
+        String mimeTypeString = mimeType.name();
+        
+        // Use the config's excluded MIME types
+        return config != null && config.getSettings().getExcludedMimeTypes().contains(mimeTypeString);
     }
 
     /**
