@@ -1,17 +1,18 @@
-# Here we log some benchmarks and profiler
+# Performance
 
+Here I log some benchmarks and profiling output.
 
-## CPU
+## CPU Profiling
 
 ![CPU Profiling](images/cpu-profiling-1.jpg)
 
 It takes around ~18ms to scan a response. This includes:
 
-✅ Pattern matching across multiple regex patterns
-✅ String/ByteArray processing for position finding
-✅ Counter lookups in persistent storage
-✅ Secret object creation and marker positioning
-✅ Audit issue creation (when secrets found)
+✅ Pattern matching across multiple regex patterns<br>
+✅ String/ByteArray processing for position finding<br>
+✅ Counter lookups in persistent storage<br>
+✅ Secret object creation and marker positioning<br>
+✅ Audit issue creation (when secrets found)<br>
 
 ### Performance Analysis:
 
@@ -50,11 +51,11 @@ It takes around ~18ms to scan a response. This includes:
 
 ### Memory Optimizations Implemented:
 
-✅ Eliminated expensive site map traversal: Removed redundant scanning of existing audit issues
-✅ Persistent counter optimization: Use cached counts instead of re-scanning markers
-✅ Threshold filtering**: Only create Secret objects for reportable findings
-✅ `copyToTempFile()` usage: Move large objects to filesystem instead of heap
-✅ Efficient threading: 25 worker threads with controlled object lifecycle
+✅ Eliminated expensive site map traversal: Removed redundant scanning of existing audit issues<br>
+✅ Persistent counter optimization: Use cached counts instead of re-scanning markers<br>
+✅ Threshold filtering**: Only create Secret objects for reportable findings<br>
+✅ `copyToTempFile()` usage: Move large objects to filesystem instead of heap<br>
+✅ Efficient threading: 25 worker threads with controlled object lifecycle<br>
 
 ### Memory Profiler Limitations:
 
