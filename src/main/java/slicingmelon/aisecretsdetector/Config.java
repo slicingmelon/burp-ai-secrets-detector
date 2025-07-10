@@ -90,9 +90,9 @@ public class Config {
         public void compile(int minLength, int maxLength) {
             String fullPattern = buildFullPattern(prefix, pattern, suffix, minLength, maxLength);
             try {
-                Logger.logCritical("Compiling pattern '" + name + "' with regex: " + fullPattern);
+                //Logger.logCritical("Compiling pattern '" + name + "' with regex: " + fullPattern);
                 this.compiledPattern = Pattern.compile(fullPattern);
-                Logger.logCritical("Successfully compiled pattern '" + name + "'");
+                //Logger.logCritical("Successfully compiled pattern '" + name + "'");
             } catch (Exception e) {
                 Logger.logCriticalError("FAILED to compile pattern '" + name + "' with regex: " + fullPattern + " - Error: " + e.getMessage());
                 throw new IllegalArgumentException("Invalid regex in pattern '" + name + "': " + e.getMessage(), e);
@@ -950,26 +950,25 @@ public class Config {
      * Add host exclusion
      */
     public void addHostExclusion(String host) {
-        String regex = "^" + Pattern.quote(host) + "$";
-        addExclusion("host", regex, "*");
+        addExclusion("host", host, "*");
     }
     
     /**
-     * Add URL exclusion
+     * Add URL exclusion  
      */
     public void addUrlExclusion(String url) {
-        String regex = "^" + Pattern.quote(url) + "$";
-        addExclusion("url", regex, "*");
+        addExclusion("url", url, "*");
     }
     
     /**
-     * Add context exclusion for a specific pattern
+     * Add context exclusion - uses pattern as-is for flexible matching
      */
     public void addContextExclusion(String context, String patternName) {
-        // Escape special regex characters in the context
-        String regex = Pattern.quote(context);
-        addExclusion("context", regex, patternName);
+        // Use context as regex pattern directly - more flexible
+        addExclusion("context", context, patternName);
     }
+    
+
     
     /**
      * Generate smart context exclusion from selected text and matching pattern

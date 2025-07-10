@@ -250,13 +250,14 @@ public class SecretScanner {
                     case "host":
                         matches = exclusion.matches(host);
                         break;
-                    case "context":
-                        matches = exclusion.matches(responseString);
-                        break;
                     case "path":
                         String path = extractPath(baseUrl);
                         matches = exclusion.matches(path);
                         break;
+                    case "context":
+                        // Context exclusions should NOT be checked at response level
+                        // They are pattern-specific and checked in shouldExcludePattern
+                        continue;
                     default:
                         Logger.logCritical("SecretScanner.shouldExcludeResponse: Unknown exclusion type: " + exclusion.getType());
                         continue;
