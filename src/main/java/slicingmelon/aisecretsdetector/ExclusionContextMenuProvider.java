@@ -42,38 +42,16 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
         api.logging().logToOutput("Message editor present: " + event.messageEditorRequestResponse().isPresent());
         
         try {
-            // Check if this is a message editor context (request or response)
+                        // Check if this is a message editor context (request or response)
             if (event.messageEditorRequestResponse().isPresent()) {
                 MessageEditorHttpRequestResponse messageEditor = event.messageEditorRequestResponse().get();
                 
-                                 // Check if there's a selection with actual content
-                 api.logging().logToOutput("Selection present: " + messageEditor.selectionOffsets().isPresent());
-                 if (messageEditor.selectionOffsets().isPresent()) {
-                     Range selection = messageEditor.selectionOffsets().get();
-                     api.logging().logToOutput("Selection range: " + selection.startIndexInclusive() + "-" + selection.endIndexExclusive());
-                    
-                    // Get the selected text based on the context (request or response)
-                    String selectedText = null;
-                    
-                    if (messageEditor.selectionContext() == MessageEditorHttpRequestResponse.SelectionContext.REQUEST) {
-                        selectedText = messageEditor.requestResponse().request().toString()
-                                .substring(selection.startIndexInclusive(), selection.endIndexExclusive());
-                    } else if (messageEditor.selectionContext() == MessageEditorHttpRequestResponse.SelectionContext.RESPONSE) {
-                        selectedText = messageEditor.requestResponse().response().toString()
-                                .substring(selection.startIndexInclusive(), selection.endIndexExclusive());
-                    }
-                    
-                                         // Only show menu item if we have actual selected text
-                     if (selectedText != null && !selectedText.trim().isEmpty()) {
-                         api.logging().logToOutput("Creating context menu item for selected text: " + selectedText.substring(0, Math.min(50, selectedText.length())));
-                         JMenuItem excludeMenuItem = new JMenuItem("Exclude findings matching selected context");
-                         excludeMenuItem.addActionListener(new ExclusionActionListener(selectedText));
-                         menuItems.add(excludeMenuItem);
-                         api.logging().logToOutput("Menu item added to list");
-                     } else {
-                         api.logging().logToOutput("No valid selected text found");
-                     }
-                }
+                // Always show the menu item - we'll handle no selection in the action listener
+                api.logging().logToOutput("Creating context menu item (always show)");
+                JMenuItem excludeMenuItem = new JMenuItem("Exclude findings matching selected context");
+                excludeMenuItem.addActionListener(new ExclusionActionListener(messageEditor));
+                menuItems.add(excludeMenuItem);
+                api.logging().logToOutput("Menu item added to list");
             }
         } catch (Exception e) {
             // Log error but don't break the context menu
@@ -87,14 +65,45 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
      * Action listener for the exclusion menu item
      */
     private class ExclusionActionListener implements ActionListener {
-        private final String selectedText;
+        private final MessageEditorHttpRequestResponse messageEditor;
         
-        public ExclusionActionListener(String selectedText) {
-            this.selectedText = selectedText;
+        public ExclusionActionListener(MessageEditorHttpRequestResponse messageEditor) {
+            this.messageEditor = messageEditor;
         }
         
         @Override
         public void actionPerformed(ActionEvent e) {
+            // Check if there's a selection
+            if (!messageEditor.selectionOffsets().isPresent()) {
+                SwingUtilities.invokeLater(() -> {
+                    JOptionPane.showMessageDialog(null, 
+                            "Please select a portion of text from the response around the red marker (secret finding) that you want to exclude.", 
+                            "No Text Selected", JOptionPane.INFORMATION_MESSAGE);
+                });
+                return;
+            }
+            
+            // Get the selected text
+            Range selection = messageEditor.selectionOffsets().get();
+            String selectedText = null;
+            
+            if (messageEditor.selectionContext() == MessageEditorHttpRequestResponse.SelectionContext.REQUEST) {
+                selectedText = messageEditor.requestResponse().request().toString()
+                        .substring(selection.startIndexInclusive(), selection.endIndexExclusive());
+            } else if (messageEditor.selectionContext() == MessageEditorHttpRequestResponse.SelectionContext.RESPONSE) {
+                selectedText = messageEditor.requestResponse().response().toString()
+                        .substring(selection.startIndexInclusive(), selection.endIndexExclusive());
+            }
+            
+            if (selectedText == null || selectedText.trim().isEmpty()) {
+                SwingUtilities.invokeLater(() -> {
+                    JOptionPane.showMessageDialog(null, 
+                            "Please select a portion of text from the response around the red marker (secret finding) that you want to exclude.", 
+                            "No Valid Text Selected", JOptionPane.INFORMATION_MESSAGE);
+                });
+                return;
+            }
+            
             generateExclusionsFromContext(selectedText);
         }
     }
@@ -106,11 +115,17 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
      */
     private void generateExclusionsFromContext(String selectedText) {
         try {
+            api.logging().logToOutput("=== generateExclusionsFromContext called ===");
+            api.logging().logToOutput("Selected text length: " + selectedText.length());
+            api.logging().logToOutput("Selected text: " + selectedText);
+            api.logging().logToOutput("=== Starting pattern matching ===");
+            
             List<String> generatedExclusions = new ArrayList<>();
             int exclusionCount = 0;
             
             // Get all patterns from config
             List<Config.PatternConfig> patterns = config.getPatterns();
+            api.logging().logToOutput("Total patterns to test: " + patterns.size());
             
             for (Config.PatternConfig patternConfig : patterns) {
                 String patternName = patternConfig.getName();
@@ -118,14 +133,18 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
                 String pattern = patternConfig.getPattern();
                 String suffix = patternConfig.getSuffix();
                 
-                // Build the full regex pattern
+                // Build the full regex pattern with proper min/max lengths
                 String fullPattern = buildFullPattern(prefix, pattern, suffix);
+                
+                api.logging().logToOutput("Testing pattern '" + patternName + "' against selected text");
+                api.logging().logToOutput("Full pattern: " + fullPattern);
                 
                 try {
                     Pattern compiledPattern = Pattern.compile(fullPattern, Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
                     Matcher matcher = compiledPattern.matcher(selectedText);
                     
                     if (matcher.find()) {
+                        api.logging().logToOutput("Pattern '" + patternName + "' MATCHED! Full match: " + matcher.group(0));
                         // Generate dynamic exclusion
                         String exclusionRegex = generateDynamicExclusion(selectedText, matcher, pattern);
                         
@@ -135,9 +154,12 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
                             generatedExclusions.add(String.format("Pattern '%s': %s", patternName, exclusionRegex));
                             exclusionCount++;
                         }
+                    } else {
+                        api.logging().logToOutput("Pattern '" + patternName + "' did NOT match");
                     }
                 } catch (Exception ex) {
                     api.logging().logToError("Error processing pattern '" + patternName + "': " + ex.getMessage());
+                    ex.printStackTrace();
                 }
             }
             
@@ -183,18 +205,35 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
         StringBuilder fullPattern = new StringBuilder();
         
         if (prefix != null && !prefix.isEmpty()) {
-            fullPattern.append(prefix);
+            fullPattern.append(replacePlaceholders(prefix));
         }
         
         if (pattern != null && !pattern.isEmpty()) {
-            fullPattern.append(pattern);
+            fullPattern.append(replacePlaceholders(pattern));
         }
         
         if (suffix != null && !suffix.isEmpty()) {
-            fullPattern.append(suffix);
+            fullPattern.append(replacePlaceholders(suffix));
         }
         
         return fullPattern.toString();
+    }
+    
+    /**
+     * Replace placeholders in regex patterns with actual config values
+     */
+    private String replacePlaceholders(String text) {
+        if (text == null) return text;
+        
+        // Get min/max lengths from config
+        int minLength = config.getSettings().getGenericSecretMinLength();
+        int maxLength = config.getSettings().getGenericSecretMaxLength();
+        
+        // Replace placeholders with actual values
+        String result = text.replace("generic_secret_min_length", String.valueOf(minLength));
+        result = result.replace("generic_secret_max_length", String.valueOf(maxLength));
+        
+        return result;
     }
     
     /**
