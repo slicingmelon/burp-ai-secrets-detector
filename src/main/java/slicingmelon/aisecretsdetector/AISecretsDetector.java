@@ -154,7 +154,9 @@ public class AISecretsDetector implements BurpExtension {
     }
     
     private void initializeWorkers() {
-        executorService = Executors.newFixedThreadPool(config.getSettings().getWorkers());
+        int workerCount = config.getSettings().getWorkers();
+        executorService = Executors.newFixedThreadPool(workerCount);
+        logMsg("Initialized thread pool with " + workerCount + " worker threads");
     }
     
     private void shutdownWorkers() {
@@ -164,6 +166,7 @@ public class AISecretsDetector implements BurpExtension {
     }
     
     private void updateWorkers() {
+        logMsg("Worker count changed - updating thread pool...");
         shutdownWorkers();
         initializeWorkers();
         
