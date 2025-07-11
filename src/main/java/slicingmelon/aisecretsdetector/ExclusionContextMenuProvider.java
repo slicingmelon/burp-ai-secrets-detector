@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * Context menu provider for creating exclusions from selected text.
@@ -145,21 +146,23 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
                     
                     if (matcher.find()) {
                         api.logging().logToOutput("Pattern '" + patternName + "' MATCHED! Full match: " + matcher.group(0));
-                        // Generate dynamic exclusion
                         api.logging().logToOutput("Generating dynamic exclusion for pattern: " + patternName);
+
                         String exclusionRegex = generateDynamicExclusion(selectedText, matcher, pattern, fullPattern);
-                        
-                        api.logging().logToOutput("Generated exclusion regex: " + exclusionRegex);
-                        
-                                        if (exclusionRegex != null) {
-                    // Add exclusion to config using new format (context-only)
-                    config.addExclusion(null, exclusionRegex);
-                    generatedExclusions.add(String.format("Pattern '%s': %s", patternName, exclusionRegex));
-                    exclusionCount++;
-                    api.logging().logToOutput("Successfully added exclusion for pattern: " + patternName);
-                } else {
-                    api.logging().logToOutput("Failed to generate exclusion regex for pattern: " + patternName);
-                }
+
+                        if (exclusionRegex != null) {
+                            try {
+                                Pattern.compile(exclusionRegex); // Validate before saving
+                                config.addExclusion(null, exclusionRegex);
+                                generatedExclusions.add(String.format("Pattern '%s': %s", patternName, exclusionRegex));
+                                exclusionCount++;
+                                api.logging().logToOutput("Successfully added exclusion for pattern: " + patternName);
+                            } catch (PatternSyntaxException ex) {
+                                api.logging().logToError("Invalid exclusion regex: " + exclusionRegex + "\n" + ex.getDescription());
+                            }
+                        } else {
+                            api.logging().logToOutput("Failed to generate exclusion regex for pattern: " + patternName);
+                        }
                     } else {
                         api.logging().logToOutput("Pattern '" + patternName + "' did NOT match");
                     }
@@ -243,31 +246,36 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
     }
     
     /**
-     * Generate a dynamic exclusion regex by replacing the full match
-     * with the full pattern
+     * Generate a dynamic exclusion regex by escaping context and keeping the pattern
      */
     private String generateDynamicExclusion(String selectedText, Matcher matcher, String secretPattern, String fullPattern) {
         try {
             api.logging().logToOutput("=== generateDynamicExclusion called ===");
-            
-            // Get the full match (group 0)
-            String fullMatch = matcher.group(0);
-            
-            api.logging().logToOutput("Selected text: " + selectedText);
-            api.logging().logToOutput("Full match: " + fullMatch);
-            api.logging().logToOutput("Full pattern: " + fullPattern);
-            
-            // Replace the full match with the full pattern
-            String exclusionRegex = selectedText.replace(fullMatch, fullPattern);
-            
+
+            int start = matcher.start();
+            int end = matcher.end();
+
+            // Escape non-matching context with Pattern.quote
+            String before = Pattern.quote(selectedText.substring(0, start));
+            String after = Pattern.quote(selectedText.substring(end));
+            String exclusionRegex = before + fullPattern + after;
+
+            // Optional: validate it compiles
+            Pattern.compile(exclusionRegex);
+
             api.logging().logToOutput("Final exclusion regex: " + exclusionRegex);
-            
             return exclusionRegex;
-            
+
         } catch (Exception ex) {
             api.logging().logToError("Error generating dynamic exclusion: " + ex.getMessage());
             ex.printStackTrace();
             return null;
         }
+
+        /*
+         * Note: Pattern.quote is used to escape the non-matching parts of the selection.
+         * It's equivalent to manually escaping all regex metacharacters, and safer than
+         * trying to reimplement internal logic like RemoveQEQuoting from java.util.regex.Pattern.
+         */
     }
 } 
