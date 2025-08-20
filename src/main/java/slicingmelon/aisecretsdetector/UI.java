@@ -547,7 +547,7 @@ public class UI {
             // Check if we have persisted config
             if (api != null) {
                 try {
-                    String savedConfig = api.persistence().extensionData().getString("config_toml");
+                    String savedConfig = api.persistence().extensionData().getString("ai_secrets_detector_config");
                     if (savedConfig != null && !savedConfig.isEmpty()) {
                         info.append(" [ACTIVE]");
                     } else {

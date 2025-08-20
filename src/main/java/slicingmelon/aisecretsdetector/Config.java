@@ -579,31 +579,44 @@ public class Config {
         
         // 1. Try to load from Burp persistence first (primary source of truth)
         if (api != null && loadFromBurpPersistence()) {
-            saveToConfigFile();
+            // Success - Burp persistence is the single source of truth
             return;
         }
 
-        // 2. If not available, try to load from external config.toml
-        Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
-        if (Files.exists(configPath)) {
-            try {
-                // Read raw TOML content from file
-                this.rawTomlContent = Files.readString(configPath, StandardCharsets.UTF_8);
-                
-                // Parse the raw TOML content
-                TomlRoot tomlRoot = tomlMapper.readValue(this.rawTomlContent, TomlRoot.class);
-                parseTomlRoot(tomlRoot);
-                saveToBurpPersistence(); // Save to Burp persistence for future use
-                return;
-            } catch (IOException e) {
-                Logger.logCriticalError("Error loading config from file: " + e.getMessage());
-            }
-        }
-
-        // 3. If neither available, load defaults and save to both
+        // 2. If not available, load defaults and save to Burp persistence
         loadDefaultConfig();
-        saveToBurpPersistence();
-        saveToConfigFile();
+        if (api != null) {
+            saveToBurpPersistence();
+        }
+        
+        // 3. Create reference template file on first run (one-time operation)
+        createReferenceTemplateFile();
+    }
+
+    /**
+     * Create a reference template file for user documentation (one-time operation)
+     * This file is NOT used for configuration - it's purely for reference
+     */
+    private void createReferenceTemplateFile() {
+        try {
+            Path templatePath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "example-config-template.toml");
+            
+            // Only create if it doesn't exist
+            if (!Files.exists(templatePath)) {
+                Files.createDirectories(templatePath.getParent());
+                
+                try (InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH)) {
+                    if (defaultConfigStream != null) {
+                        Files.copy(defaultConfigStream, templatePath, StandardCopyOption.REPLACE_EXISTING);
+                        Logger.logCritical("Created reference template file: " + templatePath.toAbsolutePath());
+                    }
+                } catch (IOException e) {
+                    Logger.logCriticalError("Error creating reference template file: " + e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            Logger.logCriticalError("Error creating reference template file: " + e.getMessage());
+        }
     }
 
     private boolean loadFromBurpPersistence() {
@@ -642,29 +655,22 @@ public class Config {
         }
 
         try {
-            // Use raw TOML content to avoid double-escaping during serialization
-            if (rawTomlContent != null && !rawTomlContent.isEmpty()) {
-                // Update the raw TOML content with current settings if needed
-                String updatedTomlContent = updateRawTomlContent(rawTomlContent);
-                api.persistence().extensionData().setString(PERSISTENCE_CONFIG_KEY, updatedTomlContent);
-                api.persistence().extensionData().setString(PERSISTENCE_VERSION_KEY, this.configVersion);
-                
-                // Update our stored raw content
-                this.rawTomlContent = updatedTomlContent;
-            } else {
-                // Fallback to serialization (shouldn't happen after fix, but kept for safety)
-                TomlRoot tomlRoot = new TomlRoot();
-                tomlRoot.version = this.configVersion;
-                tomlRoot.settings = this.settings;
-                tomlRoot.patterns = this.patterns;
+            // Create clean TOML serialization with current configuration
+            TomlRoot tomlRoot = new TomlRoot();
+            tomlRoot.version = this.configVersion;
+            tomlRoot.settings = this.settings;
+            tomlRoot.patterns = this.patterns;
+            tomlRoot.exclusions = this.exclusions;
 
-                String configData = tomlMapper.writeValueAsString(tomlRoot);
-                api.persistence().extensionData().setString(PERSISTENCE_CONFIG_KEY, configData);
-                api.persistence().extensionData().setString(PERSISTENCE_VERSION_KEY, this.configVersion);
-                
-                // Store the serialized content as raw content for future use
-                this.rawTomlContent = configData;
-            }
+            // Serialize to TOML string and save to Burp persistence
+            String configData = tomlMapper.writeValueAsString(tomlRoot);
+            api.persistence().extensionData().setString(PERSISTENCE_CONFIG_KEY, configData);
+            api.persistence().extensionData().setString(PERSISTENCE_VERSION_KEY, this.configVersion);
+            
+            // Store the serialized content as raw content for future use
+            this.rawTomlContent = configData;
+            
+            Logger.logCritical("Configuration saved to Burp persistence");
         } catch (Exception e) {
             Logger.logCriticalError("Error saving config to Burp persistence: " + e.getMessage());
         }
@@ -778,11 +784,8 @@ public class Config {
         // Recompile patterns with current config values
         recompilePatterns();
         
-        // Save to Burp persistence (primary)
+        // Save to Burp persistence (single source of truth)
         saveToBurpPersistence();
-        
-        // Auto-save to config.toml file as well
-        saveToConfigFile();
         
         // Notify callback
         if (onConfigChangedCallback != null) {
@@ -793,6 +796,7 @@ public class Config {
         // to prevent cascading refresh cycles
     }
 
+    @Deprecated
     private void saveToConfigFile() {
         try {
             Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
@@ -818,7 +822,9 @@ public class Config {
     /**
      * Updates only the values in the config file, preserving formatting and structure
      * Also updates patterns to include any user-added patterns
+     * @deprecated This method is no longer used after simplifying the config system
      */
+    @Deprecated
     private void updateConfigValues(Path configPath) throws IOException {
         List<String> lines = Files.readAllLines(configPath, StandardCharsets.UTF_8);
         List<String> updatedLines = new ArrayList<>();
@@ -974,6 +980,7 @@ public class Config {
                 .collect(Collectors.joining(", ")) + "]";
     }
     
+    @Deprecated
     private void copyDefaultConfigToUserDirectory(Path configPath) throws IOException {
         try (InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH)) {
             if (defaultConfigStream != null) {
@@ -986,8 +993,8 @@ public class Config {
     }
     
     public void resetToDefaults() {
-        loadDefaultConfig(); // This now preserves rawTomlContent
-        saveConfig(); // This will save to both Burp persistence and config.toml
+        loadDefaultConfig(); // Load defaults into memory
+        saveConfig(); // Save to Burp persistence only
         
         // Notify UI to refresh if available
         if (AISecretsDetector.getInstance() != null) {
@@ -996,6 +1003,8 @@ public class Config {
                 ui.refreshUI();
             }
         }
+        
+        Logger.logCritical("Configuration reset to defaults");
     }
 
     @Deprecated
@@ -1286,30 +1295,37 @@ public class Config {
         Path destinationPath = Paths.get(filePath);
         Files.createDirectories(destinationPath.getParent());
         
+        // Create clean TOML export with current configuration
         TomlRoot tomlRoot = new TomlRoot();
         tomlRoot.version = this.configVersion;
         tomlRoot.settings = this.settings;
         tomlRoot.patterns = this.patterns;
         tomlRoot.exclusions = this.exclusions;
         
-        tomlMapper.writeValue(destinationPath.toFile(), tomlRoot);
+        // Use clean TOML serialization (no complex formatting preservation)
+        String tomlContent = tomlMapper.writeValueAsString(tomlRoot);
+        Files.writeString(destinationPath, tomlContent, StandardCharsets.UTF_8);
+        
+        Logger.logCritical("Exported configuration to: " + destinationPath.toAbsolutePath());
     }
     
     public void importConfigFromFile(String filePath) throws IOException {
         Path sourcePath = Paths.get(filePath);
         if (Files.exists(sourcePath)) {
-            // Read raw TOML content from file
-            this.rawTomlContent = Files.readString(sourcePath, StandardCharsets.UTF_8);
+            // Read and parse TOML content from file
+            String importedTomlContent = Files.readString(sourcePath, StandardCharsets.UTF_8);
+            TomlRoot tomlRoot = tomlMapper.readValue(importedTomlContent, TomlRoot.class);
             
-            // Parse the raw TOML content
-            TomlRoot tomlRoot = tomlMapper.readValue(this.rawTomlContent, TomlRoot.class);
+            // Store the imported raw content
+            this.rawTomlContent = importedTomlContent;
             
+            // Parse and apply the imported configuration
             parseTomlRoot(tomlRoot);
             
             // Update version to current extension version
             this.configVersion = getCurrentExtensionVersion();
             
-            // Save to Burp persistence (primary storage) but don't overwrite the config file
+            // Save to Burp persistence (single source of truth)
             saveToBurpPersistence();
             
             // Notify callback about config changes
@@ -1324,6 +1340,8 @@ public class Config {
                     ui.refreshUI();
                 }
             }
+            
+            Logger.logCritical("Imported configuration from: " + sourcePath.toAbsolutePath());
         } else {
             throw new IOException("File not found: " + filePath);
         }
@@ -1343,7 +1361,9 @@ public class Config {
      * Updates the raw TOML content with current settings values to avoid double-escaping
      * This method directly modifies the TOML string instead of serializing Java objects
      * For patterns, we rebuild them completely to ensure current pattern content is used
+     * @deprecated This method is no longer used after simplifying the config system
      */
+    @Deprecated
     private String updateRawTomlContent(String rawToml) {
         if (rawToml == null || rawToml.isEmpty()) {
             return rawToml;
