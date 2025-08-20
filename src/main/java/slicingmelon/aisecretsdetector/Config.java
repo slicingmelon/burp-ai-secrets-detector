@@ -580,6 +580,7 @@ public class Config {
         // 1. Try to load from Burp persistence first (primary source of truth)
         if (api != null && loadFromBurpPersistence()) {
             // Success - Burp persistence is the single source of truth
+            createReferenceTemplateFile(); // Always ensure template exists
             return;
         }
 
@@ -589,7 +590,7 @@ public class Config {
             saveToBurpPersistence();
         }
         
-        // 3. Create reference template file on first run (one-time operation)
+        // 3. Create reference template file (one-time operation)
         createReferenceTemplateFile();
     }
 
@@ -600,23 +601,40 @@ public class Config {
     private void createReferenceTemplateFile() {
         try {
             Path templatePath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "example-config-template.toml");
+            Logger.logCritical("createReferenceTemplateFile: Attempting to create template at: " + templatePath.toAbsolutePath());
             
             // Only create if it doesn't exist
             if (!Files.exists(templatePath)) {
+                Logger.logCritical("createReferenceTemplateFile: Template file does not exist, creating...");
                 Files.createDirectories(templatePath.getParent());
+                Logger.logCritical("createReferenceTemplateFile: Created parent directories");
                 
                 try (InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH)) {
                     if (defaultConfigStream != null) {
+                        Logger.logCritical("createReferenceTemplateFile: Found default config resource, copying...");
                         Files.copy(defaultConfigStream, templatePath, StandardCopyOption.REPLACE_EXISTING);
                         Logger.logCritical("Created reference template file: " + templatePath.toAbsolutePath());
+                    } else {
+                        Logger.logCriticalError("createReferenceTemplateFile: Default config resource not found at: " + DEFAULT_CONFIG_PATH);
                     }
                 } catch (IOException e) {
-                    Logger.logCriticalError("Error creating reference template file: " + e.getMessage());
+                    Logger.logCriticalError("createReferenceTemplateFile: IO error: " + e.getMessage());
+                    e.printStackTrace();
                 }
+            } else {
+                Logger.logCritical("createReferenceTemplateFile: Template file already exists at: " + templatePath.toAbsolutePath());
             }
         } catch (Exception e) {
-            Logger.logCriticalError("Error creating reference template file: " + e.getMessage());
+            Logger.logCriticalError("createReferenceTemplateFile: General error: " + e.getMessage());
+            e.printStackTrace();
         }
+    }
+
+    /**
+     * Manually create the reference template file (public method for debugging/manual creation)
+     */
+    public void createReferenceTemplateFileManually() {
+        createReferenceTemplateFile();
     }
 
     private boolean loadFromBurpPersistence() {
