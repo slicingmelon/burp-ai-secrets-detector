@@ -1,4 +1,5 @@
 # AI Secrets Detector Configuration
+# This is a reference file to the default configuration. Changes here will not affect the extension.
 # Version of this config file - should match extension version
 version = "1.7.1"
 
