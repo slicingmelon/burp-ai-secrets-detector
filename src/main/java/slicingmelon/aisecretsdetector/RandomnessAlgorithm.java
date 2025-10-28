@@ -193,6 +193,7 @@ public class RandomnessAlgorithm {
     /**
      * Calculates randomness probability for a specific character class
      * Optimized with getBytes() for hot-path performance
+     * NOTE: Uses < max (not <=) to match Rust's calibration
      */
     private static double pRandomCharClassAux(ByteArray data, byte min, byte max, double base) {
         byte[] a = data.getBytes();
@@ -200,7 +201,7 @@ public class RandomnessAlgorithm {
         
         for (int i = 0; i < a.length; i++) {
             byte b = a[i];
-            if (b >= min && b <= max) {
+            if (b >= min && b < max) {  // Match Rust: strictly less-than max
                 count++;
             }
         }
@@ -349,26 +350,30 @@ public class RandomnessAlgorithm {
     
     /**
      * Recursive helper for distinct configurations calculation
-     * Thread-safe memoized version using ConcurrentHashMap and computeIfAbsent
+     * Thread-safe memoized version - compute first, then cache
      */
     private static double numDistinctConfigurationsAux(int numPositions, int position, int remainingValues) {
         if (remainingValues == 0) {
             return 1.0;
         }
         
-        String key = numPositions + ":" + position + ":" + remainingValues;
+        final String key = numPositions + ":" + position + ":" + remainingValues;
         
-        // Thread-safe atomic computation
-        return configCache.computeIfAbsent(key, k -> {
-            double numConfigs = 0.0;
-            
-            if (position + 1 < numPositions) {
-                numConfigs += numDistinctConfigurationsAux(numPositions, position + 1, remainingValues);
-            }
-            
-            numConfigs += (position + 1) * numDistinctConfigurationsAux(numPositions, position, remainingValues - 1);
-            
-            return numConfigs;
-        });
+        // Check cache first
+        Double cached = configCache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        
+        // Compute outside of map modification
+        double numConfigs = 0.0;
+        if (position + 1 < numPositions) {
+            numConfigs += numDistinctConfigurationsAux(numPositions, position + 1, remainingValues);
+        }
+        numConfigs += (position + 1) * numDistinctConfigurationsAux(numPositions, position, remainingValues - 1);
+        
+        // Cache after computation (safe now)
+        configCache.put(key, numConfigs);
+        return numConfigs;
     }
 }
