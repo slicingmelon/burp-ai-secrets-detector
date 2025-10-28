@@ -237,7 +237,7 @@ public class AISecretsDetector implements BurpExtension {
                         responseMarkers.add(Marker.marker(secret.getStartIndex(), secret.getEndIndex()));
                         Logger.logCritical("AISecretsDetector.processHttpResponse: Found exact position for " + secretType + " at " + secret.getStartIndex() + "-" + secret.getEndIndex());
                         
-                        secretsToReportByType.computeIfAbsent(secretType, _ -> new HashSet<>()).add(secretValue);
+                        secretsToReportByType.computeIfAbsent(secretType, e -> new HashSet<>()).add(secretValue);
                         
                         Logger.logCritical("AISecretsDetector.processHttpResponse: Found " + secretType + ": " + secretValue);
                     }
@@ -329,8 +329,8 @@ public class AISecretsDetector implements BurpExtension {
     * Increment the counter for a specific secret at a base URL
     */
     public void incrementSecretCounter(String baseUrl, String secret) {
-        Map<String, Integer> counters = secretCounters.computeIfAbsent(baseUrl, _ -> new ConcurrentHashMap<>());
-        counters.compute(secret, (_, v) -> (v == null) ? 1 : v + 1);
+        Map<String, Integer> counters = secretCounters.computeIfAbsent(baseUrl, e -> new ConcurrentHashMap<>());
+        counters.compute(secret, (k, v) -> (v == null) ? 1 : v + 1);
         
         // Save counters to persist data
         saveSecretCounters();

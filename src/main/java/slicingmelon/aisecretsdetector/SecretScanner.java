@@ -433,7 +433,7 @@ public class SecretScanner {
 
                         // STEP 3: CHECK FOR UNIQUENESS for this pattern
                         // If we have already found and highlighted this exact secret value for this pattern, skip to the next match.
-                        Set<String> foundValuesForPattern = uniqueSecretsPerPattern.computeIfAbsent(pattern.getName(), _ -> new HashSet<>());
+                        Set<String> foundValuesForPattern = uniqueSecretsPerPattern.computeIfAbsent(pattern.getName(), e -> new HashSet<>());
                         if (!foundValuesForPattern.add(secretValue)) {
                             Logger.logCritical("SecretScanner.scanResponse: Skipping duplicate secret for pattern " + pattern.getName());
                             continue;

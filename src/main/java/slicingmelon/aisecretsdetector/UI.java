@@ -112,7 +112,7 @@ public class UI {
         spinnerPanel.setOpaque(false);
         spinnerPanel.add(workersSpinner);
         
-        workersSpinner.addChangeListener(_ -> {
+        workersSpinner.addChangeListener(e -> {
             if (config != null) {
                 config.getSettings().setWorkers((Integer) workersSpinner.getValue());
                 config.saveConfig();
@@ -128,7 +128,7 @@ public class UI {
         // In-scope only setting
         inScopeCheckbox = new JCheckBox("In-Scope Requests Only", 
                 config != null ? config.getSettings().isInScopeOnly() : true);
-        inScopeCheckbox.addActionListener(_ -> {
+        inScopeCheckbox.addActionListener(e -> {
             if (config != null) {
                 config.getSettings().setInScopeOnly(inScopeCheckbox.isSelected());
                 config.saveConfig();
@@ -145,7 +145,7 @@ public class UI {
         // Enable logging setting
         loggingCheckbox = new JCheckBox("Enable Logging", 
                 config != null ? config.getSettings().isLoggingEnabled() : false);
-        loggingCheckbox.addActionListener(_ -> {
+        loggingCheckbox.addActionListener(e -> {
             if (config != null) {
                 config.getSettings().setLoggingEnabled(loggingCheckbox.isSelected());
                 config.saveConfig();
@@ -169,7 +169,7 @@ public class UI {
         // Randomness Algorithm Enable
         randomnessCheckbox = new JCheckBox("Enable Randomness Algorithm Detection", 
                 config != null ? config.getSettings().isRandomnessAlgorithmEnabled() : true);
-        randomnessCheckbox.addActionListener(_ -> {
+        randomnessCheckbox.addActionListener(e -> {
             if (config != null) {
                 config.getSettings().setRandomnessAlgorithmEnabled(randomnessCheckbox.isSelected());
                 config.saveConfig();
@@ -198,7 +198,7 @@ public class UI {
                 1
         );
         minLengthSpinner = new JSpinner(minLengthModel);
-        minLengthSpinner.addChangeListener(_ -> {
+        minLengthSpinner.addChangeListener(e -> {
             if (config != null) {
                 int newMinLength = (Integer) minLengthSpinner.getValue();
                 int currentMaxLength = config.getSettings().getGenericSecretMaxLength();
@@ -230,7 +230,7 @@ public class UI {
                 1
         );
         maxLengthSpinner = new JSpinner(maxLengthModel);
-        maxLengthSpinner.addChangeListener(_ -> {
+        maxLengthSpinner.addChangeListener(e -> {
             if (config != null) {
                 int currentMinLength = config.getSettings().getGenericSecretMinLength();
                 int newMaxLength = (Integer) maxLengthSpinner.getValue();
@@ -262,7 +262,7 @@ public class UI {
                 1
         );
         duplicateThresholdSpinner = new JSpinner(duplicateThresholdModel);
-        duplicateThresholdSpinner.addChangeListener(_ -> {
+        duplicateThresholdSpinner.addChangeListener(e -> {
             if (config != null) {
                 config.getSettings().setDuplicateThreshold((Integer) duplicateThresholdSpinner.getValue());
                 config.saveConfig();
@@ -295,7 +295,7 @@ public class UI {
         for (ToolType tool : tools) {
             JCheckBox toolCheckbox = new JCheckBox(tool.name(), 
                     config != null ? config.getSettings().isToolEnabled(tool) : false);
-            toolCheckbox.addActionListener(_ -> {
+            toolCheckbox.addActionListener(e -> {
                 if (config != null) {
                     config.getSettings().setToolEnabled(tool, toolCheckbox.isSelected());
                     config.saveConfig();
@@ -327,27 +327,27 @@ public class UI {
         buttonPanel.setBorder(new TitledBorder("Actions:"));
         
         JButton refreshUIButton = new JButton("Refresh UI");
-        refreshUIButton.addActionListener(_ -> refreshUI());
+        refreshUIButton.addActionListener(e -> refreshUI());
         buttonPanel.add(refreshUIButton);
         
         JButton resetCountersButton = new JButton("Reset Secret Counters");
-        resetCountersButton.addActionListener(_ -> resetSecretCounters());
+        resetCountersButton.addActionListener(e -> resetSecretCounters());
         buttonPanel.add(resetCountersButton);
         
         JButton resetDefaultsButton = new JButton("Reset to Defaults");
-        resetDefaultsButton.addActionListener(_ -> resetToDefaults());
+        resetDefaultsButton.addActionListener(e -> resetToDefaults());
         buttonPanel.add(resetDefaultsButton);
         
         JButton exportConfigButton = new JButton("Export Config to File");
-        exportConfigButton.addActionListener(_ -> exportConfigToFile());
+        exportConfigButton.addActionListener(e -> exportConfigToFile());
         buttonPanel.add(exportConfigButton);
         
         JButton importConfigButton = new JButton("Import Config from File");
-        importConfigButton.addActionListener(_ -> importConfigFromFile());
+        importConfigButton.addActionListener(e -> importConfigFromFile());
         buttonPanel.add(importConfigButton);
         
         JButton createTemplateButton = new JButton("Create Template File");
-        createTemplateButton.addActionListener(_ -> createTemplateFile());
+        createTemplateButton.addActionListener(e -> createTemplateFile());
         buttonPanel.add(createTemplateButton);
         
         // Create a combined bottom panel for config info and buttons
@@ -407,15 +407,15 @@ public class UI {
         JPanel logButtonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         
         JButton clearLogButton = new JButton("Clear Normal Log");
-        clearLogButton.addActionListener(_ -> clearLogs());
+        clearLogButton.addActionListener(e -> clearLogs());
         logButtonPanel.add(clearLogButton);
         
         JButton clearErrorLogButton = new JButton("Clear Error Log");
-        clearErrorLogButton.addActionListener(_ -> clearErrorLogs());
+        clearErrorLogButton.addActionListener(e -> clearErrorLogs());
         logButtonPanel.add(clearErrorLogButton);
         
         JButton clearAllLogsButton = new JButton("Clear All Logs");
-        clearAllLogsButton.addActionListener(_ -> {
+        clearAllLogsButton.addActionListener(e -> {
             clearLogs();
             clearErrorLogs();
         });
