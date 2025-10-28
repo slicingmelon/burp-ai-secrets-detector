@@ -16,13 +16,15 @@ import java.util.concurrent.ConcurrentMap;
  * Randomness detection algorithm ported from RipSecrets
  * Used to determine if a byte sequence is likely to be a random string (secret)
  * 
- * Performance optimizations:
- * - Static bigram lookup table (65536 entries) for O(1) access
- * - Log-space binomial calculations to prevent overflow
- * - Byte-level operations to minimize allocations
- * - Pre-computed log factorials
- * - Thread-safe memoization with ConcurrentHashMap
- * - Zero-allocation countDistinctValues with bitmap
+ * Performance optimizations for hot-path (concurrent threads, thousands of requests, millions of bytes):
+ * - Static bigram lookup table (65,536 entries) for O(1) bigram matching
+ * - Updated bigram list (500+ bigrams) for accurate calibration
+ * - Byte-level operations with getBytes() to minimize allocations
+ * - Static character class arrays to avoid per-call allocation
+ * - Zero-allocation countDistinctValues using boolean[256] bitmap
+ * - Thread-safe memoization with ConcurrentHashMap (non-recursive put)
+ * - Log-space arithmetic for pRandomDistinctValues to prevent overflow
+ * - Direct factorial calculations for pBinomial (matches Rust exactly)
  */
 public class RandomnessAlgorithm {
     
