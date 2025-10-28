@@ -9,19 +9,87 @@ package slicingmelon.aisecretsdetector;
 
 import burp.api.montoya.core.ByteArray;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Randomness detection algorithm ported from RipSecrets
  * Used to determine if a byte sequence is likely to be a random string (secret)
+ * 
+ * Performance optimizations:
+ * - Static bigram lookup table (65536 entries) for O(1) access
+ * - Log-space binomial calculations to prevent overflow
+ * - Byte-level operations to minimize allocations
+ * - Pre-computed log factorials
+ * - Thread-safe memoization with ConcurrentHashMap
+ * - Zero-allocation countDistinctValues with bitmap
  */
 public class RandomnessAlgorithm {
     
-    // Memoization cache for configuration calculations
-    private static final Map<String, Double> configCache = new HashMap<>();
+    // Thread-safe memoization cache for configuration calculations
+    private static final ConcurrentMap<String, Double> configCache = new ConcurrentHashMap<>();
+    
+    // ========== BIGRAM TABLE (STATIC, INITIALIZED ONCE) ==========
+    // Full bigram list from RipSecrets for accurate calibration
+    private static final boolean[] BIGRAM_TABLE = new boolean[1 << 16]; // 65536 entries
+    private static final double BIGRAM_P; // Probability: |bigrams| / (64 * 64)
+    
+    static {
+        // Complete bigram list from RipSecrets Rust source
+        final String BIGRAM_CSV =
+            "er,te,an,en,ma,ke,10,at,/m,on,09,ti,al,io,.h,./,..,ra,ht,es,or,tm,pe,ml,re,in,3/,n3,0F,ok," +
+            "ey,00,80,08,ss,07,15,81,F3,st,52,KE,To,01,it,2B,2C,/E,P_,EY,B7,se,73,de,VP,EV,to,od,B0,0E,nt," +
+            "et,_P,A0,60,90,0A,ri,30,ar,C0,op,03,ec,ns,as,FF,F7,po,PK,la,.p,AE,62,me,F4,71,8E,yp,pa,50,qu," +
+            "D7,7D,rs,ea,Y_,t_,ha,3B,c/,D2,ls,DE,pr,am,E0,oc,06,li,do,id,05,51,40,ED,_p,70,ed,04,02,t.,rd," +
+            "mp,20,d_,co,ro,ex,11,ua,nd,0C,0D,D0,Eq,le,EF,wo,e_,e.,ct,0B,_c,Li,45,rT,pt,14,61,Th,56,sT,E6," +
+            "DF,nT,16,85,em,BF,9E,ne,_s,25,91,78,57,BE,ta,ng,cl,_t,E1,1F,y_,xp,cr,4F,si,s_,E5,pl,AB,ge,7E," +
+            "F8,35,E2,s.,CF,58,32,2F,E7,1B,ve,B1,3D,nc,Gr,EB,C6,77,64,sl,8A,6A,_k,79,C8,88,ce,Ex,5C,28,EA," +
+            "A6,2A,Ke,A7,th,CA,ry,F0,B6,7/,D9,6B,4D,DA,3C,ue,n7,9C,.c,7B,72,ac,98,22,/o,va,2D,n.,_m,B8,A3," +
+            "8D,n_,12,nE,ca,3A,is,AD,rt,r_,l-,_C,n1,_v,y.,yw,1/,ov,_n,_d,ut,no,ul,sa,CT,_K,SS,_e,F1,ty,ou," +
+            "nG,tr,s/,il,na,iv,L_,AA,da,Ty,EC,ur,TX,xt,lu,No,r.,SL,Re,sw,_1,om,e/,Pa,xc,_g,_a,X_,/e,vi,ds," +
+            "ai,==,ts,ni,mg,ic,o/,mt,gm,pk,d.,ch,/p,tu,sp,17,/c,ym,ot,ki,Te,FE,ub,nL,eL,.k,if,he,34,e-,23," +
+            "ze,rE,iz,St,EE,-p,be,In,ER,67,13,yn,ig,ib,_f,.o,el,55,Un,21,fi,54,mo,mb,gi,_r,Qu,FD,-o,ie,fo," +
+            "As,7F,48,41,/i,eS,ab,FB,1E,h_,ef,rr,rc,di,b.,ol,im,eg,ap,_l,Se,19,oS,ew,bs,Su,F5,Co,BC,ud,C1," +
+            "r-,ia,_o,65,.r,sk,o_,ck,CD,Am,9F,un,fa,F6,5F,nk,lo,ev,/f,.t,sE,nO,a_,EN,E4,Di,AC,95,74,1_,1A," +
+            "us,ly,ll,_b,SA,FC,69,5E,43,um,tT,OS,CE,87,7A,59,44,t-,bl,ad,Or,D5,A_,31,24,t/,ph,mm,f.,ag,RS," +
+            "Of,It,FA,De,1D,/d,-k,lf,hr,gu,fy,D6,89,6F,4E,/k,w_,cu,br,TE,ST,R_,E8,/O";
+        
+        int count = 0;
+        for (String bg : BIGRAM_CSV.split(",")) {
+            if (bg.length() != 2) continue;
+            int b1 = bg.charAt(0) & 0xFF;
+            int b2 = bg.charAt(1) & 0xFF;
+            int idx = (b1 << 8) | b2;
+            BIGRAM_TABLE[idx] = true;
+            count++;
+        }
+        BIGRAM_P = count / (64.0 * 64.0);
+    }
+    
+    // ========== LOG-SPACE FACTORIAL TABLE ==========
+    // Pre-computed to prevent overflow and improve performance
+    private static final int LOGFACT_MAX_N = 1024;
+    private static final double[] LOGFACT = new double[LOGFACT_MAX_N + 1];
+    
+    static {
+        LOGFACT[0] = 0.0;
+        for (int i = 1; i <= LOGFACT_MAX_N; i++) {
+            LOGFACT[i] = LOGFACT[i - 1] + Math.log(i);
+        }
+    }
+    
+    // ========== CHARACTER CLASS RANGES (STATIC) ==========
+    // Avoid allocation per call in hot path
+    private static final byte[][] CLASSES_36 = {
+        {(byte)'0', (byte)'9'}, 
+        {(byte)'A', (byte)'Z'}
+    };
+    
+    private static final byte[][] CLASSES_64 = {
+        {(byte)'0', (byte)'9'}, 
+        {(byte)'A', (byte)'Z'}, 
+        {(byte)'a', (byte)'z'}
+    };
     
     /**
      * Determines if a byte sequence is likely to be a random string (secret)
@@ -113,31 +181,24 @@ public class RandomnessAlgorithm {
     
     /**
      * Analyzes character classes to determine randomness
+     * Optimized to use static character class arrays
      */
     private static double pRandomCharClass(ByteArray data, double base) {
         if (base == 16.0) {
             return pRandomCharClassAux(data, (byte)'0', (byte)'9', 16.0);
-        } else {
-            double minP = Double.POSITIVE_INFINITY;
-            
-            byte[][] charClasses;
-            if (base == 36.0) {
-                // For base 36, we only check digits and uppercase
-                charClasses = new byte[][] {{(byte)'0', (byte)'9'}, {(byte)'A', (byte)'Z'}};
-            } else {
-                // For base 64, we check digits, uppercase, and lowercase
-                charClasses = new byte[][] {{(byte)'0', (byte)'9'}, {(byte)'A', (byte)'Z'}, {(byte)'a', (byte)'z'}};
-            }
-            
-            for (byte[] charClass : charClasses) {
-                double p = pRandomCharClassAux(data, charClass[0], charClass[1], base);
-                if (p < minP) {
-                    minP = p;
-                }
-            }
-            
-            return minP;
         }
+        
+        double minP = Double.POSITIVE_INFINITY;
+        byte[][] classes = (base == 36.0) ? CLASSES_36 : CLASSES_64;
+        
+        for (byte[] c : classes) {
+            double p = pRandomCharClassAux(data, c[0], c[1], base);
+            if (p < minP) {
+                minP = p;
+            }
+        }
+        
+        return minP;
     }
     
     /**
@@ -156,60 +217,72 @@ public class RandomnessAlgorithm {
     }
     
     /**
-     * Calculates binomial probability
+     * Calculates binomial probability using log-space for numerical stability
+     * Prevents overflow that occurs with factorial-based approach
      */
     private static double pBinomial(int n, int x, double p) {
+        // Handle edge cases
+        if (n == 0) return 1.0;
+        if (p == 0.0) return x == 0 ? 1.0 : 0.0;
+        if (p == 1.0) return x == n ? 1.0 : 0.0;
+        
         boolean leftTail = x < n * p;
         int min = leftTail ? 0 : x;
         int max = leftTail ? x : n;
         
         double totalP = 0.0;
-        for (int i = min; i <= max; i++) {
-            totalP += factorial(n) / (factorial(n - i) * factorial(i)) 
-                    * Math.pow(p, i) 
-                    * Math.pow(1.0 - p, n - i);
+        for (int k = min; k <= max; k++) {
+            double logTerm = logChoose(n, k) + k * Math.log(p) + (n - k) * Math.log(1.0 - p);
+            totalP += Math.exp(logTerm);
         }
         
         return totalP;
     }
     
     /**
-     * Calculates factorial
+     * Calculates log of factorial using pre-computed table or Stirling's approximation
      */
-    private static double factorial(int n) {
-        double result = 1.0;
-        for (int i = 2; i <= n; i++) {
-            result *= i;
+    private static double logFactorial(int n) {
+        if (n <= LOGFACT_MAX_N) {
+            return LOGFACT[n];
         }
-        return result;
+        // Stirling's approximation for very large n (unlikely for secrets, but safe)
+        double x = n + 1;
+        return 0.5 * Math.log(2 * Math.PI * x) + x * (Math.log(x) - 1);
+    }
+    
+    /**
+     * Calculates log of binomial coefficient C(n, k)
+     */
+    private static double logChoose(int n, int k) {
+        if (k < 0 || k > n) return Double.NEGATIVE_INFINITY;
+        if (k == 0 || k == n) return 0.0;
+        return logFactorial(n) - logFactorial(k) - logFactorial(n - k);
     }
     
     /**
      * Calculates randomness based on bigram frequencies
+     * Optimized version using static lookup table and byte-level operations
+     * Zero allocations per iteration for hot-path performance
      */
     private static double pRandomBigrams(ByteArray data) {
-        // Common bigrams from ripsecrets code (a subset for Java version)
-        String[] commonBigrams = {
-            "er", "te", "an", "en", "ma", "ke", "10", "at", "/m", "on", 
-            "09", "ti", "al", "io", ".h", "./", "..", "ra", "ht", "es", 
-            "or", "tm", "pe", "ml", "re", "in", "3/", "n3", "0F", "ok", 
-            "ey", "00", "80", "08", "ss", "07", "15", "81", "F3", "st"
-        };
+        byte[] bytes = data.getBytes();
         
-        Set<String> bigramSet = new HashSet<>();
-        for (String bigram : commonBigrams) {
-            bigramSet.add(bigram);
+        if (bytes.length < 2) {
+            // Match Rust behavior: call pBinomial with n = length
+            return pBinomial(bytes.length, 0, BIGRAM_P);
         }
         
         int numBigrams = 0;
-        for (int i = 0; i < data.length() - 1; i++) {
-            String bigram = data.subArray(i, i + 2).toString();
-            if (bigramSet.contains(bigram)) {
+        for (int i = 0; i < bytes.length - 1; i++) {
+            int idx = ((bytes[i] & 0xFF) << 8) | (bytes[i + 1] & 0xFF);
+            if (BIGRAM_TABLE[idx]) {
                 numBigrams++;
             }
         }
         
-        return pBinomial(data.length() - 1, numBigrams, (double) bigramSet.size() / (64.0 * 64.0));
+        // IMPORTANT: Match Rust calibration - use data.length(), not data.length() - 1
+        return pBinomial(bytes.length, numBigrams, BIGRAM_P);
     }
     
     /**
@@ -229,13 +302,21 @@ public class RandomnessAlgorithm {
     
     /**
      * Counts distinct values in a byte array
+     * Optimized with bitmap to avoid boxing overhead
      */
     private static int countDistinctValues(ByteArray data) {
-        Set<Byte> values = new HashSet<>();
+        boolean[] seen = new boolean[256];
+        int distinct = 0;
+        
         for (byte b : data) {
-            values.add(b);
+            int v = b & 0xFF;
+            if (!seen[v]) {
+                seen[v] = true;
+                distinct++;
+            }
         }
-        return values.size();
+        
+        return distinct;
     }
     
     /**
@@ -262,26 +343,26 @@ public class RandomnessAlgorithm {
     
     /**
      * Recursive helper for distinct configurations calculation
-     * Memoized version of the function from ripsecrets
+     * Thread-safe memoized version using ConcurrentHashMap and computeIfAbsent
      */
     private static double numDistinctConfigurationsAux(int numPositions, int position, int remainingValues) {
-        String key = numPositions + ":" + position + ":" + remainingValues;
-        if (configCache.containsKey(key)) {
-            return configCache.get(key);
-        }
-        
         if (remainingValues == 0) {
             return 1.0;
         }
         
-        double numConfigs = 0.0;
-        if (position + 1 < numPositions) {
-            numConfigs += numDistinctConfigurationsAux(numPositions, position + 1, remainingValues);
-        }
+        String key = numPositions + ":" + position + ":" + remainingValues;
         
-        numConfigs += (position + 1) * numDistinctConfigurationsAux(numPositions, position, remainingValues - 1);
-        
-        configCache.put(key, numConfigs);
-        return numConfigs;
+        // Thread-safe atomic computation
+        return configCache.computeIfAbsent(key, k -> {
+            double numConfigs = 0.0;
+            
+            if (position + 1 < numPositions) {
+                numConfigs += numDistinctConfigurationsAux(numPositions, position + 1, remainingValues);
+            }
+            
+            numConfigs += (position + 1) * numDistinctConfigurationsAux(numPositions, position, remainingValues - 1);
+            
+            return numConfigs;
+        });
     }
-} 
+}
