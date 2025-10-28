@@ -107,7 +107,7 @@ public class RandomnessAlgorithm {
         }
         
         boolean containsDigit = false;
-        for (byte b : data) {
+        for (byte b : data.getBytes()) {
             if (b >= '0' && b <= '9') {
                 containsDigit = true;
                 break;
@@ -154,7 +154,7 @@ public class RandomnessAlgorithm {
             return false;
         }
         
-        for (byte b : data) {
+        for (byte b : data.getBytes()) {
             if (!((b >= '0' && b <= '9') || (b >= 'a' && b <= 'f') || (b >= 'A' && b <= 'F'))) {
                 return false;
             }
@@ -171,7 +171,7 @@ public class RandomnessAlgorithm {
             return false;
         }
         
-        for (byte b : data) {
+        for (byte b : data.getBytes()) {
             if (!((b >= '0' && b <= '9') || (b >= 'A' && b <= 'Z'))) {
                 return false;
             }
@@ -203,22 +203,26 @@ public class RandomnessAlgorithm {
     
     /**
      * Calculates randomness probability for a specific character class
+     * Optimized with getBytes() for hot-path performance
      */
     private static double pRandomCharClassAux(ByteArray data, byte min, byte max, double base) {
+        byte[] a = data.getBytes();
         int count = 0;
-        for (byte b : data) {
+        
+        for (int i = 0; i < a.length; i++) {
+            byte b = a[i];
             if (b >= min && b <= max) {
                 count++;
             }
         }
         
         double numChars = (max - min + 1);
-        return pBinomial(data.length(), count, numChars / base);
+        return pBinomial(a.length, count, numChars / base);
     }
     
     /**
-     * Calculates binomial probability using log-space for numerical stability
-     * Prevents overflow that occurs with factorial-based approach
+     * Calculates binomial probability using stable log-sum-exp for numerical stability
+     * Prevents overflow/underflow that occurs with naive approaches
      */
     private static double pBinomial(int n, int x, double p) {
         // Handle edge cases
@@ -230,13 +234,42 @@ public class RandomnessAlgorithm {
         int min = leftTail ? 0 : x;
         int max = leftTail ? x : n;
         
-        double totalP = 0.0;
+        // First pass: find the maximum log term to prevent underflow
+        double maxLog = Double.NEGATIVE_INFINITY;
         for (int k = min; k <= max; k++) {
             double logTerm = logChoose(n, k) + k * Math.log(p) + (n - k) * Math.log(1.0 - p);
-            totalP += Math.exp(logTerm);
+            if (logTerm > maxLog) {
+                maxLog = logTerm;
+            }
         }
         
-        return totalP;
+        if (!Double.isFinite(maxLog)) {
+            return 0.0;
+        }
+        
+        // Second pass: log-sum-exp with normalization
+        double sum = 0.0;
+        for (int k = min; k <= max; k++) {
+            double logTerm = logChoose(n, k) + k * Math.log(p) + (n - k) * Math.log(1.0 - p);
+            sum += Math.exp(logTerm - maxLog);
+        }
+        
+        return Math.exp(maxLog) * sum;
+    }
+    
+    /**
+     * Numerically stable log(exp(a) + exp(b))
+     * Used to add probabilities in log space
+     */
+    private static double logAddExp(double a, double b) {
+        if (a == Double.NEGATIVE_INFINITY) return b;
+        if (b == Double.NEGATIVE_INFINITY) return a;
+        if (a < b) {
+            double t = a;
+            a = b;
+            b = t;
+        }
+        return a + Math.log1p(Math.exp(b - a));
     }
     
     /**
@@ -287,17 +320,25 @@ public class RandomnessAlgorithm {
     
     /**
      * Calculates randomness probability based on distinct values
+     * Uses log-space arithmetic to prevent overflow
      */
     private static double pRandomDistinctValues(ByteArray data, double base) {
-        double totalPossible = Math.pow(base, data.length());
+        int n = data.length();
+        double logTotal = n * Math.log(base);
         int numDistinctValues = countDistinctValues(data);
         
-        double numMoreExtremeOutcomes = 0.0;
+        double logSum = Double.NEGATIVE_INFINITY;
         for (int i = 1; i <= numDistinctValues; i++) {
-            numMoreExtremeOutcomes += numPossibleOutcomes(data.length(), i, (int) base);
+            double termLog = logNumPossibleOutcomes(n, i, (int) base);
+            logSum = logAddExp(logSum, termLog);
         }
         
-        return numMoreExtremeOutcomes / totalPossible;
+        if (!Double.isFinite(logSum)) return 0.0;
+        
+        double logP = logSum - logTotal;
+        if (logP > 0.0) return 1.0; // clamp
+        
+        return Math.exp(logP);
     }
     
     /**
@@ -308,7 +349,7 @@ public class RandomnessAlgorithm {
         boolean[] seen = new boolean[256];
         int distinct = 0;
         
-        for (byte b : data) {
+        for (byte b : data.getBytes()) {
             int v = b & 0xFF;
             if (!seen[v]) {
                 seen[v] = true;
@@ -320,15 +361,18 @@ public class RandomnessAlgorithm {
     }
     
     /**
-     * Calculates number of possible outcomes
+     * Calculates log of number of possible outcomes
+     * Uses log space to prevent overflow
      */
-    private static double numPossibleOutcomes(int numValues, int numDistinctValues, int base) {
-        double res = base;
+    private static double logNumPossibleOutcomes(int numValues, int numDistinctValues, int base) {
+        double logPerm = Math.log(base);
         for (int i = 1; i < numDistinctValues; i++) {
-            res *= (base - i);
+            logPerm += Math.log(base - i);
         }
-        res *= numDistinctConfigurations(numValues, numDistinctValues);
-        return res;
+        double configs = numDistinctConfigurations(numValues, numDistinctValues);
+        // configs fits in double range here; if worried, you could compute its log too
+        double logConfigs = Math.log(configs);
+        return logPerm + logConfigs;
     }
     
     /**
