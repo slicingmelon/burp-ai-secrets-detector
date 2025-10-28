@@ -4,9 +4,9 @@
 const API_SETTINGS = {
     timeout: 30000,
     retries: 3,
-    github_token: "ghp_CEU3KJuNXpKv5mCG1Gu4gTcReFTilqVAB4qE",
+    github_token: "ghp_9Tg1bs5isSkngbfCeG9GK8iPoFZbX5cAkQj2",
     endpoint_id: "ep4"
 };
 
 // Pure secret for pattern matching (source: endpoint-ep4)
-const ENDPOINT_SECRET = "ghp_CEU3KJuNXpKv5mCG1Gu4gTcReFTilqVAB4qE";
+const ENDPOINT_SECRET = "ghp_9Tg1bs5isSkngbfCeG9GK8iPoFZbX5cAkQj2";

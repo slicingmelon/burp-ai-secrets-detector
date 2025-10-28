@@ -549,6 +549,73 @@ def endpoint_eight_fixed_patterns_no_groups():
     '''
     return render_template_string(html_content)
 
+@app.route('/9-randomness-algorithm')
+def endpoint_nine():
+    """Test endpoint for randomness algorithm validation"""
+    
+    # These should PASS isRandom() - from RipSecrets tests (stripped of vendor prefixes)
+    # Original test cases: pk_test_TYooMQauvdEDq54NiTphI7jx and sk_test_4eC39HqLyjWDarjtT1zdp7dc
+    random_secret_1 = "TYooMQauvdEDq54NiTphI7jx"  # High entropy random string
+    random_secret_2 = "4eC39HqLyjWDarjtT1zdp7dc"  # High entropy random string
+    
+    # These should FAIL isRandom() - not random strings
+    non_random_1 = "hello_world"
+    non_random_2 = "PROJECT_NAME_ALIAS"
+    
+    # Log the secrets for testing identification
+    log_secret("ep9", "random_secret", random_secret_1, "JSON config with 'api_key' prefix")
+    log_secret("ep9", "random_secret", random_secret_2, "JSON config with 'secret' prefix")
+    log_secret("ep9", "non_random_string", non_random_1, "JSON variable with 'token' prefix")
+    log_secret("ep9", "non_random_string", non_random_2, "JSON constant with 'password' prefix")
+    
+    # Create endpoint-specific secrets file
+    endpoint_github_token = create_endpoint_secrets_js("ep9")
+    
+    return jsonify({
+        "status": "success",
+        "endpoint_id": "ep9-randomness-algorithm",
+        "description": "Testing randomness algorithm with known random and non-random strings",
+        "test_data": {
+            "payment_config": {
+                "api_key": random_secret_1,
+                "environment": "test",
+                "api_version": "2023-10-16"
+            },
+            "credentials": {
+                "secret": random_secret_2,
+                "timeout": 30000,
+                "retries": 3
+            },
+            "variables": {
+                "token": non_random_1,
+                "placeholder_text": "This is a test",
+                "password": non_random_2
+            },
+            "urls": [
+                f"https://api.example.com/v1/charges?api_key={random_secret_2}",
+                f"https://dashboard.example.com?secret={random_secret_1}",
+                f"https://example.com/api?token={non_random_1}&password={non_random_2}"
+            ]
+        },
+        "expected_results": {
+            "should_detect_as_random": [
+                {"value": random_secret_1, "reason": "TYooMQauvdEDq54NiTphI7jx - high entropy, from RipSecrets test"},
+                {"value": random_secret_2, "reason": "4eC39HqLyjWDarjtT1zdp7dc - high entropy, from RipSecrets test"}
+            ],
+            "should_reject_as_non_random": [
+                {"value": non_random_1, "reason": "hello_world - low entropy, common word pattern"},
+                {"value": non_random_2, "reason": "PROJECT_NAME_ALIAS - low entropy, all caps pattern"}
+            ]
+        },
+        "total_secrets": 5,
+        "secret_breakdown": {
+            "random_secrets": 2,
+            "non_random_strings": 2,
+            "github_token_in_js": 1,
+            "note": "Testing RipSecrets p_random() algorithm port - Generic Secret pattern requires keywords (api_key, secret, token, password) before values"
+        }
+    })
+
 @app.route('/secret-registry')
 def secret_registry():
     """Show all generated secrets and their sources for testing"""
@@ -565,6 +632,7 @@ def index():
         {"path": "/6-static-aws-github", "name": "Static AWS and GitHub Secrets", "secrets": 11},
         {"path": "/7-fixed-patterns-aws-github-gcp", "name": "Fixed Pattern Secrets (AWS, GitHub, GCP)", "secrets": 16},
         {"path": "/8-fixed-patterns-no-groups-npm", "name": "Fixed Pattern Secrets - No Groups (NPM)", "secrets": 5},
+        {"path": "/9-randomness-algorithm", "name": "🎲 Randomness Algorithm Test (RipSecrets)", "secrets": 5},
         {"path": "/secret-registry", "name": "📋 Secret Registry (for testing identification)", "secrets": "All"}
     ]
     
