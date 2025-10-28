@@ -66,17 +66,6 @@ public class RandomnessAlgorithm {
         BIGRAM_P = count / (64.0 * 64.0);
     }
     
-    // ========== LOG-SPACE FACTORIAL TABLE ==========
-    // Pre-computed to prevent overflow and improve performance
-    private static final int LOGFACT_MAX_N = 1024;
-    private static final double[] LOGFACT = new double[LOGFACT_MAX_N + 1];
-    
-    static {
-        LOGFACT[0] = 0.0;
-        for (int i = 1; i <= LOGFACT_MAX_N; i++) {
-            LOGFACT[i] = LOGFACT[i - 1] + Math.log(i);
-        }
-    }
     
     // ========== CHARACTER CLASS RANGES (STATIC) ==========
     // Avoid allocation per call in hot path
@@ -221,45 +210,39 @@ public class RandomnessAlgorithm {
     }
     
     /**
-     * Calculates binomial probability using stable log-sum-exp for numerical stability
-     * Prevents overflow/underflow that occurs with naive approaches
+     * Calculates binomial probability
+     * Direct port from RipSecrets - uses factorial calculations
      */
     private static double pBinomial(int n, int x, double p) {
-        // Handle edge cases
-        if (n == 0) return 1.0;
-        if (p == 0.0) return x == 0 ? 1.0 : 0.0;
-        if (p == 1.0) return x == n ? 1.0 : 0.0;
-        
         boolean leftTail = x < n * p;
         int min = leftTail ? 0 : x;
         int max = leftTail ? x : n;
         
-        // First pass: find the maximum log term to prevent underflow
-        double maxLog = Double.NEGATIVE_INFINITY;
-        for (int k = min; k <= max; k++) {
-            double logTerm = logChoose(n, k) + k * Math.log(p) + (n - k) * Math.log(1.0 - p);
-            if (logTerm > maxLog) {
-                maxLog = logTerm;
-            }
+        double totalP = 0.0;
+        for (int i = min; i <= max; i++) {
+            totalP += factorial(n) / (factorial(n - i) * factorial(i)) 
+                    * Math.pow(p, i) 
+                    * Math.pow(1.0 - p, n - i);
         }
         
-        if (!Double.isFinite(maxLog)) {
-            return 0.0;
+        return totalP;
+    }
+    
+    /**
+     * Calculates factorial
+     * Direct port from RipSecrets
+     */
+    private static double factorial(int n) {
+        double result = 1.0;
+        for (int i = 2; i <= n; i++) {
+            result *= i;
         }
-        
-        // Second pass: log-sum-exp with normalization
-        double sum = 0.0;
-        for (int k = min; k <= max; k++) {
-            double logTerm = logChoose(n, k) + k * Math.log(p) + (n - k) * Math.log(1.0 - p);
-            sum += Math.exp(logTerm - maxLog);
-        }
-        
-        return Math.exp(maxLog) * sum;
+        return result;
     }
     
     /**
      * Numerically stable log(exp(a) + exp(b))
-     * Used to add probabilities in log space
+     * Used to add probabilities in log space for pRandomDistinctValues
      */
     private static double logAddExp(double a, double b) {
         if (a == Double.NEGATIVE_INFINITY) return b;
@@ -270,27 +253,6 @@ public class RandomnessAlgorithm {
             b = t;
         }
         return a + Math.log1p(Math.exp(b - a));
-    }
-    
-    /**
-     * Calculates log of factorial using pre-computed table or Stirling's approximation
-     */
-    private static double logFactorial(int n) {
-        if (n <= LOGFACT_MAX_N) {
-            return LOGFACT[n];
-        }
-        // Stirling's approximation for very large n (unlikely for secrets, but safe)
-        double x = n + 1;
-        return 0.5 * Math.log(2 * Math.PI * x) + x * (Math.log(x) - 1);
-    }
-    
-    /**
-     * Calculates log of binomial coefficient C(n, k)
-     */
-    private static double logChoose(int n, int k) {
-        if (k < 0 || k > n) return Double.NEGATIVE_INFINITY;
-        if (k == 0 || k == n) return 0.0;
-        return logFactorial(n) - logFactorial(k) - logFactorial(n - k);
     }
     
     /**
