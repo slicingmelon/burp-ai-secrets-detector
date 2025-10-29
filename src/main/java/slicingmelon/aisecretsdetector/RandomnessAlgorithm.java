@@ -212,23 +212,84 @@ public class RandomnessAlgorithm {
         return pBinomial(a.length, count, numChars / base);
     }
     
+    // /**
+    //  * Calculates binomial probability
+    //  * Direct port from RipSecrets - uses factorial calculations
+    //  */
+    // private static double pBinomial(int n, int x, double p) {
+    //     boolean leftTail = x < n * p;
+    //     int min = leftTail ? 0 : x;
+    //     int max = leftTail ? x : n;
+        
+    //     double totalP = 0.0;
+    //     for (int i = min; i <= max; i++) {
+    //         totalP += factorial(n) / (factorial(n - i) * factorial(i)) 
+    //                 * Math.pow(p, i) 
+    //                 * Math.pow(1.0 - p, n - i);
+    //     }
+        
+    //     return totalP;
+    // }
+    
     /**
-     * Calculates binomial probability
-     * Direct port from RipSecrets - uses factorial calculations
+     * Calculates binomial probability in a numerically stable way using logs.
+     * This avoids overflow issues with large factorials.
+     * GG version
      */
     private static double pBinomial(int n, int x, double p) {
+        if (p < 0.0 || p > 1.0 || x < 0 || x > n) {
+            return 0.0;
+        }
+
         boolean leftTail = x < n * p;
         int min = leftTail ? 0 : x;
         int max = leftTail ? x : n;
-        
+
+        // Handle edge cases where logs would fail
+        if (p == 0.0) return (min == 0) ? 1.0 : 0.0;
+        if (p == 1.0) return (max == n) ? 1.0 : 0.0;
+
         double totalP = 0.0;
+        double logP = Math.log(p);
+        double logOneMinusP = Math.log(1.0 - p);
+
+        // Start with the log probability of the first term (min)
+        double logProb = logCombination(n, min) + (min * logP) + ((n - min) * logOneMinusP);
+
         for (int i = min; i <= max; i++) {
-            totalP += factorial(n) / (factorial(n - i) * factorial(i)) 
-                    * Math.pow(p, i) 
-                    * Math.pow(1.0 - p, n - i);
+            totalP += Math.exp(logProb);
+
+            // Efficiently calculate the next term's log probability from the current one
+            if (i < max) {
+                logProb += Math.log(n - i) - Math.log(i + 1) + logP - logOneMinusP;
+            }
         }
-        
+
         return totalP;
+    }
+
+    /**
+     * Calculates the log of the binomial coefficient "n choose k" (nCk).
+     * This is used as part of the stable pBinomial calculation.
+     * GG version
+     */
+    private static double logCombination(int n, int k) {
+        if (k < 0 || k > n) {
+            return Double.NEGATIVE_INFINITY; // Log of zero
+        }
+        if (k == 0 || k == n) {
+            return 0.0; // Log of one
+        }
+        // Choose the smaller of k and n-k for fewer iterations
+        if (k > n / 2) {
+            k = n - k;
+        }
+
+        double res = 0.0;
+        for (int i = 1; i <= k; i++) {
+            res += Math.log(n - i + 1) - Math.log(i);
+        }
+        return res;
     }
     
     /**
