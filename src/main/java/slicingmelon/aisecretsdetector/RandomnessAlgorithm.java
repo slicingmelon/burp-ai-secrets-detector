@@ -29,7 +29,8 @@ import java.util.concurrent.ConcurrentMap;
 public class RandomnessAlgorithm {
     
     // Thread-safe memoization cache for configuration calculations
-    private static final ConcurrentMap<String, Double> configCache = new ConcurrentHashMap<>();
+    //private static final ConcurrentMap<String, Double> configCache = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<Long, Double> configCache = new ConcurrentHashMap<>();
     
     // ========== BIGRAM TABLE (STATIC, INITIALIZED ONCE) ==========
     // Full bigram list from RipSecrets for accurate calibration
@@ -411,16 +412,48 @@ public class RandomnessAlgorithm {
         return numDistinctConfigurationsAux(numDistinctValues, 0, numValues - numDistinctValues);
     }
     
+    // /**
+    //  * Recursive helper for distinct configurations calculation
+    //  * Thread-safe memoized version - compute first, then cache
+    //  */
+    // private static double numDistinctConfigurationsAux(int numPositions, int position, int remainingValues) {
+    //     if (remainingValues == 0) {
+    //         return 1.0;
+    //     }
+        
+    //     final String key = numPositions + ":" + position + ":" + remainingValues;
+        
+    //     // Check cache first
+    //     Double cached = configCache.get(key);
+    //     if (cached != null) {
+    //         return cached;
+    //     }
+        
+    //     // Compute outside of map modification
+    //     double numConfigs = 0.0;
+    //     if (position + 1 < numPositions) {
+    //         numConfigs += numDistinctConfigurationsAux(numPositions, position + 1, remainingValues);
+    //     }
+    //     numConfigs += (position + 1) * numDistinctConfigurationsAux(numPositions, position, remainingValues - 1);
+        
+    //     // Cache after computation (safe now)
+    //     configCache.put(key, numConfigs);
+    //     return numConfigs;
+    // }
+
     /**
-     * Recursive helper for distinct configurations calculation
      * Thread-safe memoized version - compute first, then cache
+     * GG version
      */
+
     private static double numDistinctConfigurationsAux(int numPositions, int position, int remainingValues) {
         if (remainingValues == 0) {
             return 1.0;
         }
         
-        final String key = numPositions + ":" + position + ":" + remainingValues;
+        // Use a packed long as a key to avoid String allocation in this hot, recursive path.
+        // Assumes numPositions and position fit within 16 bits, remainingValues in 32 bits.
+        final long key = ((long) numPositions << 48) | ((long) position << 32) | remainingValues;
         
         // Check cache first
         Double cached = configCache.get(key);
