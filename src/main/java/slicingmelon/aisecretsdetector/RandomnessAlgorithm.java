@@ -442,6 +442,7 @@ public class RandomnessAlgorithm {
     // }
 
     /**
+     * Recursive helper for distinct configurations calculation
      * Thread-safe memoized version - compute first, then cache
      * GG version
      */
