@@ -5,24 +5,25 @@
  * https://github.com/slicingmelon/
  * This extension is a Burp Suite extension that uses a dual-detection approach combining fixed patterns and a randomness analysis algorithm to find exposed secrets with minimal false positives.
  */
+
 package slicingmelon.aisecretsdetector;
 import burp.api.montoya.core.ByteArray;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * Randomness detection algorithm ported from RipSecrets
- * Used to determine if a byte sequence is likely to be a random string (secret)
- * 
- * Performance optimizations for hot-path (concurrent threads, thousands of requests, millions of bytes):
- * - Static bigram lookup table (65,536 entries) for O(1) bigram matching
- * - Updated bigram list (500+ bigrams) for accurate calibration
- * - Byte-level operations with getBytes() to minimize allocations
- * - Static character class arrays to avoid per-call allocation
- * - Zero-allocation countDistinctValues using boolean[256] bitmap
- * - Thread-safe memoization with ConcurrentHashMap (non-recursive put)
- * - Log-space arithmetic for pRandomDistinctValues to prevent overflow
- * - Direct factorial calculations for pBinomial (matches Rust exactly)
+ * Credits to RipSecrets for the randomness detection algorithm.
+ * This implementation has been ported to Java and then optimized for use within Burp Suite Extension.
+ *
+ * It is used to determine if a byte sequence is likely to be a random string, such as a secret or API key.
+ *
+ * Key Performance Optimizations:
+ * - Direct ByteArray Access: Uses getByte(i) instead of getBytes() to eliminate intermediate byte array allocations in hot paths.
+ * - Zero-Allocation Counting: Employs a ThreadLocal "epoch marker" for countDistinctValues, avoiding array allocation and clearing on every call.
+ * - Static Lookup Tables: Uses a pre-computed bigram lookup table (65,536 entries) for O(1) matching.
+ * - Optimized Memoization: Features thread-safe memoization with ConcurrentHashMap using a packed long key to avoid String allocations in recursion.
+ * - Numerically Stable Math: All probability calculations (pBinomial, pRandomDistinctValues) are done in log-space to prevent floating-point overflow.
+ * - Static Caching: Character class ranges are stored in static final arrays to prevent per-call allocations.
  */
 public class RandomnessAlgorithm {
     
