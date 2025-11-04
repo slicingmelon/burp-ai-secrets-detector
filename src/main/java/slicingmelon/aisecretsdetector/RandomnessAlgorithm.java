@@ -99,7 +99,8 @@ public class RandomnessAlgorithm {
         }
         
         boolean containsDigit = false;
-        for (byte b : data.getBytes()) {
+        for (int i = 0; i < data.length(); i++) {
+            byte b = data.getByte(i);
             if (b >= '0' && b <= '9') {
                 containsDigit = true;
                 break;
@@ -146,7 +147,8 @@ public class RandomnessAlgorithm {
             return false;
         }
         
-        for (byte b : data.getBytes()) {
+        for (int i = 0; i < data.length(); i++) {
+            byte b = data.getByte(i);
             if (!((b >= '0' && b <= '9') || (b >= 'a' && b <= 'f') || (b >= 'A' && b <= 'F'))) {
                 return false;
             }
@@ -163,7 +165,8 @@ public class RandomnessAlgorithm {
             return false;
         }
         
-        for (byte b : data.getBytes()) {
+        for (int i = 0; i < data.length(); i++) {
+            byte b = data.getByte(i);
             if (!((b >= '0' && b <= '9') || (b >= 'A' && b <= 'Z'))) {
                 return false;
             }
@@ -199,18 +202,18 @@ public class RandomnessAlgorithm {
      * NOTE: Uses < max (not <=) to match Rust's calibration
      */
     private static double pRandomCharClassAux(ByteArray data, byte min, byte max, double base) {
-        byte[] a = data.getBytes();
         int count = 0;
+        int n = data.length();
         
-        for (int i = 0; i < a.length; i++) {
-            byte b = a[i];
+        for (int i = 0; i < n; i++) {
+            byte b = data.getByte(i);
             if (b >= min && b < max) {  // Match Rust: strictly less-than max
                 count++;
             }
         }
         
         double numChars = (max - min + 1);
-        return pBinomial(a.length, count, numChars / base);
+        return pBinomial(n, count, numChars / base);
     }
     
     // /**
@@ -326,23 +329,23 @@ public class RandomnessAlgorithm {
      * Zero allocations per iteration for hot-path performance
      */
     private static double pRandomBigrams(ByteArray data) {
-        byte[] bytes = data.getBytes();
+        int n = data.length();
         
-        if (bytes.length < 2) {
+        if (n < 2) {
             // Match Rust behavior: call pBinomial with n = length
-            return pBinomial(bytes.length, 0, BIGRAM_P);
+            return pBinomial(n, 0, BIGRAM_P);
         }
         
         int numBigrams = 0;
-        for (int i = 0; i < bytes.length - 1; i++) {
-            int idx = ((bytes[i] & 0xFF) << 8) | (bytes[i + 1] & 0xFF);
+        for (int i = 0; i < n - 1; i++) {
+            int idx = ((data.getByte(i) & 0xFF) << 8) | (data.getByte(i + 1) & 0xFF);
             if (BIGRAM_TABLE[idx]) {
                 numBigrams++;
             }
         }
         
         // IMPORTANT: Match Rust calibration - use data.length(), not data.length() - 1
-        return pBinomial(bytes.length, numBigrams, BIGRAM_P);
+        return pBinomial(n, numBigrams, BIGRAM_P);
     }
     
     /**
@@ -375,9 +378,10 @@ public class RandomnessAlgorithm {
     private static int countDistinctValues(ByteArray data) {
         boolean[] seen = new boolean[256];
         int distinct = 0;
+        int n = data.length();
         
-        for (byte b : data.getBytes()) {
-            int v = b & 0xFF;
+        for (int i = 0; i < n; i++) {
+            int v = data.getByte(i) & 0xFF;
             if (!seen[v]) {
                 seen[v] = true;
                 distinct++;
