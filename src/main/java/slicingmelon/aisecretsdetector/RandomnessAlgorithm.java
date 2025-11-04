@@ -222,25 +222,6 @@ public class RandomnessAlgorithm {
         return pBinomial(n, count, numChars / base);
     }
     
-    // /**
-    //  * Calculates binomial probability
-    //  * Direct port from RipSecrets - uses factorial calculations
-    //  */
-    // private static double pBinomial(int n, int x, double p) {
-    //     boolean leftTail = x < n * p;
-    //     int min = leftTail ? 0 : x;
-    //     int max = leftTail ? x : n;
-        
-    //     double totalP = 0.0;
-    //     for (int i = min; i <= max; i++) {
-    //         totalP += factorial(n) / (factorial(n - i) * factorial(i)) 
-    //                 * Math.pow(p, i) 
-    //                 * Math.pow(1.0 - p, n - i);
-    //     }
-        
-    //     return totalP;
-    // }
-    
     /**
      * Calculates binomial probability in a numerically stable way using logs.
      * This avoids overflow issues with large factorials.
@@ -301,18 +282,6 @@ public class RandomnessAlgorithm {
         }
         return res;
     }
-    
-    // /**
-    //  * Calculates factorial
-    //  * Direct port from RipSecrets
-    //  */
-    // private static double factorial(int n) {
-    //     double result = 1.0;
-    //     for (int i = 2; i <= n; i++) {
-    //         result *= i;
-    //     }
-    //     return result;
-    // }
     
     /**
      * Numerically stable log(exp(a) + exp(b))
