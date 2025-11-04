@@ -314,10 +314,11 @@ public class SecretScanner {
         Logger.logCritical("SecretScanner.scanResponse: Received " + persistedCounts.size() + " persisted secret counts for baseUrl: " + baseUrl);
         
         try {
-            // Use String for reliable regex matching
-            String responseString = response.toString();
-            // Use ByteArray for fast, byte-accurate searching of found secrets
-            ByteArray responseBytes = response.toByteArray();
+            // Use String for reliable regex matching on the response body
+            String responseString = response.bodyToString();
+            // Use ByteArray for fast, byte-accurate searching of found secrets in the body
+            ByteArray responseBytes = response.body();
+            int bodyOffset = response.bodyOffset();
             
             // Check exclusions before scanning
             if (shouldExcludeResponse(response, baseUrl, responseString)) {
@@ -409,17 +410,17 @@ public class SecretScanner {
                                 break;
                             }
 
-                            // Create a secret for this occurrence
-                            int fullStartPos = exactPos;
-                            int fullEndPos = fullStartPos + secretValueBytes.length();
-                            secret = new Secret(pattern.getName(), secretValue, fullStartPos, fullEndPos);
+                            // Create a secret for this occurrence, adjusting for the body offset
+                            int highlightStartPos = bodyOffset + exactPos;
+                            int highlightEndPos = highlightStartPos + secretValueBytes.length();
+                            secret = new Secret(pattern.getName(), secretValue, highlightStartPos, highlightEndPos);
                             foundSecrets.add(secret);
                             highlightsCreated++;
 
-                            Logger.logCritical("SecretScanner.scanResponse: Created highlight #" + highlightsCreated + " for secret at position " + fullStartPos + "-" + fullEndPos);
+                            Logger.logCritical("SecretScanner.scanResponse: Created highlight #" + highlightsCreated + " for secret at position " + highlightStartPos + "-" + highlightEndPos);
 
-                            // Move search start past this occurrence
-                            searchStart = fullEndPos;
+                            // Move search start past this occurrence (relative to the body)
+                            searchStart = exactPos + secretValueBytes.length();
                         }
                     }
                     
