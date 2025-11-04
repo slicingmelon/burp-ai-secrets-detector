@@ -101,6 +101,12 @@ pattern = '''(?i)([A-Za-z]+://\S{3,50}:(?:\S{4,64})@(?:\[[A-Fa-f0-9:]+\]|[\dA-Za
 suffix = ''''''
 
 [[patterns]]
+name = "URL with Credentials 2"
+prefix = ''''''
+pattern = '''(?i)\b(https?:\/\/[\w!#$%&()*+,\-./;<=>?@[\\\]^_{|}~]{0,50}:[\w!#$%&()*+,\-./:;<=>?[\\\]^_{|}~]{3,50}@[a-zA-Z0-9.-]+(?:\.[a-zA-Z]{2,})?(?::\d{1,5})?[\w/]+)\b'''
+suffix = ''''''
+
+[[patterns]]
 name = "Age Secret Key"
 prefix = ''''''
 pattern = '''(AGE-SECRET-KEY-1[0-9A-Z]{58})'''
