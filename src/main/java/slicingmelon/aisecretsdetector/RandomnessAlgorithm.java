@@ -31,6 +31,12 @@ public class RandomnessAlgorithm {
     // Thread-safe memoization cache for configuration calculations
     //private static final ConcurrentMap<String, Double> configCache = new ConcurrentHashMap<>();
     private static final ConcurrentMap<Long, Double> configCache = new ConcurrentHashMap<>();
+
+    // ========== THREAD-LOCAL CACHE FOR countDistinctValues ==========
+    // Avoid allocating a new int[256] on every call in a hot path.
+    // Use an "epoch marker" to avoid even clearing the array.
+    private static final ThreadLocal<int[]> TL_SEEN = ThreadLocal.withInitial(() -> new int[256]);
+    private static final ThreadLocal<Integer> TL_MARKER = ThreadLocal.withInitial(() -> 1);
     
     // ========== BIGRAM TABLE (STATIC, INITIALIZED ONCE) ==========
     // Full bigram list from RipSecrets for accurate calibration
@@ -296,17 +302,17 @@ public class RandomnessAlgorithm {
         return res;
     }
     
-    /**
-     * Calculates factorial
-     * Direct port from RipSecrets
-     */
-    private static double factorial(int n) {
-        double result = 1.0;
-        for (int i = 2; i <= n; i++) {
-            result *= i;
-        }
-        return result;
-    }
+    // /**
+    //  * Calculates factorial
+    //  * Direct port from RipSecrets
+    //  */
+    // private static double factorial(int n) {
+    //     double result = 1.0;
+    //     for (int i = 2; i <= n; i++) {
+    //         result *= i;
+    //     }
+    //     return result;
+    // }
     
     /**
      * Numerically stable log(exp(a) + exp(b))
@@ -373,21 +379,30 @@ public class RandomnessAlgorithm {
     
     /**
      * Counts distinct values in a byte array
-     * Optimized with bitmap to avoid boxing overhead
+     * Optimized with bitmap to avoid boxing overhead and ThreadLocal to avoid allocation.
      */
     private static int countDistinctValues(ByteArray data) {
-        boolean[] seen = new boolean[256];
+        int[] seen = TL_SEEN.get();
+        int marker = TL_MARKER.get();
         int distinct = 0;
         int n = data.length();
-        
+
         for (int i = 0; i < n; i++) {
             int v = data.getByte(i) & 0xFF;
-            if (!seen[v]) {
-                seen[v] = true;
+            if (seen[v] != marker) {
+                seen[v] = marker;
                 distinct++;
             }
         }
-        
+
+        // Increment marker for the next call on this thread.
+        // Wrap around if it approaches MAX_VALUE to avoid overflow.
+        marker++;
+        if (marker == Integer.MAX_VALUE) {
+            marker = 1; // Reset to 1, 0 is the default array value
+        }
+        TL_MARKER.set(marker);
+
         return distinct;
     }
     
