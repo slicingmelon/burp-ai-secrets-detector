@@ -6,9 +6,7 @@
  * This extension is a Burp Suite extension that uses a dual-detection approach combining fixed patterns and a randomness analysis algorithm to find exposed secrets with minimal false positives.
  */
 package slicingmelon.aisecretsdetector;
-
 import burp.api.montoya.core.ByteArray;
-
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -29,22 +27,20 @@ import java.util.concurrent.ConcurrentMap;
 public class RandomnessAlgorithm {
     
     // Thread-safe memoization cache for configuration calculations
-    //private static final ConcurrentMap<String, Double> configCache = new ConcurrentHashMap<>();
     private static final ConcurrentMap<Long, Double> configCache = new ConcurrentHashMap<>();
 
-    // ========== THREAD-LOCAL CACHE FOR countDistinctValues ==========
+    // THREAD-LOCAL CACHE FOR countDistinctValues
     // Avoid allocating a new int[256] on every call in a hot path.
     // Use an "epoch marker" to avoid even clearing the array.
     private static final ThreadLocal<int[]> TL_SEEN = ThreadLocal.withInitial(() -> new int[256]);
     private static final ThreadLocal<Integer> TL_MARKER = ThreadLocal.withInitial(() -> 1);
     
-    // ========== BIGRAM TABLE (STATIC, INITIALIZED ONCE) ==========
-    // Full bigram list from RipSecrets for accurate calibration
+    // BIGRAM TABLE (STATIC, INITIALIZED ONCE)
     private static final boolean[] BIGRAM_TABLE = new boolean[1 << 16]; // 65536 entries
     private static final double BIGRAM_P; // Probability: |bigrams| / (64 * 64)
     
+    // Full bigram list from RipSecrets p_random.rs for accurate calibration
     static {
-        // Complete bigram list from RipSecrets Rust source
         final String BIGRAM_CSV =
             "er,te,an,en,ma,ke,10,at,/m,on,09,ti,al,io,.h,./,..,ra,ht,es,or,tm,pe,ml,re,in,3/,n3,0F,ok," +
             "ey,00,80,08,ss,07,15,81,F3,st,52,KE,To,01,it,2B,2C,/E,P_,EY,B7,se,73,de,VP,EV,to,od,B0,0E,nt," +
@@ -213,7 +209,7 @@ public class RandomnessAlgorithm {
         
         for (int i = 0; i < n; i++) {
             byte b = data.getByte(i);
-            if (b >= min && b < max) {  // Match Rust: strictly less-than max
+            if (b >= min && b < max) {
                 count++;
             }
         }
@@ -400,35 +396,6 @@ public class RandomnessAlgorithm {
         return numDistinctConfigurationsAux(numDistinctValues, 0, numValues - numDistinctValues);
     }
     
-    // /**
-    //  * Recursive helper for distinct configurations calculation
-    //  * Thread-safe memoized version - compute first, then cache
-    //  */
-    // private static double numDistinctConfigurationsAux(int numPositions, int position, int remainingValues) {
-    //     if (remainingValues == 0) {
-    //         return 1.0;
-    //     }
-        
-    //     final String key = numPositions + ":" + position + ":" + remainingValues;
-        
-    //     // Check cache first
-    //     Double cached = configCache.get(key);
-    //     if (cached != null) {
-    //         return cached;
-    //     }
-        
-    //     // Compute outside of map modification
-    //     double numConfigs = 0.0;
-    //     if (position + 1 < numPositions) {
-    //         numConfigs += numDistinctConfigurationsAux(numPositions, position + 1, remainingValues);
-    //     }
-    //     numConfigs += (position + 1) * numDistinctConfigurationsAux(numPositions, position, remainingValues - 1);
-        
-    //     // Cache after computation (safe now)
-    //     configCache.put(key, numConfigs);
-    //     return numConfigs;
-    // }
-
     /**
      * Recursive helper for distinct configurations calculation
      * Thread-safe memoized version - compute first, then cache
