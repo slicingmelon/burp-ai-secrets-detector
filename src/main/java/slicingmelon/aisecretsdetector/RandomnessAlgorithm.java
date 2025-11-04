@@ -401,7 +401,6 @@ public class RandomnessAlgorithm {
      * Thread-safe memoized version - compute first, then cache
      * GG version
      */
-
     private static double numDistinctConfigurationsAux(int numPositions, int position, int remainingValues) {
         if (remainingValues == 0) {
             return 1.0;
