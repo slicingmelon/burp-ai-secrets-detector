@@ -75,11 +75,13 @@ public class TomlWriter {
      */
     private static String fixMultilineStrings(String toml) {
         // Remove newline after opening triple quotes
-        String fixed = toml.replaceAll("'''\\n", "'''");
+        // Use System.lineSeparator() to match actual line breaks (could be \n or \r\n)
+        String newline = System.lineSeparator();
+        String fixed = toml.replace("'''" + newline, "'''");
         
         // Fix Night-Config's 4-quote bug: '''' -> '''
         // This is critical for producing valid TOML that can be parsed back
-        fixed = fixed.replaceAll("\\n''''", "'''");
+        fixed = fixed.replace(newline + "''''", "'''");
         
         return fixed;
     }
