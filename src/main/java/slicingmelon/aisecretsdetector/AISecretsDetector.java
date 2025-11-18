@@ -16,8 +16,8 @@ import burp.api.montoya.core.Marker;
 import burp.api.montoya.scanner.audit.issues.AuditIssue;
 import burp.api.montoya.scanner.audit.issues.AuditIssueConfidence;
 import burp.api.montoya.scanner.audit.issues.AuditIssueSeverity;
-import burp.api.montoya.sitemap.SiteMapFilter;
-import burp.api.montoya.sitemap.SiteMapNode;
+//import burp.api.montoya.sitemap.SiteMapFilter;
+//import burp.api.montoya.sitemap.SiteMapNode;
 import burp.api.montoya.core.ToolType;
 import burp.api.montoya.http.message.MimeType;
 import burp.api.montoya.utilities.json.JsonUtils;
@@ -35,7 +35,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Set;
-import burp.api.montoya.core.ByteArray;
+//import burp.api.montoya.core.ByteArray;
 
 public class AISecretsDetector implements BurpExtension {
     

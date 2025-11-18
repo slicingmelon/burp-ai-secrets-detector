@@ -59,17 +59,6 @@ public class SecretScanner {
         }
     }
     
-    // Helper class for returning both start and end positions
-    // public static class MatchResult {
-    //     public final int startPos;
-    //     public final int endPos;
-        
-    //     public MatchResult(int startPos, int endPos) {
-    //         this.startPos = startPos;
-    //         this.endPos = endPos;
-    //     }
-    // }
-    
     public static class SecretPattern {
         private final String name;
         private final Pattern pattern;

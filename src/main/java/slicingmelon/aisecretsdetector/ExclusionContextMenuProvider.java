@@ -3,7 +3,7 @@ package slicingmelon.aisecretsdetector;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.ui.contextmenu.ContextMenuEvent;
 import burp.api.montoya.ui.contextmenu.ContextMenuItemsProvider;
-import burp.api.montoya.ui.contextmenu.InvocationType;
+//import burp.api.montoya.ui.contextmenu.InvocationType;
 import burp.api.montoya.ui.contextmenu.MessageEditorHttpRequestResponse;
 import burp.api.montoya.core.Range;
 

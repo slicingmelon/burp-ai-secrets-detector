@@ -27,9 +27,7 @@ public class TomlConverter {
      */
     public static CommentedConfig toNightConfig(Config config, TomlWriter.LiteralStringRegistry literalRegistry) {
         CommentedConfig nc = TomlFormat.newConfig(LinkedHashMap::new);
-        
-        // Note: Version is NOT stored in TOML - it's managed separately in JAR manifest
-        
+                
         // Settings section (all fields)
         CommentedConfig settingsSection = nc.createSubConfig();
         Config.Settings s = config.getSettings();
@@ -54,7 +52,7 @@ public class TomlConverter {
         
         nc.set("settings", settingsSection);
         
-        // Exclusions array (if any)
+        // Exclusions array
         List<CommentedConfig> exclusionsArray = new ArrayList<>();
         for (Config.ExclusionConfig e : config.getExclusions()) {
             CommentedConfig ec = nc.createSubConfig();
@@ -73,7 +71,7 @@ public class TomlConverter {
             nc.set("exclusions", exclusionsArray);
         }
         
-        // Patterns array (50+ patterns)
+        // Secret patterns
         List<CommentedConfig> patternsArray = new ArrayList<>();
         for (Config.PatternConfig p : config.getPatterns()) {
             CommentedConfig pc = nc.createSubConfig();
