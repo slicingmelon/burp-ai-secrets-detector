@@ -10,8 +10,9 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'net.portswigger.burp.extensions:montoya-api:2025.10'
-    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.20.0'
+    compileOnly 'net.portswigger.burp.extensions:montoya-api:2025.11'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.20.1'
+    implementation 'com.electronwill.night-config:toml:3.8.3'
 }
 
 // Generate version.properties file during build

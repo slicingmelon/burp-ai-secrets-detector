@@ -19,7 +19,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
@@ -44,7 +43,6 @@ public class Config {
     private Settings settings;
     private List<PatternConfig> patterns;
     private List<ExclusionConfig> exclusions;
-    private String rawTomlContent; // Store raw TOML content to avoid double-escaping
 
     private final TomlMapper tomlMapper;
 
@@ -580,7 +578,6 @@ public class Config {
         // 1. Try to load from Burp persistence first (primary source of truth)
         if (api != null && loadFromBurpPersistence()) {
             // Success - Burp persistence is the single source of truth
-            createReferenceTemplateFile(); // Always ensure template exists
             return;
         }
 
@@ -589,53 +586,8 @@ public class Config {
         if (api != null) {
             saveToBurpPersistence();
         }
-        
-        // 3. Create reference template file (one-time operation)
-        createReferenceTemplateFile();
     }
 
-    /**
-     * Create a reference template file for user documentation (one-time operation)
-     * This file is NOT used for configuration - it's purely for reference
-     */
-    private void createReferenceTemplateFile() {
-        try {
-            Path templatePath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "example-config-template.toml");
-            Logger.logCritical("createReferenceTemplateFile: Attempting to create template at: " + templatePath.toAbsolutePath());
-            
-            // Only create if it doesn't exist
-            if (!Files.exists(templatePath)) {
-                Logger.logCritical("createReferenceTemplateFile: Template file does not exist, creating...");
-                Files.createDirectories(templatePath.getParent());
-                Logger.logCritical("createReferenceTemplateFile: Created parent directories");
-                
-                try (InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH)) {
-                    if (defaultConfigStream != null) {
-                        Logger.logCritical("createReferenceTemplateFile: Found default config resource, copying...");
-                        Files.copy(defaultConfigStream, templatePath, StandardCopyOption.REPLACE_EXISTING);
-                        Logger.logCritical("Created reference template file: " + templatePath.toAbsolutePath());
-                    } else {
-                        Logger.logCriticalError("createReferenceTemplateFile: Default config resource not found at: " + DEFAULT_CONFIG_PATH);
-                    }
-                } catch (IOException e) {
-                    Logger.logCriticalError("createReferenceTemplateFile: IO error: " + e.getMessage());
-                    e.printStackTrace();
-                }
-            } else {
-                Logger.logCritical("createReferenceTemplateFile: Template file already exists at: " + templatePath.toAbsolutePath());
-            }
-        } catch (Exception e) {
-            Logger.logCriticalError("createReferenceTemplateFile: General error: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Manually create the reference template file (public method for debugging/manual creation)
-     */
-    public void createReferenceTemplateFileManually() {
-        createReferenceTemplateFile();
-    }
 
     private boolean loadFromBurpPersistence() {
         if (api == null) {
@@ -647,10 +599,7 @@ public class Config {
             String versionData = api.persistence().extensionData().getString(PERSISTENCE_VERSION_KEY);
             
             if (configData != null && !configData.isEmpty()) {
-                // Store raw TOML content directly to avoid double-escaping
-                this.rawTomlContent = configData;
-                
-                // Parse the raw TOML content
+                // Parse the TOML content using Jackson
                 TomlRoot tomlRoot = tomlMapper.readValue(configData, TomlRoot.class);
                 parseTomlRoot(tomlRoot);
                 
@@ -673,20 +622,12 @@ public class Config {
         }
 
         try {
-            // Create clean TOML serialization with current configuration
-            TomlRoot tomlRoot = new TomlRoot();
-            tomlRoot.version = this.configVersion;
-            tomlRoot.settings = this.settings;
-            tomlRoot.patterns = this.patterns;
-            tomlRoot.exclusions = this.exclusions;
-
-            // Serialize to TOML string and save to Burp persistence
-            String configData = tomlMapper.writeValueAsString(tomlRoot);
+            // Use Night-Config writer for beautiful TOML with triple quotes
+            String configData = TomlWriter.writeToString(this);
+            
+            // Save to Burp persistence (single source of truth)
             api.persistence().extensionData().setString(PERSISTENCE_CONFIG_KEY, configData);
             api.persistence().extensionData().setString(PERSISTENCE_VERSION_KEY, this.configVersion);
-            
-            // Store the serialized content as raw content for future use
-            this.rawTomlContent = configData;
             
             Logger.logCritical("Configuration saved to Burp persistence");
         } catch (Exception e) {
@@ -697,12 +638,11 @@ public class Config {
     private void loadDefaultConfig() {
         try (InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH)) {
             if (defaultConfigStream != null) {
-                // Read raw TOML content first
+                // Read and parse TOML content using Jackson
                 byte[] rawBytes = defaultConfigStream.readAllBytes();
-                this.rawTomlContent = new String(rawBytes, StandardCharsets.UTF_8);
+                String tomlContent = new String(rawBytes, StandardCharsets.UTF_8);
                 
-                // Parse the raw TOML content  
-                TomlRoot tomlRoot = tomlMapper.readValue(this.rawTomlContent, TomlRoot.class);
+                TomlRoot tomlRoot = tomlMapper.readValue(tomlContent, TomlRoot.class);
                 parseTomlRoot(tomlRoot);
             } else {
                 Logger.logCriticalError("Default config file not found.");
@@ -794,6 +734,140 @@ public class Config {
         }
     }
     
+    /**
+     * Validate configuration before accepting it (for imports)
+     * Throws IllegalArgumentException with detailed error messages if validation fails
+     */
+    private void validateConfig(TomlRoot config) {
+        List<String> errors = new ArrayList<>();
+        
+        // Required sections
+        if (config.settings == null) {
+            errors.add("Missing [settings] section");
+        }
+        if (config.patterns == null || config.patterns.isEmpty()) {
+            errors.add("Missing [[patterns]] section or no patterns defined");
+        }
+        
+        // Settings validation
+        if (config.settings != null) {
+            Settings s = config.settings;
+            
+            if (s.getWorkers() < 1 || s.getWorkers() > 100) {
+                errors.add("Invalid workers count: " + s.getWorkers() + " (must be between 1 and 100)");
+            }
+            
+            if (s.getGenericSecretMinLength() < 8 || s.getGenericSecretMinLength() > 128) {
+                errors.add("Invalid generic_secret_min_length: " + s.getGenericSecretMinLength() + " (must be between 8 and 128)");
+            }
+            
+            if (s.getGenericSecretMaxLength() < 8 || s.getGenericSecretMaxLength() > 256) {
+                errors.add("Invalid generic_secret_max_length: " + s.getGenericSecretMaxLength() + " (must be between 8 and 256)");
+            }
+            
+            if (s.getGenericSecretMinLength() > s.getGenericSecretMaxLength()) {
+                errors.add("generic_secret_min_length (" + s.getGenericSecretMinLength() + 
+                          ") cannot be greater than generic_secret_max_length (" + s.getGenericSecretMaxLength() + ")");
+            }
+            
+            if (s.getDuplicateThreshold() < 1) {
+                errors.add("Invalid duplicate_threshold: " + s.getDuplicateThreshold() + " (must be at least 1)");
+            }
+            
+            if (s.getMaxHighlightsPerSecret() < 1) {
+                errors.add("Invalid max_highlights_per_secret: " + s.getMaxHighlightsPerSecret() + " (must be at least 1)");
+            }
+            
+            if (s.getExcludedFileExtensions() == null) {
+                errors.add("Missing excluded_file_extensions array");
+            }
+            
+            if (s.getExcludedMimeTypes() == null) {
+                errors.add("Missing excluded_mime_types array");
+            }
+            
+            if (s.getEnabledTools() == null || s.getEnabledTools().isEmpty()) {
+                errors.add("Missing or empty enabled_tools array (at least one tool must be enabled)");
+            }
+        }
+        
+        // Pattern validation
+        if (config.patterns != null) {
+            Set<String> patternNames = new HashSet<>();
+            int minLength = config.settings != null ? config.settings.getGenericSecretMinLength() : 15;
+            int maxLength = config.settings != null ? config.settings.getGenericSecretMaxLength() : 80;
+            
+            for (PatternConfig p : config.patterns) {
+                // Check for duplicate names
+                if (patternNames.contains(p.getName())) {
+                    errors.add("Duplicate pattern name: '" + p.getName() + "'");
+                } else {
+                    patternNames.add(p.getName());
+                }
+                
+                // Check for null/empty name
+                if (p.getName() == null || p.getName().trim().isEmpty()) {
+                    errors.add("Pattern with empty or null name found");
+                    continue;
+                }
+                
+                // Check for null pattern field
+                if (p.getPattern() == null) {
+                    errors.add("Pattern '" + p.getName() + "' has null pattern field");
+                    continue;
+                }
+                
+                // Test regex compilation
+                try {
+                    p.compile(minLength, maxLength);
+                } catch (Exception e) {
+                    errors.add("Invalid regex in pattern '" + p.getName() + "': " + e.getMessage());
+                }
+            }
+        }
+        
+        // Exclusion validation
+        if (config.exclusions != null) {
+            for (int i = 0; i < config.exclusions.size(); i++) {
+                ExclusionConfig e = config.exclusions.get(i);
+                
+                // Check that at least one field is set
+                List<String> allUrls = e.getAllUrls();
+                List<String> allContexts = e.getAllContexts();
+                
+                if (allUrls.isEmpty() && allContexts.isEmpty()) {
+                    errors.add("Exclusion #" + (i + 1) + " has no URL or context patterns defined");
+                    continue;
+                }
+                
+                // Test regex compilation for URLs
+                for (String urlPattern : allUrls) {
+                    try {
+                        java.util.regex.Pattern.compile(urlPattern);
+                    } catch (Exception ex) {
+                        errors.add("Invalid URL regex in exclusion #" + (i + 1) + ": " + ex.getMessage());
+                    }
+                }
+                
+                // Test regex compilation for contexts
+                for (String contextPattern : allContexts) {
+                    try {
+                        java.util.regex.Pattern.compile(contextPattern);
+                    } catch (Exception ex) {
+                        errors.add("Invalid context regex in exclusion #" + (i + 1) + ": " + ex.getMessage());
+                    }
+                }
+            }
+        }
+        
+        // Throw exception if any errors found
+        if (!errors.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Config validation failed:\n- " + String.join("\n- ", errors)
+            );
+        }
+    }
+    
     public void saveConfig() {
         
         // Update version to current extension version
@@ -814,201 +888,6 @@ public class Config {
         // to prevent cascading refresh cycles
     }
 
-    @Deprecated
-    private void saveToConfigFile() {
-        try {
-            Path configPath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "config.toml");
-            Logger.logCritical("Config.saveToConfigFile: Saving to path: " + configPath.toAbsolutePath());
-            
-            Files.createDirectories(configPath.getParent());
-
-            // Always use the beautiful default format, then update values
-            Logger.logCritical("Config.saveToConfigFile: Copying default config");
-            copyDefaultConfigToUserDirectory(configPath);
-            
-            Logger.logCritical("Config.saveToConfigFile: Updating config values - minLength=" + settings.getGenericSecretMinLength() + ", maxLength=" + settings.getGenericSecretMaxLength());
-            updateConfigValues(configPath);
-            
-            Logger.logCritical("Config.saveToConfigFile: Config file saved successfully");
-            
-        } catch (IOException e) {
-            Logger.logCriticalError("Error saving config to file: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Updates only the values in the config file, preserving formatting and structure
-     * Also updates patterns to include any user-added patterns
-     * @deprecated This method is no longer used after simplifying the config system
-     */
-    @Deprecated
-    private void updateConfigValues(Path configPath) throws IOException {
-        List<String> lines = Files.readAllLines(configPath, StandardCharsets.UTF_8);
-        List<String> updatedLines = new ArrayList<>();
-        
-        boolean inSettingsSection = false;
-        boolean foundPatternsSection = false;
-        
-        for (String line : lines) {
-            String trimmed = line.trim();
-            
-                    // Detect sections
-        if (trimmed.equals("[settings]")) {
-            inSettingsSection = true;
-            updatedLines.add(line);
-            continue;
-        } else if (trimmed.startsWith("[[patterns]]") || trimmed.startsWith("[[exclusions]]")) {
-            inSettingsSection = false;
-            foundPatternsSection = true;
-            break; // Stop processing here, we'll append our exclusions and patterns
-        } else if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-            inSettingsSection = false;
-            updatedLines.add(line);
-            continue;
-        }
-            
-            // Update version
-            if (trimmed.startsWith("version = ")) {
-                updatedLines.add("version = \"" + this.configVersion + "\"");
-                continue;
-            }
-            
-            // Update settings values
-            if (inSettingsSection) {
-                if (trimmed.startsWith("workers = ")) {
-                    updatedLines.add("workers = " + this.settings.getWorkers());
-                } else if (trimmed.startsWith("in_scope_only = ")) {
-                    updatedLines.add("in_scope_only = " + this.settings.isInScopeOnly());
-                } else if (trimmed.startsWith("logging_enabled = ")) {
-                    updatedLines.add("logging_enabled = " + this.settings.isLoggingEnabled());
-                } else if (trimmed.startsWith("randomness_algorithm_enabled = ")) {
-                    updatedLines.add("randomness_algorithm_enabled = " + this.settings.isRandomnessAlgorithmEnabled());
-                } else if (trimmed.startsWith("generic_secret_min_length = ")) {
-                    updatedLines.add("generic_secret_min_length = " + this.settings.getGenericSecretMinLength());
-                } else if (trimmed.startsWith("generic_secret_max_length = ")) {
-                    updatedLines.add("generic_secret_max_length = " + this.settings.getGenericSecretMaxLength());
-                } else if (trimmed.startsWith("duplicate_threshold = ")) {
-                    updatedLines.add("duplicate_threshold = " + this.settings.getDuplicateThreshold());
-                } else if (trimmed.startsWith("max_highlights_per_secret = ")) {
-                    updatedLines.add("max_highlights_per_secret = " + this.settings.getMaxHighlightsPerSecret());
-                } else if (trimmed.startsWith("excluded_file_extensions = ")) {
-                    updatedLines.add("excluded_file_extensions = " + formatStringArray(this.settings.getExcludedFileExtensions()));
-                } else if (trimmed.startsWith("excluded_mime_types = ")) {
-                    updatedLines.add("excluded_mime_types = " + formatStringArray(this.settings.getExcludedMimeTypes()));
-                } else if (trimmed.startsWith("enabled_tools = ")) {
-                    updatedLines.add("enabled_tools = " + formatToolArray(this.settings.getEnabledTools()));
-                } else {
-                    updatedLines.add(line);
-                }
-            } else {
-                updatedLines.add(line);
-            }
-        }
-        
-        // Append all current patterns (preserves user-added ones)
-        if (foundPatternsSection) {
-            updatedLines.add(""); // Empty line before patterns section
-        }
-        
-        // Write all current exclusions first
-        if (this.exclusions != null && !this.exclusions.isEmpty()) {
-            for (ExclusionConfig exclusion : this.exclusions) {
-                updatedLines.add("[[exclusions]]");
-                
-                // Write URL patterns
-                List<String> allUrls = exclusion.getAllUrls();
-                if (allUrls.size() == 1) {
-                    updatedLines.add("url = '''" + allUrls.get(0) + "'''");
-                } else if (allUrls.size() > 1) {
-                    updatedLines.add("urls = [");
-                    for (int i = 0; i < allUrls.size(); i++) {
-                        String prefix = i == 0 ? "  '''" : "  '''";
-                        String suffix = i == allUrls.size() - 1 ? "'''" : "''',";
-                        updatedLines.add(prefix + allUrls.get(i) + suffix);
-                    }
-                    updatedLines.add("]");
-                }
-                
-                // Write Context patterns
-                List<String> allContexts = exclusion.getAllContexts();
-                if (allContexts.size() == 1) {
-                    updatedLines.add("context = '''" + allContexts.get(0) + "'''");
-                } else if (allContexts.size() > 1) {
-                    updatedLines.add("contexts = [");
-                    for (int i = 0; i < allContexts.size(); i++) {
-                        String prefix = i == 0 ? "  '''" : "  '''";
-                        String suffix = i == allContexts.size() - 1 ? "'''" : "''',";
-                        updatedLines.add(prefix + allContexts.get(i) + suffix);
-                    }
-                    updatedLines.add("]");
-                }
-                
-                updatedLines.add(""); // Empty line after each exclusion
-            }
-        }
-        
-        // Write all current patterns with their current content (this ensures updated patterns are saved)
-        for (PatternConfig pattern : this.patterns) {
-            updatedLines.add("[[patterns]]");
-            updatedLines.add("name = \"" + pattern.getName() + "\"");
-            updatedLines.add("prefix = '''" + (pattern.getPrefix() != null ? pattern.getPrefix() : "") + "'''");
-            updatedLines.add("pattern = '''" + (pattern.getPattern() != null ? pattern.getPattern() : "") + "'''");
-            updatedLines.add("suffix = '''" + (pattern.getSuffix() != null ? pattern.getSuffix() : "") + "'''");
-            updatedLines.add(""); // Empty line after each pattern
-        }
-        
-        // Write the updated content back
-        Files.write(configPath, updatedLines, StandardCharsets.UTF_8);
-    }
-
-    private String formatStringArray(Set<String> strings) {
-        if (strings == null || strings.isEmpty()) {
-            return "[]";
-        }
-        return "[" + strings.stream()
-                .map(s -> "\"" + s + "\"")
-                .collect(Collectors.joining(", ")) + "]";
-    }
-
-    private String formatToolArray(Set<ToolType> tools) {
-        if (tools == null || tools.isEmpty()) {
-            return "[]";
-        }
-        return "[" + tools.stream()
-                .map(t -> "\"" + t.name() + "\"")
-                .collect(Collectors.joining(", ")) + "]";
-    }
-
-    private String formatStringArrayForToml(Set<String> strings) {
-        if (strings == null || strings.isEmpty()) {
-            return "[]";
-        }
-        return "[" + strings.stream()
-                .map(s -> "\"" + s + "\"")
-                .collect(Collectors.joining(", ")) + "]";
-    }
-
-    private String formatToolArrayForToml(Set<ToolType> tools) {
-        if (tools == null || tools.isEmpty()) {
-            return "[]";
-        }
-        return "[" + tools.stream()
-                .map(t -> "\"" + t.name() + "\"")
-                .collect(Collectors.joining(", ")) + "]";
-    }
-    
-    @Deprecated
-    private void copyDefaultConfigToUserDirectory(Path configPath) throws IOException {
-        try (InputStream defaultConfigStream = getClass().getResourceAsStream(DEFAULT_CONFIG_PATH)) {
-            if (defaultConfigStream != null) {
-                Files.copy(defaultConfigStream, configPath, StandardCopyOption.REPLACE_EXISTING);
-                Logger.logCritical("Copied default config to: " + configPath.toAbsolutePath());
-            } else {
-                Logger.logCriticalError("Default config resource not found: " + DEFAULT_CONFIG_PATH);
-            }
-        }
-    }
     
     public void resetToDefaults() {
         loadDefaultConfig(); // Load defaults into memory
@@ -1087,9 +966,6 @@ public class Config {
 
             // Update version to current
             this.configVersion = getCurrentExtensionVersion();
-
-            // DO NOT overwrite rawTomlContent with defaults - keep user's content!
-            // The rawTomlContent should preserve user's exclusions and formatting
             
             // Save the merged config
             saveConfig();
@@ -1313,15 +1189,8 @@ public class Config {
         Path destinationPath = Paths.get(filePath);
         Files.createDirectories(destinationPath.getParent());
         
-        // Create clean TOML export with current configuration
-        TomlRoot tomlRoot = new TomlRoot();
-        tomlRoot.version = this.configVersion;
-        tomlRoot.settings = this.settings;
-        tomlRoot.patterns = this.patterns;
-        tomlRoot.exclusions = this.exclusions;
-        
-        // Use clean TOML serialization (no complex formatting preservation)
-        String tomlContent = tomlMapper.writeValueAsString(tomlRoot);
+        // Use Night-Config writer for beautiful TOML with triple quotes
+        String tomlContent = TomlWriter.writeToString(this);
         Files.writeString(destinationPath, tomlContent, StandardCharsets.UTF_8);
         
         Logger.logCritical("Exported configuration to: " + destinationPath.toAbsolutePath());
@@ -1329,40 +1198,40 @@ public class Config {
     
     public void importConfigFromFile(String filePath) throws IOException {
         Path sourcePath = Paths.get(filePath);
-        if (Files.exists(sourcePath)) {
-            // Read and parse TOML content from file
-            String importedTomlContent = Files.readString(sourcePath, StandardCharsets.UTF_8);
-            TomlRoot tomlRoot = tomlMapper.readValue(importedTomlContent, TomlRoot.class);
-            
-            // Store the imported raw content
-            this.rawTomlContent = importedTomlContent;
-            
-            // Parse and apply the imported configuration
-            parseTomlRoot(tomlRoot);
-            
-            // Update version to current extension version
-            this.configVersion = getCurrentExtensionVersion();
-            
-            // Save to Burp persistence (single source of truth)
-            saveToBurpPersistence();
-            
-            // Notify callback about config changes
-            if (onConfigChangedCallback != null) {
-                onConfigChangedCallback.run();
-            }
-            
-            // Notify UI to refresh if available
-            if (AISecretsDetector.getInstance() != null) {
-                UI ui = AISecretsDetector.getInstance().getUI();
-                if (ui != null) {
-                    ui.refreshUI();
-                }
-            }
-            
-            Logger.logCritical("Imported configuration from: " + sourcePath.toAbsolutePath());
-        } else {
+        if (!Files.exists(sourcePath)) {
             throw new IOException("File not found: " + filePath);
         }
+        
+        // Read and parse TOML content from file
+        String importedTomlContent = Files.readString(sourcePath, StandardCharsets.UTF_8);
+        TomlRoot tomlRoot = tomlMapper.readValue(importedTomlContent, TomlRoot.class);
+        
+        // VALIDATE strictly before accepting the configuration
+        validateConfig(tomlRoot);
+        
+        // If validation passes, parse and apply the imported configuration
+        parseTomlRoot(tomlRoot);
+        
+        // Update version to current extension version
+        this.configVersion = getCurrentExtensionVersion();
+        
+        // Save to Burp persistence (single source of truth)
+        saveToBurpPersistence();
+        
+        // Notify callback about config changes
+        if (onConfigChangedCallback != null) {
+            onConfigChangedCallback.run();
+        }
+        
+        // Notify UI to refresh if available
+        if (AISecretsDetector.getInstance() != null) {
+            UI ui = AISecretsDetector.getInstance().getUI();
+            if (ui != null) {
+                ui.refreshUI();
+            }
+        }
+        
+        Logger.logCritical("Imported configuration from: " + sourcePath.toAbsolutePath());
     }
     
     public String getDefaultConfigFilePath() {
@@ -1375,116 +1244,4 @@ public class Config {
         return Files.exists(configPath);
     }
 
-    /**
-     * Updates the raw TOML content with current settings values to avoid double-escaping
-     * This method directly modifies the TOML string instead of serializing Java objects
-     * For patterns, we rebuild them completely to ensure current pattern content is used
-     * @deprecated This method is no longer used after simplifying the config system
-     */
-    @Deprecated
-    private String updateRawTomlContent(String rawToml) {
-        if (rawToml == null || rawToml.isEmpty()) {
-            return rawToml;
-        }
-        
-        try {
-            List<String> lines = Arrays.asList(rawToml.split("\\r?\\n"));
-            List<String> updatedLines = new ArrayList<>();
-            
-            boolean inSettingsSection = false;
-            boolean inPatternsSection = false;
-            
-            for (String line : lines) {
-                String trimmed = line.trim();
-                
-                // Detect sections
-                if (trimmed.equals("[settings]")) {
-                    inSettingsSection = true;
-                    inPatternsSection = false;
-                    updatedLines.add(line);
-                    continue;
-                } else if (trimmed.startsWith("[[patterns]]")) {
-                    inSettingsSection = false;
-                    inPatternsSection = true;
-                    // Stop processing here - we'll rebuild all patterns at the end
-                    break;
-                } else if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-                    inSettingsSection = false;
-                    inPatternsSection = false;
-                    updatedLines.add(line);
-                    continue;
-                }
-                
-                // Skip pattern content
-                if (inPatternsSection) {
-                    continue;
-                }
-                
-                // Update version
-                if (trimmed.startsWith("version = ")) {
-                    updatedLines.add("version = \"" + this.configVersion + "\"");
-                    continue;
-                }
-                
-                // Update settings values
-                if (inSettingsSection && settings != null) {
-                    if (trimmed.startsWith("workers = ")) {
-                        updatedLines.add("workers = " + settings.getWorkers());
-                    } else if (trimmed.startsWith("in_scope_only = ")) {
-                        updatedLines.add("in_scope_only = " + settings.isInScopeOnly());
-                    } else if (trimmed.startsWith("logging_enabled = ")) {
-                        updatedLines.add("logging_enabled = " + settings.isLoggingEnabled());
-                    } else if (trimmed.startsWith("randomness_algorithm_enabled = ")) {
-                        updatedLines.add("randomness_algorithm_enabled = " + settings.isRandomnessAlgorithmEnabled());
-                    } else if (trimmed.startsWith("generic_secret_min_length = ")) {
-                        updatedLines.add("generic_secret_min_length = " + settings.getGenericSecretMinLength());
-                    } else if (trimmed.startsWith("generic_secret_max_length = ")) {
-                        updatedLines.add("generic_secret_max_length = " + settings.getGenericSecretMaxLength());
-                    } else if (trimmed.startsWith("duplicate_threshold = ")) {
-                        updatedLines.add("duplicate_threshold = " + settings.getDuplicateThreshold());
-                    } else if (trimmed.startsWith("max_highlights_per_secret = ")) {
-                        updatedLines.add("max_highlights_per_secret = " + settings.getMaxHighlightsPerSecret());
-                    } else if (trimmed.startsWith("excluded_file_extensions = ")) {
-                        updatedLines.add("excluded_file_extensions = " + formatStringArrayForToml(settings.getExcludedFileExtensions()));
-                    } else if (trimmed.startsWith("excluded_mime_types = ")) {
-                        updatedLines.add("excluded_mime_types = " + formatStringArrayForToml(settings.getExcludedMimeTypes()));
-                    } else if (trimmed.startsWith("enabled_tools = ")) {
-                        updatedLines.add("enabled_tools = " + formatToolArrayForToml(settings.getEnabledTools()));
-                    } else {
-                        updatedLines.add(line);
-                    }
-                } else {
-                    updatedLines.add(line);
-                }
-            }
-            
-            // Rebuild exclusions section first
-            if (this.exclusions != null && !this.exclusions.isEmpty()) {
-                updatedLines.add("");
-                for (ExclusionConfig exclusion : this.exclusions) {
-                    updatedLines.add("[[exclusions]]");
-                    updatedLines.add("type = \"" + (exclusion.getType() != null ? exclusion.getType() : "") + "\"");
-                    updatedLines.add("regex = '''" + (exclusion.getRegex() != null ? exclusion.getRegex() : "") + "'''");
-                    updatedLines.add("pattern_name = \"" + (exclusion.getPatternName() != null ? exclusion.getPatternName() : "*") + "\"");
-                    updatedLines.add("");
-                }
-            }
-            
-            // Rebuild patterns section completely with current pattern content
-            updatedLines.add("");
-            for (PatternConfig pattern : this.patterns) {
-                updatedLines.add("[[patterns]]");
-                updatedLines.add("name = \"" + (pattern.getName() != null ? pattern.getName() : "") + "\"");
-                updatedLines.add("prefix = '''" + (pattern.getPrefix() != null ? pattern.getPrefix() : "") + "'''");
-                updatedLines.add("pattern = '''" + (pattern.getPattern() != null ? pattern.getPattern() : "") + "'''");
-                updatedLines.add("suffix = '''" + (pattern.getSuffix() != null ? pattern.getSuffix() : "") + "'''");
-                updatedLines.add("");
-            }
-            
-            return String.join("\n", updatedLines);
-        } catch (Exception e) {
-            Logger.logCriticalError("Error updating raw TOML content: " + e.getMessage());
-            return rawToml; // Return original content if update fails
-        }
-    }
 } 
