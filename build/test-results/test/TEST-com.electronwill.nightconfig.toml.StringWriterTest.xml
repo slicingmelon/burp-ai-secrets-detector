@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.electronwill.nightconfig.toml.StringWriterTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2025-11-18T07:52:12.216Z" hostname="BUC-W-4NQD044" time="0.045">
+<testsuite name="com.electronwill.nightconfig.toml.StringWriterTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2025-11-18T08:12:39.250Z" hostname="BUC-W-4NQD044" time="0.062">
   <properties/>
-  <testcase name="literalMultilineKeepsSingleLineStringsInline()" classname="com.electronwill.nightconfig.toml.StringWriterTest" time="0.037"/>
+  <testcase name="literalMultilineKeepsSingleLineStringsInline()" classname="com.electronwill.nightconfig.toml.StringWriterTest" time="0.053"/>
   <testcase name="literalMultilineAddsNewlinesWhenNeeded()" classname="com.electronwill.nightconfig.toml.StringWriterTest" time="0.006"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>

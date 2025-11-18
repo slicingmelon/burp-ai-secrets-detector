@@ -10,12 +10,11 @@ package slicingmelon.aisecretsdetector;
 import com.electronwill.nightconfig.core.CommentedConfig;
 import com.electronwill.nightconfig.core.io.IndentStyle;
 
+import java.util.IdentityHashMap;
+import java.util.Map;
+
 /**
  * Helper class to write TOML using Night-Config with triple-quoted literals for regex patterns.
- * 
- * NOTE: Night-Config has a bug in writeLiteralMultiline() that writes 4 quotes instead of 3.
- * We work around this with post-processing until the bug is fixed upstream.
- * See: https://github.com/TheElectronWill/night-config/blob/master/toml/src/main/java/com/electronwill/nightconfig/toml/StringWriter.java#L76
  */
 public class TomlWriter {
 
@@ -27,7 +26,8 @@ public class TomlWriter {
      */
     public static String writeToString(Config config) {
         // Convert POJOs to Night-Config structure
-        CommentedConfig nightConfig = TomlConverter.toNightConfig(config);
+        LiteralStringRegistry literalRegistry = new LiteralStringRegistry();
+        CommentedConfig nightConfig = TomlConverter.toNightConfig(config, literalRegistry);
         
         // Configure writer
         com.electronwill.nightconfig.toml.TomlWriter writer = new com.electronwill.nightconfig.toml.TomlWriter();
@@ -36,8 +36,10 @@ public class TomlWriter {
         writer.setIndent(IndentStyle.TABS);
         
         // Use literal triple quotes only when needed (regex, quotes, empty string, newlines)
-        writer.setWriteStringLiteralPredicate(TomlWriter::shouldUseLiteral);
-        writer.setWriteStringMultilinePredicate(TomlWriter::shouldUseLiteral);
+        writer.setWriteStringLiteralPredicate(str ->
+            literalRegistry.isMarked(str) || defaultShouldUseLiteral(str));
+        writer.setWriteStringMultilinePredicate(str ->
+            literalRegistry.isMarked(str) || defaultShouldUseLiteral(str));
         
         // Don't indent array elements
         writer.setIndentArrayElementsPredicate(array -> false);
@@ -48,7 +50,7 @@ public class TomlWriter {
         return writer.writeToString(nightConfig);
     }
     
-    private static boolean shouldUseLiteral(String str) {
+    private static boolean defaultShouldUseLiteral(String str) {
         if (str == null) {
             return false;
         }
@@ -57,5 +59,22 @@ public class TomlWriter {
             || str.contains("'")
             || str.contains("\n")
             || str.contains("\r");
+    }
+
+    static final class LiteralStringRegistry {
+        private final Map<String, Boolean> literals = new IdentityHashMap<>();
+
+        String mark(String value) {
+            if (value == null) {
+                return null;
+            }
+            String unique = new String(value);
+            literals.put(unique, Boolean.TRUE);
+            return unique;
+        }
+
+        boolean isMarked(String value) {
+            return value != null && literals.containsKey(value);
+        }
     }
 }

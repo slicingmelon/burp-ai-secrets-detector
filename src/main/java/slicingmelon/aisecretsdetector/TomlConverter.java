@@ -25,7 +25,7 @@ public class TomlConverter {
      * Convert Config POJOs to night-config CommentedConfig structure
      * for writing beautiful TOML with triple quotes
      */
-    public static CommentedConfig toNightConfig(Config config) {
+    public static CommentedConfig toNightConfig(Config config, TomlWriter.LiteralStringRegistry literalRegistry) {
         CommentedConfig nc = TomlFormat.newConfig(LinkedHashMap::new);
         
         // Note: Version is NOT stored in TOML - it's managed separately in JAR manifest
@@ -86,9 +86,9 @@ public class TomlConverter {
         for (Config.PatternConfig p : config.getPatterns()) {
             CommentedConfig pc = nc.createSubConfig();
             pc.set("name", p.getName());
-            pc.set("prefix", p.getPrefix() != null ? p.getPrefix() : "");
-            pc.set("pattern", p.getPattern() != null ? p.getPattern() : "");
-            pc.set("suffix", p.getSuffix() != null ? p.getSuffix() : "");
+            pc.set("prefix", literalRegistry.mark(p.getPrefix() != null ? p.getPrefix() : ""));
+            pc.set("pattern", literalRegistry.mark(p.getPattern() != null ? p.getPattern() : ""));
+            pc.set("suffix", literalRegistry.mark(p.getSuffix() != null ? p.getSuffix() : ""));
             patternsArray.add(pc);
         }
         nc.set("patterns", patternsArray);
