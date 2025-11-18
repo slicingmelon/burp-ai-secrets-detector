@@ -530,6 +530,7 @@ public class Config {
 
     private TomlMapper createTomlMapper() {
         return TomlMapper.builder()
+                .enable(com.fasterxml.jackson.databind.MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
                 .build();
     }
 
