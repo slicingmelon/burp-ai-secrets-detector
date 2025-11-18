@@ -712,7 +712,8 @@ public class Config {
 
     private void parseTomlRoot(TomlRoot tomlRoot) {
         if (tomlRoot != null) {
-            this.configVersion = tomlRoot.version;
+            // Version is no longer stored in TOML - always use current extension version
+            this.configVersion = getCurrentExtensionVersion();
             this.settings = tomlRoot.settings != null ? tomlRoot.settings : new Settings();
             this.patterns = tomlRoot.patterns != null ? new CopyOnWriteArrayList<>(tomlRoot.patterns) : new CopyOnWriteArrayList<>();
             this.exclusions = tomlRoot.exclusions != null ? new CopyOnWriteArrayList<>(tomlRoot.exclusions) : new CopyOnWriteArrayList<>();

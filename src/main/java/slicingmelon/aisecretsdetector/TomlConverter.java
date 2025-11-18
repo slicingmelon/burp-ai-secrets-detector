@@ -28,8 +28,7 @@ public class TomlConverter {
     public static CommentedConfig toNightConfig(Config config) {
         CommentedConfig nc = TomlFormat.newConfig(LinkedHashMap::new);
         
-        // Version
-        nc.set("version", config.getConfigVersion());
+        // Note: Version is NOT stored in TOML - it's managed separately in JAR manifest
         
         // Settings section (all fields)
         CommentedConfig settingsSection = nc.createSubConfig();

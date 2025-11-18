@@ -33,13 +33,11 @@ public class TomlWriter {
         writer.setIndent(IndentStyle.TABS);
         
         // Use literal strings (single quotes) for all strings
-        // This is required for triple-quoted literals to work
+        // Single quotes in TOML are literal - no escaping needed for backslashes
         writer.setWriteStringLiteralPredicate(str -> true);
         
-        // Use multiline (triple quotes) for:
-        // 1. Strings containing backslashes (regex patterns)
-        // 2. Empty strings (to get '''''')
-        // When combined with writeStringLiteralPredicate=true, this produces '''...'''
+        // Use multiline mode for strings with backslashes or empty strings
+        // This produces '''..''' format (but with newlines that we'll fix)
         writer.setWriteStringMultilinePredicate(str -> 
             str.contains("\\") || str.isEmpty()
         );
@@ -51,7 +49,31 @@ public class TomlWriter {
         writer.setWriteTableInlinePredicate(table -> false);
         
         // Generate TOML string
-        return writer.writeToString(nightConfig);
+        String toml = writer.writeToString(nightConfig);
+        
+        // Post-process to fix multiline strings: convert '''\\n...\\n''' to '''...'''
+        return fixMultilineStrings(toml);
+    }
+    
+    /**
+     * Fix multiline strings by removing unwanted newlines after opening ''' and before closing '''
+     * 
+     * Night-Config writes multiline literal strings as:
+     * '''
+     * content
+     * ''''
+     * 
+     * We want inline format: '''content'''
+     */
+    private static String fixMultilineStrings(String toml) {
+        // Replace '''\\n with ''' (remove newline after opening triple quotes)
+        String fixed = toml.replaceAll("'''\\n", "'''");
+        
+        // Replace \\n'''' (newline + 4 quotes) with ''' (3 quotes)
+        // Night-Config ends multiline literals with 4 quotes: ''''
+        fixed = fixed.replaceAll("\\n''''", "'''");
+        
+        return fixed;
     }
 }
 
