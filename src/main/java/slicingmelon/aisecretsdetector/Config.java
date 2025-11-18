@@ -612,6 +612,17 @@ public class Config {
             }
         } catch (Exception e) {
             Logger.logCriticalError("Error loading config from Burp persistence: " + e.getMessage());
+            Logger.logCriticalError("This is likely due to corrupted config from a previous version.");
+            Logger.logCriticalError("Clearing corrupted config and falling back to defaults...");
+            
+            // Clear the corrupted config from persistence
+            try {
+                api.persistence().extensionData().deleteString(PERSISTENCE_CONFIG_KEY);
+                api.persistence().extensionData().deleteString(PERSISTENCE_VERSION_KEY);
+                Logger.logCritical("Corrupted config cleared from Burp persistence.");
+            } catch (Exception clearError) {
+                Logger.logCriticalError("Failed to clear corrupted config: " + clearError.getMessage());
+            }
         }
         return false;
     }

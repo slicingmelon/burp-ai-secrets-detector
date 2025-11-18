@@ -39,9 +39,7 @@ public class TomlConverter {
         settingsSection.set("excluded_file_extensions", 
             new ArrayList<>(s.getExcludedFileExtensions()));
         settingsSection.set("excluded_mime_types", 
-            s.getExcludedMimeTypes().stream()
-                .map(Object::toString)
-                .collect(Collectors.toList()));
+            new ArrayList<>(s.getExcludedMimeTypes()));
         settingsSection.set("workers", s.getWorkers());
         settingsSection.set("in_scope_only", s.isInScopeOnly());
         settingsSection.set("logging_enabled", s.isLoggingEnabled());
@@ -52,7 +50,7 @@ public class TomlConverter {
         settingsSection.set("max_highlights_per_secret", s.getMaxHighlightsPerSecret());
         settingsSection.set("enabled_tools", 
             s.getEnabledTools().stream()
-                .map(Object::toString)
+                .map(Enum::name)
                 .collect(Collectors.toList()));
         
         nc.set("settings", settingsSection);
