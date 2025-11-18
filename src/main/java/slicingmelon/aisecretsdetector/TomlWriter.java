@@ -54,8 +54,30 @@ public class TomlWriter {
         // Generate TOML string
         String toml = writer.writeToString(nightConfig);
         
+        // DEBUG: Log first pattern to see raw output
+        if (toml.contains("[[patterns]]")) {
+            int start = toml.indexOf("[[patterns]]");
+            int end = toml.indexOf("[[patterns]]", start + 1);
+            if (end == -1) end = Math.min(start + 500, toml.length());
+            System.out.println("=== RAW OUTPUT BEFORE FIX ===");
+            System.out.println(toml.substring(start, end));
+            System.out.println("=== END RAW OUTPUT ===");
+        }
+        
         // WORKAROUND: Fix Night-Config's multiline literal bug
-        return fixMultilineStrings(toml);
+        String fixed = fixMultilineStrings(toml);
+        
+        // DEBUG: Log after fix
+        if (fixed.contains("[[patterns]]")) {
+            int start = fixed.indexOf("[[patterns]]");
+            int end = fixed.indexOf("[[patterns]]", start + 1);
+            if (end == -1) end = Math.min(start + 500, fixed.length());
+            System.out.println("=== AFTER FIX ===");
+            System.out.println(fixed.substring(start, end));
+            System.out.println("=== END AFTER FIX ===");
+        }
+        
+        return fixed;
     }
     
     /**
