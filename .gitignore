@@ -8,3 +8,4 @@ build/tmp/
 build/resources/main/
 z-local-dev-resources
 REFACTORING_SUMMARY.md
+build/test-results/
