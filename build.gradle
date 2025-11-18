@@ -14,7 +14,7 @@ dependencies {
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.20.1'
     implementation 'com.electronwill.night-config:toml:3.8.3'
     testImplementation 'org.junit.jupiter:junit-jupiter:6.0.0'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.13.4'
 }
 
 // Generate version.properties file during build
