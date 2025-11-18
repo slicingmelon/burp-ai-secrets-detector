@@ -32,10 +32,15 @@ public class TomlWriter {
         // Use tabs for indentation
         writer.setIndent(IndentStyle.TABS);
         
-        // Use triple-quoted literals for:
+        // Use literal strings (single quotes) for all strings
+        // This is required for triple-quoted literals to work
+        writer.setWriteStringLiteralPredicate(str -> true);
+        
+        // Use multiline (triple quotes) for:
         // 1. Strings containing backslashes (regex patterns)
         // 2. Empty strings (to get '''''')
-        writer.setWriteStringLiteralPredicate(str -> 
+        // When combined with writeStringLiteralPredicate=true, this produces '''...'''
+        writer.setWriteStringMultilinePredicate(str -> 
             str.contains("\\") || str.isEmpty()
         );
         

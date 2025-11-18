@@ -346,10 +346,6 @@ public class UI {
         importConfigButton.addActionListener(e -> importConfigFromFile());
         buttonPanel.add(importConfigButton);
         
-        JButton createTemplateButton = new JButton("Create Template File");
-        createTemplateButton.addActionListener(e -> createTemplateFile());
-        buttonPanel.add(createTemplateButton);
-        
         // Create a combined bottom panel for config info and buttons
         JPanel bottomPanel = new JPanel(new BorderLayout());
         bottomPanel.add(configInfoPanel, BorderLayout.NORTH);
@@ -686,44 +682,4 @@ public class UI {
         }
     }
     
-    private void createTemplateFile() {
-        if (config == null) {
-            appendToErrorLog("Config not available for template creation");
-            return;
-        }
-        
-        try {
-            config.createReferenceTemplateFileManually();
-            appendToLog("Template file creation triggered - check logs for details");
-            
-            // Check if it was actually created
-            Path templatePath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "example-config-template.toml");
-            if (java.nio.file.Files.exists(templatePath)) {
-                appendToLog("Template file successfully created at: " + templatePath.toAbsolutePath());
-                JOptionPane.showMessageDialog(
-                    null,
-                    "Template file created successfully!\n\nFile: " + templatePath.toAbsolutePath() + "\n\nThis file serves as a reference for configuration options.",
-                    "Template Created",
-                    JOptionPane.INFORMATION_MESSAGE
-                );
-            } else {
-                appendToErrorLog("Template file was not created - check error logs for details");
-                JOptionPane.showMessageDialog(
-                    null,
-                    "Template file creation may have failed.\nCheck the error logs for details.",
-                    "Template Creation Status",
-                    JOptionPane.WARNING_MESSAGE
-                );
-            }
-        } catch (Exception e) {
-            String errorMsg = "Failed to create template file: " + e.getMessage();
-            appendToErrorLog(errorMsg);
-            JOptionPane.showMessageDialog(
-                null,
-                errorMsg,
-                "Template Creation Failed",
-                JOptionPane.ERROR_MESSAGE
-            );
-        }
-    }
 } 
