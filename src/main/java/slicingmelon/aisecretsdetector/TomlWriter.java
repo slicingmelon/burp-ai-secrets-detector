@@ -35,15 +35,9 @@ public class TomlWriter {
         // Use tabs for indentation
         writer.setIndent(IndentStyle.TABS);
         
-        // Use literal strings (single quotes) for ALL strings
-        // Single quotes in TOML are literal - no escaping needed for backslashes
-        writer.setWriteStringLiteralPredicate(str -> true);
-        
-        // Use multiline mode for strings with backslashes or empty strings
-        // This produces ''' format (but with bugs that we'll fix via post-processing)
-        writer.setWriteStringMultilinePredicate(str -> 
-            str.contains("\\") || str.isEmpty()
-        );
+        // Use literal triple quotes only when needed (regex, quotes, empty string, newlines)
+        writer.setWriteStringLiteralPredicate(TomlWriter::shouldUseLiteral);
+        writer.setWriteStringMultilinePredicate(TomlWriter::shouldUseLiteral);
         
         // Don't indent array elements
         writer.setIndentArrayElementsPredicate(array -> false);
@@ -51,60 +45,17 @@ public class TomlWriter {
         // Don't write tables inline
         writer.setWriteTableInlinePredicate(table -> false);
         
-        // Generate TOML string
-        String toml = writer.writeToString(nightConfig);
-        
-        // DEBUG: Log first pattern to see raw output
-        if (toml.contains("[[patterns]]")) {
-            int start = toml.indexOf("[[patterns]]");
-            int end = toml.indexOf("[[patterns]]", start + 1);
-            if (end == -1) end = Math.min(start + 500, toml.length());
-            System.out.println("=== RAW OUTPUT BEFORE FIX ===");
-            System.out.println(toml.substring(start, end));
-            System.out.println("=== END RAW OUTPUT ===");
-        }
-        
-        // WORKAROUND: Fix Night-Config's multiline literal bug
-        String fixed = fixMultilineStrings(toml);
-        
-        // DEBUG: Log after fix
-        if (fixed.contains("[[patterns]]")) {
-            int start = fixed.indexOf("[[patterns]]");
-            int end = fixed.indexOf("[[patterns]]", start + 1);
-            if (end == -1) end = Math.min(start + 500, fixed.length());
-            System.out.println("=== AFTER FIX ===");
-            System.out.println(fixed.substring(start, end));
-            System.out.println("=== END AFTER FIX ===");
-        }
-        
-        return fixed;
+        return writer.writeToString(nightConfig);
     }
     
-    /**
-     * Fix Night-Config's multiline literal string bugs:
-     * 1. Remove unwanted newlines after opening ''' and before closing '''
-     * 2. Fix the 4-quote bug (Night-Config writes '''' instead of ''')
-     * 
-     * Night-Config's writeLiteralMultiline() produces:
-     * '''
-     * content
-     * ''''
-     * 
-     * We convert to valid TOML inline format: '''content'''
-     * 
-     * This workaround is needed until https://github.com/TheElectronWill/night-config
-     * fixes the bug in StringWriter.writeLiteralMultiline() (line 76)
-     */
-    private static String fixMultilineStrings(String toml) {
-        // Remove newline after opening triple quotes
-        // Use System.lineSeparator() to match actual line breaks (could be \n or \r\n)
-        String newline = System.lineSeparator();
-        String fixed = toml.replace("'''" + newline, "'''");
-        
-        // Fix Night-Config's 4-quote bug: '''' -> '''
-        // This is critical for producing valid TOML that can be parsed back
-        fixed = fixed.replace(newline + "''''", "'''");
-        
-        return fixed;
+    private static boolean shouldUseLiteral(String str) {
+        if (str == null) {
+            return false;
+        }
+        return str.isEmpty()
+            || str.contains("\\")
+            || str.contains("'")
+            || str.contains("\n")
+            || str.contains("\r");
     }
 }
