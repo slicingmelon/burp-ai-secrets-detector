@@ -2,8 +2,6 @@ package com.electronwill.nightconfig.toml;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.io.StringWriter;
-
 import org.junit.jupiter.api.Test;
 
 import com.electronwill.nightconfig.core.io.WriterOutput;
