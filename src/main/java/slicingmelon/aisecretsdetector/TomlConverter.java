@@ -59,20 +59,12 @@ public class TomlConverter {
         for (Config.ExclusionConfig e : config.getExclusions()) {
             CommentedConfig ec = nc.createSubConfig();
             
-            // Handle URL patterns
             if (e.getUrl() != null && !e.getUrl().trim().isEmpty()) {
                 ec.set("url", e.getUrl());
             }
-            if (e.getUrls() != null && !e.getUrls().isEmpty()) {
-                ec.set("urls", new ArrayList<>(e.getUrls()));
-            }
             
-            // Handle Context patterns
             if (e.getContext() != null && !e.getContext().trim().isEmpty()) {
                 ec.set("context", e.getContext());
-            }
-            if (e.getContexts() != null && !e.getContexts().isEmpty()) {
-                ec.set("contexts", new ArrayList<>(e.getContexts()));
             }
             
             exclusionsArray.add(ec);

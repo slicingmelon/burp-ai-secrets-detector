@@ -38,47 +38,33 @@ max_highlights_per_secret = 3
 # Tools from which to process messages
 enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
 
-# Exclusions - Skip scanning for specific patterns/contexts
-# New format supports url/context arrays and AND logic
+# Exclusions - Skip scanning based on URL and/or response context
+# Each rule is a table with optional `url` and `context` regex strings:
+#   [[exclusions]]
+#   url = '''optional regex over the full request URL'''
+#   context = '''optional regex over the highlighted response context'''
 # 
-# Structure:
-# url = '''pattern'''           # Single URL pattern
-# urls = ['''p1''', '''p2''']   # Multiple URL patterns (OR logic)
-# context = '''pattern'''       # Single context pattern
-# contexts = ['''p1''', '''p2'''] # Multiple context patterns (OR logic)
-#
-# Logic:
-# - If both url/urls AND context/contexts are present: URL AND Context (both must match)
-# - If only url/urls: applies to all contexts in those URLs
-# - If only context/contexts: applies to all URLs
+# Matching logic:
+# - If both fields are present, the URL must match AND the context must match.
+# - If only `url` is present, every match from URLs matching that regex is skipped.
+# - If only `context` is present, matches with that context are skipped regardless of URL.
+# - Leave a field empty (or omit it) to treat it as "match everything".
 
 # Example exclusions (uncomment and modify as needed):
 
-# URL-only exclusion (applies to all contexts in matching URLs)
+# URL-only exclusion (ignore everything from *.example.com):
 # [[exclusions]]
-# url = '''.*\.example\.com.*'''
+# url = '''https?://([^.]+\.)*example\.com/.*'''
+# context = ''''''
 
-# Context-only exclusion (applies to all URLs)
+# Context-only exclusion (ignore CSRF meta tags anywhere)
 # [[exclusions]]
 # context = '''<meta name="csrf-token" content="[^"]{32}">'''
 
-# URL + Context exclusion (both must match)
+# URL + Context exclusion (suppress purchase keys only on example.com)
 # [[exclusions]]
-# url = '''.*\.example\.com.*'''
-# context = '''<meta name="csrf-token" content="[^"]{32}">'''
-
-# Multiple contexts exclusion (any context matches)
-# [[exclusions]]
-# contexts = [
-#   '''<meta name="csrf-token" content="[^"]{32}">''',
-#   '''<input type="hidden" name="_token" value="[^"]{40}">''',
-#   '''window\.csrfToken = "[^"]{32}";'''
-# ]
-
-# Multiple URLs with single context
-# [[exclusions]]
-# urls = ['''.*\.example\.com.*''', '''.*\.test\.com.*''']
-# context = '''<meta name="csrf-token" content="[^"]{32}">'''
+# url = '''https?://([^.]+\.)*example\.com/.*'''
+# context = '''"contentPurchaseKey":"[0-9a-f]{16}"'''
 
 # Secret detection patterns
 # Each pattern has:

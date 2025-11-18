@@ -173,9 +173,9 @@ public class SecretScanner {
     }
     
     /**
-     * Check if response should be excluded from scanning based on exclusion rules
+     * Check if response should be excluded from scanning based on URL-only rules
      */
-    private boolean shouldExcludeResponse(HttpResponse response, String baseUrl, String responseString) {
+    private boolean shouldExcludeResponse(String requestUrl, String responseString) {
         if (config == null) {
             return false;
         }
@@ -185,23 +185,12 @@ public class SecretScanner {
             return false;
         }
         
-        // Use full URL for matching
-        String targetUrl = baseUrl;
-        String targetContext = responseString;
-        
         for (Config.ExclusionConfig exclusion : exclusions) {
             try {
-                // Check if this exclusion applies to URL-only exclusions (no context patterns)
-                List<String> contextPatterns = exclusion.getAllContexts();
-                if (contextPatterns.isEmpty()) {
-                    // URL-only exclusion, check if URL matches
-                    if (exclusion.matches(targetUrl, null)) {
-                        Logger.logCritical("SecretScanner.shouldExcludeResponse: Response excluded by URL-only rule");
-                        return true;
-                    }
+                if (exclusion.hasUrl() && !exclusion.hasContext() && exclusion.matches(requestUrl, null)) {
+                    Logger.logCritical("SecretScanner.shouldExcludeResponse: Response excluded by URL-only rule");
+                    return true;
                 }
-                // Context-only and URL+Context exclusions are handled at pattern level
-                
             } catch (Exception e) {
                 Logger.logCriticalError("SecretScanner.shouldExcludeResponse: Error checking exclusion: " + e.getMessage());
             }
@@ -213,7 +202,7 @@ public class SecretScanner {
     /**
      * Check if a specific pattern should be excluded for a given context
      */
-    private boolean shouldExcludePattern(String patternName, String context, String baseUrl) {
+    private boolean shouldExcludeMatch(String patternName, String context, String requestUrl) {
         if (config == null) {
             return false;
         }
@@ -223,23 +212,14 @@ public class SecretScanner {
             return false;
         }
         
-        String targetUrl = baseUrl;
-        String targetContext = context;
-        
         for (Config.ExclusionConfig exclusion : exclusions) {
             try {
-                // Check if this exclusion has context patterns (context-only or URL+context)
-                List<String> contextPatterns = exclusion.getAllContexts();
-                if (!contextPatterns.isEmpty()) {
-                    // This exclusion has context patterns, check if it matches
-                    if (exclusion.matches(targetUrl, targetContext)) {
-                        Logger.logCritical("SecretScanner.shouldExcludePattern: Pattern " + patternName + " excluded by context rule");
-                        return true;
-                    }
+                if (exclusion.hasContext() && exclusion.matches(requestUrl, context)) {
+                    Logger.logCritical("SecretScanner.shouldExcludeMatch: Pattern " + patternName + " excluded by context rule");
+                    return true;
                 }
-                
             } catch (Exception e) {
-                Logger.logCriticalError("SecretScanner.shouldExcludePattern: Error checking pattern exclusion: " + e.getMessage());
+                Logger.logCriticalError("SecretScanner.shouldExcludeMatch: Error checking pattern exclusion: " + e.getMessage());
             }
         }
         
@@ -303,7 +283,7 @@ public class SecretScanner {
         }
     }
     
-    public SecretScanResult scanResponse(HttpResponse response, String baseUrl, Map<String, Integer> persistedCounts) {
+    public SecretScanResult scanResponse(HttpResponse response, String requestUrl, String baseUrl, Map<String, Integer> persistedCounts) {
         List<Secret> foundSecrets = new ArrayList<>();
         Map<String, Set<String>> uniqueSecretsPerPattern = new HashMap<>();
         
@@ -321,7 +301,7 @@ public class SecretScanner {
             int bodyOffset = response.bodyOffset();
             
             // Check exclusions before scanning
-            if (shouldExcludeResponse(response, baseUrl, responseString)) {
+            if (shouldExcludeResponse(requestUrl, responseString)) {
                 Logger.logCritical("SecretScanner.scanResponse: Response excluded by exclusion rules");
                 return new SecretScanResult(response, foundSecrets);
             }
@@ -342,7 +322,7 @@ public class SecretScanner {
                     }
                     
                     // Check if this pattern should be excluded
-                    if (shouldExcludePattern(pattern.getName(), responseString, baseUrl)) {
+                    if (shouldExcludeMatch(pattern.getName(), responseString, requestUrl)) {
                         Logger.logCritical("SecretScanner.scanResponse: Skipping pattern " + pattern.getName() + " - excluded by exclusion rules");
                         continue;
                     }

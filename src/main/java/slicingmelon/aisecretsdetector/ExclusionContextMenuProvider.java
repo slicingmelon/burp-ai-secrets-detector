@@ -10,6 +10,8 @@ import burp.api.montoya.core.Range;
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -105,7 +107,14 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
                 return;
             }
             
-            generateExclusionsFromContext(selectedText);
+            String requestUrl = null;
+            try {
+                requestUrl = messageEditor.requestResponse().request().url();
+            } catch (Exception ex) {
+                api.logging().logToError("Failed to resolve request URL for exclusion: " + ex.getMessage());
+            }
+            
+            generateExclusionsFromContext(selectedText, requestUrl);
         }
     }
     
@@ -114,7 +123,7 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
      * This method runs all configured patterns against the selected text
      * and creates dynamic exclusion rules for each pattern that matches.
      */
-    private void generateExclusionsFromContext(String selectedText) {
+    private void generateExclusionsFromContext(String selectedText, String requestUrl) {
         try {
             api.logging().logToOutput("=== generateExclusionsFromContext called ===");
             api.logging().logToOutput("Selected text length: " + selectedText.length());
@@ -123,6 +132,7 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
             
             List<String> generatedExclusions = new ArrayList<>();
             int exclusionCount = 0;
+            String hostRegex = buildHostRegex(requestUrl);
             
             // Get all patterns from config
             List<Config.PatternConfig> patterns = config.getPatterns();
@@ -153,8 +163,9 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
                         if (exclusionRegex != null) {
                             try {
                                 Pattern.compile(exclusionRegex); // Validate before saving
-                                config.addExclusion(null, exclusionRegex);
-                                generatedExclusions.add(String.format("Pattern '%s': %s", patternName, exclusionRegex));
+                                String urlPattern = (hostRegex == null || hostRegex.isEmpty()) ? "'''" : hostRegex;
+                                config.addExclusion(hostRegex, exclusionRegex);
+                                generatedExclusions.add(String.format("Pattern '%s': url=%s, context=%s", patternName, urlPattern, exclusionRegex));
                                 exclusionCount++;
                                 api.logging().logToOutput("Successfully added exclusion for pattern: " + patternName);
                             } catch (PatternSyntaxException ex) {
@@ -277,5 +288,30 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
          * It's equivalent to manually escaping all regex metacharacters, and safer than
          * trying to reimplement internal logic like RemoveQEQuoting from java.util.regex.Pattern.
          */
+    }
+
+    private String buildHostRegex(String requestUrl) {
+        if (requestUrl == null || requestUrl.isBlank()) {
+            return null;
+        }
+        try {
+            URI uri = new URI(requestUrl);
+            String host = uri.getHost();
+            String scheme = uri.getScheme();
+            if (host == null) {
+                return null;
+            }
+            String escapedHost = host.replace(".", "\\.");
+            String schemePattern;
+            if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+                schemePattern = scheme.equalsIgnoreCase("http") ? "http" : "https";
+            } else {
+                schemePattern = "https?";
+            }
+            return schemePattern + "://" + escapedHost + "/.*";
+        } catch (URISyntaxException e) {
+            api.logging().logToError("Failed to parse URL for exclusion: " + e.getMessage());
+            return null;
+        }
     }
 } 
