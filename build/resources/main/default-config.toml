@@ -2,14 +2,6 @@
 # This is the default configuration loaded on first run or when resetting to defaults.
 
 [settings]
-# File extensions to skip during scanning (binary/media files unlikely to contain secrets)
-# Categories: Media files, Image files, Archive files, Application packages, Executables, Document formats, Fonts, Binary/misc formats, Stylesheets
-excluded_file_extensions = ["3g2", "3gp", "aac", "aif", "aifc", "aiff", "au", "avi", "flac", "flv", "m3u", "m4a", "m4v", "mid", "midi", "mkv", "mov", "mp2", "mp3", "mp4", "mpa", "mpe", "mpeg", "mpg", "mpv2", "oga", "ogg", "ogv", "ogx", "ra", "ram", "rmi", "snd", "wav", "weba", "webm", "wma", "wmv", "bmp", "gif", "ico", "ief", "jfif", "jpe", "jpeg", "jpg", "pbm", "pgm", "png", "pnm", "ppm", "ras", "raw", "rgb", "svg", "tiff", "webp", "xbm", "xpm", "xwd", "psd", "ai", "eps", "cmx", "7z", "arc", "bz", "bz2", "gz", "rar", "tar", "zip", "zipx", "xz", "lz", "lzma", "apk", "jar", "war", "ear", "mpkg", "bin", "cod", "com", "exe", "msi", "dll", "so", "dylib", "app", "deb", "rpm", "pkg", "dmg", "iso", "img", "abw", "azw", "doc", "docx", "epub", "mpp", "odp", "ods", "odt", "pages", "numbers", "keynote", "pdf", "ppt", "pptx", "rtf", "vsd", "xls", "xlsx", "eot", "otf", "ttf", "woff", "woff2", "dat", "mdb", "accdb", "o", "obj", "swf", "fla", "xul", "css"]
-
-# MIME types to skip during scanning (binary/media content unlikely to contain secrets)
-# Categories: Images, Fonts, Media, Applications, Documents
-excluded_mime_types = ["IMAGE_BMP", "IMAGE_GIF", "IMAGE_JPEG", "IMAGE_PNG", "IMAGE_SVG_XML", "IMAGE_TIFF", "IMAGE_UNKNOWN", "FONT_WOFF", "FONT_WOFF2", "SOUND", "VIDEO", "APPLICATION_FLASH", "RTF", "CSS", "APPLICATION_UNKNOWN", "UNRECOGNIZED"]
-
 # Number of workers (threads) for processing HTTP responses
 workers = 20
 
@@ -36,6 +28,14 @@ max_highlights_per_secret = 3
 
 # Tools from which to process messages
 enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
+
+# File extensions to skip during scanning (binary/media files unlikely to contain secrets)
+# Categories: Media files, Image files, Archive files, Application packages, Executables, Document formats, Fonts, Binary/misc formats, Stylesheets
+excluded_file_extensions = ["3g2", "3gp", "aac", "aif", "aifc", "aiff", "au", "avi", "flac", "flv", "m3u", "m4a", "m4v", "mid", "midi", "mkv", "mov", "mp2", "mp3", "mp4", "mpa", "mpe", "mpeg", "mpg", "mpv2", "oga", "ogg", "ogv", "ogx", "ra", "ram", "rmi", "snd", "wav", "weba", "webm", "wma", "wmv", "bmp", "gif", "ico", "ief", "jfif", "jpe", "jpeg", "jpg", "pbm", "pgm", "png", "pnm", "ppm", "ras", "raw", "rgb", "svg", "tiff", "webp", "xbm", "xpm", "xwd", "psd", "ai", "eps", "cmx", "7z", "arc", "bz", "bz2", "gz", "rar", "tar", "zip", "zipx", "xz", "lz", "lzma", "apk", "jar", "war", "ear", "mpkg", "bin", "cod", "com", "exe", "msi", "dll", "so", "dylib", "app", "deb", "rpm", "pkg", "dmg", "iso", "img", "abw", "azw", "doc", "docx", "epub", "mpp", "odp", "ods", "odt", "pages", "numbers", "keynote", "pdf", "ppt", "pptx", "rtf", "vsd", "xls", "xlsx", "eot", "otf", "ttf", "woff", "woff2", "dat", "mdb", "accdb", "o", "obj", "swf", "fla", "xul", "css"]
+
+# MIME types to skip during scanning (binary/media content unlikely to contain secrets)
+# Categories: Images, Fonts, Media, Applications, Documents
+excluded_mime_types = ["IMAGE_BMP", "IMAGE_GIF", "IMAGE_JPEG", "IMAGE_PNG", "IMAGE_SVG_XML", "IMAGE_TIFF", "IMAGE_UNKNOWN", "FONT_WOFF", "FONT_WOFF2", "SOUND", "VIDEO", "APPLICATION_FLASH", "RTF", "CSS", "APPLICATION_UNKNOWN", "UNRECOGNIZED"]
 
 
 ## Secret detection patterns
@@ -404,8 +404,16 @@ suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
 
 
 ## Default exclusions
-
 [[exclusions]]
-url = '''www\.googletagmanager\.com.*'''
+url = '''www\.googletagmanager\.com'''
 context = ''''''
 
+[[eclusions]]
+url = '''www\.gstatic\.com'''
+context = ''''''
+
+[[exclusions]]
+url = '''.*\.google-analytics\.com'''
+
+[[exclusions]]
+url = '''.*recaptcha\.net'''
