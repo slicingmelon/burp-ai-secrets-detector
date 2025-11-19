@@ -405,6 +405,15 @@ suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
 
 ## Default exclusions
 [[exclusions]]
-url = '''www\.googletagmanager\.com.*'''
+url = '''www\.googletagmanager\.com'''
 context = ''''''
 
+[[eclusions]]
+url = '''www\.gstatic\.com'''
+context = ''''''
+
+[[exclusions]]
+url = '''.*\.google-analytics\.com'''
+
+[[exclusions]]
+url = '''.*recaptcha\.net'''
