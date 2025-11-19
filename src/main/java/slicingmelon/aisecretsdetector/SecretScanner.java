@@ -17,7 +17,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-//import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.HashMap;
 
@@ -213,63 +212,6 @@ public class SecretScanner {
         }
         
         return false;
-    }
-    
-    /**
-     * Extract host from URL
-     */
-    private String extractHost(String url) {
-        try {
-            if (url == null || url.isEmpty()) {
-                return "";
-            }
-            
-            // Remove protocol
-            String withoutProtocol = url.replaceAll("^https?://", "");
-            
-            // Extract host part (before first slash or colon for port)
-            int slashIndex = withoutProtocol.indexOf('/');
-            int colonIndex = withoutProtocol.indexOf(':');
-            
-            int endIndex = withoutProtocol.length();
-            if (slashIndex != -1 && colonIndex != -1) {
-                endIndex = Math.min(slashIndex, colonIndex);
-            } else if (slashIndex != -1) {
-                endIndex = slashIndex;
-            } else if (colonIndex != -1) {
-                endIndex = colonIndex;
-            }
-            
-            return withoutProtocol.substring(0, endIndex);
-        } catch (Exception e) {
-            Logger.logCriticalError("SecretScanner.extractHost: Error extracting host from URL: " + e.getMessage());
-            return "";
-        }
-    }
-    
-    /**
-     * Extract path from URL
-     */
-    private String extractPath(String url) {
-        try {
-            if (url == null || url.isEmpty()) {
-                return "";
-            }
-            
-            // Remove protocol
-            String withoutProtocol = url.replaceAll("^https?://", "");
-            
-            // Find first slash (start of path)
-            int slashIndex = withoutProtocol.indexOf('/');
-            if (slashIndex == -1) {
-                return "/";
-            }
-            
-            return withoutProtocol.substring(slashIndex);
-        } catch (Exception e) {
-            Logger.logCriticalError("SecretScanner.extractPath: Error extracting path from URL: " + e.getMessage());
-            return "";
-        }
     }
     
     public SecretScanResult scanResponse(HttpResponse response, String requestUrl, String baseUrl, Map<String, Integer> persistedCounts) {
