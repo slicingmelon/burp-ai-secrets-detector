@@ -408,7 +408,7 @@ suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
 url = '''www\.googletagmanager\.com'''
 context = ''''''
 
-[[eclusions]]
+[[exclusions]]
 url = '''www\.gstatic\.com'''
 context = ''''''
 
