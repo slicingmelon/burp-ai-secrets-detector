@@ -39,13 +39,8 @@ public class ExclusionContextMenuProvider implements ContextMenuItemsProvider {
     public List<java.awt.Component> provideMenuItems(ContextMenuEvent event) {
         List<java.awt.Component> menuItems = new ArrayList<>();
         
-        // Debug logging
-        api.logging().logToOutput("ExclusionContextMenuProvider: provideMenuItems called");
-        api.logging().logToOutput("Invocation type: " + event.invocationType());
-        api.logging().logToOutput("Message editor present: " + event.messageEditorRequestResponse().isPresent());
-        
         try {
-                        // Check if this is a message editor context (request or response)
+            // Check if this is a message editor context (request or response)
             if (event.messageEditorRequestResponse().isPresent()) {
                 MessageEditorHttpRequestResponse messageEditor = event.messageEditorRequestResponse().get();
                 
