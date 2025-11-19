@@ -17,13 +17,12 @@ import java.util.stream.Collectors;
 
 /**
  * Helper class to convert Config POJOs to Night-Config CommentedConfig structure
- * for writing beautiful TOML with triple quotes and proper formatting
  */
 public class TomlConverter {
 
     /**
      * Convert Config POJOs to night-config CommentedConfig structure
-     * for writing beautiful TOML with triple quotes
+     * for writing TOML files with literal strings (triple quotes) for regex patterns
      */
     public static CommentedConfig toNightConfig(Config config, TomlWriter.LiteralStringRegistry literalRegistry) {
         CommentedConfig nc = TomlFormat.newConfig(LinkedHashMap::new);
@@ -32,11 +31,6 @@ public class TomlConverter {
         CommentedConfig settingsSection = nc.createSubConfig();
         Config.Settings s = config.getSettings();
         
-        // Add settings in the same order as default-config.toml
-        settingsSection.set("excluded_file_extensions", 
-            new ArrayList<>(s.getExcludedFileExtensions()));
-        settingsSection.set("excluded_mime_types", 
-            new ArrayList<>(s.getExcludedMimeTypes()));
         settingsSection.set("workers", s.getWorkers());
         settingsSection.set("in_scope_only", s.isInScopeOnly());
         settingsSection.set("logging_enabled", s.isLoggingEnabled());
@@ -49,10 +43,26 @@ public class TomlConverter {
             s.getEnabledTools().stream()
                 .map(Enum::name)
                 .collect(Collectors.toList()));
+        settingsSection.set("excluded_file_extensions", 
+            new ArrayList<>(s.getExcludedFileExtensions()));
+        settingsSection.set("excluded_mime_types", 
+            new ArrayList<>(s.getExcludedMimeTypes()));
         
         nc.set("settings", settingsSection);
         
-        // Exclusions array
+        // Secrets patterns
+        List<CommentedConfig> patternsArray = new ArrayList<>();
+        for (Config.PatternConfig p : config.getPatterns()) {
+            CommentedConfig pc = nc.createSubConfig();
+            pc.set("name", p.getName());
+            pc.set("prefix", literalRegistry.mark(p.getPrefix() != null ? p.getPrefix() : ""));
+            pc.set("pattern", literalRegistry.mark(p.getPattern() != null ? p.getPattern() : ""));
+            pc.set("suffix", literalRegistry.mark(p.getSuffix() != null ? p.getSuffix() : ""));
+            patternsArray.add(pc);
+        }
+        nc.set("patterns", patternsArray);
+        
+        // Exclusions
         List<CommentedConfig> exclusionsArray = new ArrayList<>();
         for (Config.ExclusionConfig e : config.getExclusions()) {
             CommentedConfig ec = nc.createSubConfig();
@@ -70,18 +80,6 @@ public class TomlConverter {
         if (!exclusionsArray.isEmpty()) {
             nc.set("exclusions", exclusionsArray);
         }
-        
-        // Secret patterns
-        List<CommentedConfig> patternsArray = new ArrayList<>();
-        for (Config.PatternConfig p : config.getPatterns()) {
-            CommentedConfig pc = nc.createSubConfig();
-            pc.set("name", p.getName());
-            pc.set("prefix", literalRegistry.mark(p.getPrefix() != null ? p.getPrefix() : ""));
-            pc.set("pattern", literalRegistry.mark(p.getPattern() != null ? p.getPattern() : ""));
-            pc.set("suffix", literalRegistry.mark(p.getSuffix() != null ? p.getSuffix() : ""));
-            patternsArray.add(pc);
-        }
-        nc.set("patterns", patternsArray);
         
         return nc;
     }
