@@ -188,9 +188,9 @@ public class SecretScanner {
     }
     
     /**
-     * Check if a specific pattern should be excluded for a given context
+     * Check if a specific pattern should be excluded based a given context
      */
-    private boolean shouldExcludeMatch(String patternName, String context, String requestUrl) {
+    private boolean shouldExcludeContextMatch(String patternName, String context, String requestUrl) {
         if (config == null) {
             return false;
         }
@@ -214,7 +214,10 @@ public class SecretScanner {
         return false;
     }
     
-    public SecretScanResult scanResponse(HttpResponse response, String requestUrl, String baseUrl, Map<String, Integer> persistedCounts) {
+    /** ScanResponse
+    /* Core function for scanning a HTTP response
+    */
+    public SecretScanResult ScanResponse(HttpResponse response, String requestUrl, String baseUrl, Map<String, Integer> persistedCounts) {
         List<Secret> foundSecrets = new ArrayList<>();
         Map<String, Set<String>> uniqueSecretsPerPattern = new HashMap<>();
         
@@ -253,7 +256,7 @@ public class SecretScanner {
                     }
                     
                     // Check if this pattern should be excluded
-                    if (shouldExcludeMatch(pattern.getName(), responseString, requestUrl)) {
+                    if (shouldExcludeContextMatch(pattern.getName(), responseString, requestUrl)) {
                         Logger.logCritical("SecretScanner.scanResponse: Skipping pattern " + pattern.getName() + " - excluded by exclusion rules");
                         continue;
                     }

@@ -206,7 +206,7 @@ public class AISecretsDetector implements BurpExtension {
             
             Logger.logCritical("AISecretsDetector.processHttpResponse: Using " + persistedCounts.size() + " persisted secret counts for baseUrl: " + baseUrl);
             
-            SecretScanner.SecretScanResult result = secretScanner.scanResponse(tempResponse, url, baseUrl, persistedCounts);
+            SecretScanner.SecretScanResult result = secretScanner.ScanResponse(tempResponse, url, baseUrl, persistedCounts);
             
             Logger.logCritical("AISecretsDetector.processHttpResponse: Scanner returned " + result.getSecretCount() + " secrets");
             
