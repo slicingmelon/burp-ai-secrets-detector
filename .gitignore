@@ -6,4 +6,8 @@ build/classes/
 build/generated/
 build/tmp/
 build/resources/main/
+build/test-results/
+build/reports/
 z-local-dev-resources
+REFACTORING_SUMMARY.md
+

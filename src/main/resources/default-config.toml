@@ -1,18 +1,8 @@
 # AI Secrets Detector Configuration
-# This is a reference file to the default configuration. Changes here will not affect the extension.
-# Version of this config file - should match extension version
-version = "1.7.2"
+# This is the default configuration loaded on first run or when resetting to defaults.
 
 [settings]
-# File extensions to skip during scanning (binary/media files unlikely to contain secrets)
-# Categories: Media files, Image files, Archive files, Application packages, Executables, Document formats, Fonts, Binary/misc formats, Stylesheets
-excluded_file_extensions = ["3g2", "3gp", "aac", "aif", "aifc", "aiff", "au", "avi", "flac", "flv", "m3u", "m4a", "m4v", "mid", "midi", "mkv", "mov", "mp2", "mp3", "mp4", "mpa", "mpe", "mpeg", "mpg", "mpv2", "oga", "ogg", "ogv", "ogx", "ra", "ram", "rmi", "snd", "wav", "weba", "webm", "wma", "wmv", "bmp", "gif", "ico", "ief", "jfif", "jpe", "jpeg", "jpg", "pbm", "pgm", "png", "pnm", "ppm", "ras", "raw", "rgb", "svg", "tiff", "webp", "xbm", "xpm", "xwd", "psd", "ai", "eps", "cmx", "7z", "arc", "bz", "bz2", "gz", "rar", "tar", "zip", "zipx", "xz", "lz", "lzma", "apk", "jar", "war", "ear", "mpkg", "bin", "cod", "com", "exe", "msi", "dll", "so", "dylib", "app", "deb", "rpm", "pkg", "dmg", "iso", "img", "abw", "azw", "doc", "docx", "epub", "mpp", "odp", "ods", "odt", "pages", "numbers", "keynote", "pdf", "ppt", "pptx", "rtf", "vsd", "xls", "xlsx", "eot", "otf", "ttf", "woff", "woff2", "dat", "mdb", "accdb", "o", "obj", "swf", "fla", "xul", "css"]
-
-# MIME types to skip during scanning (binary/media content unlikely to contain secrets)
-# Categories: Images, Fonts, Media, Applications, Documents
-excluded_mime_types = ["IMAGE_BMP", "IMAGE_GIF", "IMAGE_JPEG", "IMAGE_PNG", "IMAGE_SVG_XML", "IMAGE_TIFF", "IMAGE_UNKNOWN", "FONT_WOFF", "FONT_WOFF2", "SOUND", "VIDEO", "APPLICATION_FLASH", "RTF", "CSS", "APPLICATION_UNKNOWN", "UNRECOGNIZED"]
-
-# Number of worker threads for processing HTTP responses
+# Number of workers (threads) for processing HTTP responses
 workers = 20
 
 # Only scan requests/responses that are in the defined scope in Burp
@@ -39,49 +29,16 @@ max_highlights_per_secret = 3
 # Tools from which to process messages
 enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
 
-# Exclusions - Skip scanning for specific patterns/contexts
-# New format supports url/context arrays and AND logic
-# 
-# Structure:
-# url = '''pattern'''           # Single URL pattern
-# urls = ['''p1''', '''p2''']   # Multiple URL patterns (OR logic)
-# context = '''pattern'''       # Single context pattern
-# contexts = ['''p1''', '''p2'''] # Multiple context patterns (OR logic)
-#
-# Logic:
-# - If both url/urls AND context/contexts are present: URL AND Context (both must match)
-# - If only url/urls: applies to all contexts in those URLs
-# - If only context/contexts: applies to all URLs
+# File extensions to skip during scanning (binary/media files unlikely to contain secrets)
+# Categories: Media files, Image files, Archive files, Application packages, Executables, Document formats, Fonts, Binary/misc formats, Stylesheets
+excluded_file_extensions = ["3g2", "3gp", "aac", "aif", "aifc", "aiff", "au", "avi", "flac", "flv", "m3u", "m4a", "m4v", "mid", "midi", "mkv", "mov", "mp2", "mp3", "mp4", "mpa", "mpe", "mpeg", "mpg", "mpv2", "oga", "ogg", "ogv", "ogx", "ra", "ram", "rmi", "snd", "wav", "weba", "webm", "wma", "wmv", "bmp", "gif", "ico", "ief", "jfif", "jpe", "jpeg", "jpg", "pbm", "pgm", "png", "pnm", "ppm", "ras", "raw", "rgb", "svg", "tiff", "webp", "xbm", "xpm", "xwd", "psd", "ai", "eps", "cmx", "7z", "arc", "bz", "bz2", "gz", "rar", "tar", "zip", "zipx", "xz", "lz", "lzma", "apk", "jar", "war", "ear", "mpkg", "bin", "cod", "com", "exe", "msi", "dll", "so", "dylib", "app", "deb", "rpm", "pkg", "dmg", "iso", "img", "abw", "azw", "doc", "docx", "epub", "mpp", "odp", "ods", "odt", "pages", "numbers", "keynote", "pdf", "ppt", "pptx", "rtf", "vsd", "xls", "xlsx", "eot", "otf", "ttf", "woff", "woff2", "dat", "mdb", "accdb", "o", "obj", "swf", "fla", "xul", "css"]
 
-# Example exclusions (uncomment and modify as needed):
+# MIME types to skip during scanning (binary/media content unlikely to contain secrets)
+# Categories: Images, Fonts, Media, Applications, Documents
+excluded_mime_types = ["IMAGE_BMP", "IMAGE_GIF", "IMAGE_JPEG", "IMAGE_PNG", "IMAGE_SVG_XML", "IMAGE_TIFF", "IMAGE_UNKNOWN", "FONT_WOFF", "FONT_WOFF2", "SOUND", "VIDEO", "APPLICATION_FLASH", "RTF", "CSS", "APPLICATION_UNKNOWN", "UNRECOGNIZED"]
 
-# URL-only exclusion (applies to all contexts in matching URLs)
-# [[exclusions]]
-# url = '''.*\.example\.com.*'''
 
-# Context-only exclusion (applies to all URLs)
-# [[exclusions]]
-# context = '''<meta name="csrf-token" content="[^"]{32}">'''
-
-# URL + Context exclusion (both must match)
-# [[exclusions]]
-# url = '''.*\.example\.com.*'''
-# context = '''<meta name="csrf-token" content="[^"]{32}">'''
-
-# Multiple contexts exclusion (any context matches)
-# [[exclusions]]
-# contexts = [
-#   '''<meta name="csrf-token" content="[^"]{32}">''',
-#   '''<input type="hidden" name="_token" value="[^"]{40}">''',
-#   '''window\.csrfToken = "[^"]{32}";'''
-# ]
-
-# Multiple URLs with single context
-# [[exclusions]]
-# urls = ['''.*\.example\.com.*''', '''.*\.test\.com.*''']
-# context = '''<meta name="csrf-token" content="[^"]{32}">'''
-
-# Secret detection patterns
+## Secret detection patterns
 # Each pattern has:
 # - name: The name of the secret type, must be unique
 # - prefix: Regex pattern that is prepended, usually non-capturing groups (use '''regexpattern''' for literal expressions)
@@ -92,7 +49,7 @@ enabled_tools = ["TARGET", "PROXY", "SCANNER", "EXTENSIONS"]
 # (e.g., use \s instead of \\s, \b instead of \\b, etc.)
 # because TOML triple-quoted strings preserve backslashes as-is.
 
-# Empty patterns are accepted as '' or ''''''
+# Empty patterns are accepted as ''''''
 
 [[patterns]]
 name = "URL with Credentials"
@@ -417,3 +374,46 @@ name = "Generic Secret v3"
 prefix = '''(?i:auth|credential|key|token|secret|pass|passwd|password)(?:.|[\n\r\t]){0,25}?'''
 pattern = '''\b([\w+./=~\-\\`^]{generic_secret_min_length,generic_secret_max_length})'''
 suffix = '''(?:[`'"\s;]|\\[nrt]|\\"|</|$)'''
+
+
+## Exclusions - Skip scanning based on URL and/or response context
+# Each rule is a table with optional `url` and `context` regex strings:
+#   [[exclusions]]
+#   url = '''optional regex over the full request URL'''
+#   context = '''optional regex over the highlighted response context'''
+# 
+# Matching logic:
+# - If both fields are present, the URL must match AND the context must match.
+# - If only `url` is present, every match from URLs matching that regex is skipped.
+# - If only `context` is present, matches with that context are skipped regardless of URL.
+# - Leave a field empty (or omit it) to treat it as "match everything".
+
+# URL-only exclusion (ignore everything from *.example.com):
+# [[exclusions]]
+# url = '''https?://([^.]+\.)*example\.com/.*'''
+# context = ''''''
+
+# Context-only exclusion (ignore CSRF meta tags anywhere)
+# [[exclusions]]
+# context = '''<meta name="csrf-token" content="[^"]{32}">'''
+
+# URL + Context exclusion (suppress purchase keys only on example.com)
+# [[exclusions]]
+# url = '''https?://([^.]+\.)*example\.com/.*'''
+# context = '''"contentPurchaseKey":"[0-9a-f]{16}"'''
+
+
+## Default exclusions
+[[exclusions]]
+url = '''www\.googletagmanager\.com'''
+context = ''''''
+
+[[exclusions]]
+url = '''www\.gstatic\.com'''
+context = ''''''
+
+[[exclusions]]
+url = '''.*\.google-analytics\.com'''
+
+[[exclusions]]
+url = '''.*recaptcha\.net'''

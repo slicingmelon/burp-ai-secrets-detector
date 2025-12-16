@@ -11,14 +11,16 @@ import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.core.ToolType;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
+import java.io.File;
 //import java.util.Set;
 import java.util.Map;
 import java.util.HashMap;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+//import java.nio.file.Path;
+//import java.nio.file.Paths;
 
 public class UI {
     private MontoyaApi api;
@@ -37,7 +39,6 @@ public class UI {
     private JSpinner maxLengthSpinner;
     private JSpinner duplicateThresholdSpinner;
     private Map<ToolType, JCheckBox> toolCheckboxes;
-    private JTextField configLocationValue;
     
     public static UI getInstance() {
         return instance;
@@ -306,23 +307,7 @@ public class UI {
             toolPanel.add(toolCheckbox);
         }
         
-        // Config Info panel
-        JPanel configInfoPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        configInfoPanel.setBorder(new TitledBorder("Configuration Information:"));
-        
-        // Config file location info
-        JLabel configLocationLabel = new JLabel("Config Storage: ");
-        configLocationLabel.setFont(configLocationLabel.getFont().deriveFont(Font.BOLD));
-        configInfoPanel.add(configLocationLabel);
-        
-        configLocationValue = new JTextField(getConfigLocationInfo());
-        configLocationValue.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 11));
-        configLocationValue.setEditable(false);
-        configLocationValue.setBorder(null);
-        configLocationValue.setOpaque(false);
-        configInfoPanel.add(configLocationValue);
-        
-        // Button panel
+        // Actions panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         buttonPanel.setBorder(new TitledBorder("Actions:"));
         
@@ -346,19 +331,10 @@ public class UI {
         importConfigButton.addActionListener(e -> importConfigFromFile());
         buttonPanel.add(importConfigButton);
         
-        JButton createTemplateButton = new JButton("Create Template File");
-        createTemplateButton.addActionListener(e -> createTemplateFile());
-        buttonPanel.add(createTemplateButton);
-        
-        // Create a combined bottom panel for config info and buttons
-        JPanel bottomPanel = new JPanel(new BorderLayout());
-        bottomPanel.add(configInfoPanel, BorderLayout.NORTH);
-        bottomPanel.add(buttonPanel, BorderLayout.SOUTH);
-        
         // Add all panels to main config panel
         panel.add(settingsPanel, BorderLayout.NORTH);
         panel.add(toolPanel, BorderLayout.CENTER);
-        panel.add(bottomPanel, BorderLayout.SOUTH);
+        panel.add(buttonPanel, BorderLayout.SOUTH);
         
         return panel;
     }
@@ -480,11 +456,6 @@ public class UI {
                 }
             }
             
-            // Update config location info
-            if (configLocationValue != null) {
-                configLocationValue.setText(getConfigLocationInfo());
-            }
-            
             appendToLog("UI refreshed with current config values");
         });
     }
@@ -541,59 +512,6 @@ public class UI {
         }
     }
     
-
-    
-    private String getConfigLocationInfo() {
-        try {
-            StringBuilder info = new StringBuilder();
-            
-            // Primary storage location
-            info.append("Primary: Burp Extension Data Storage (persistent)");
-            
-            // Check if we have persisted config
-            if (api != null) {
-                try {
-                    String savedConfig = api.persistence().extensionData().getString("ai_secrets_detector_config");
-                    if (savedConfig != null && !savedConfig.isEmpty()) {
-                        info.append(" [ACTIVE]");
-                    } else {
-                        info.append(" [USING DEFAULTS]");
-                    }
-                } catch (Exception e) {
-                    info.append(" [ERROR]");
-                }
-            } else {
-                info.append(" [NO API]");
-            }
-            
-            // External config file path
-            if (config != null) {
-                try {
-                    String configPath = config.getDefaultConfigFilePath();
-                    // Truncate long paths for display
-                    String displayPath = configPath.length() > 60 ? 
-                        "..." + configPath.substring(configPath.length() - 57) : configPath;
-                    
-                    info.append(" | External: ");
-                    info.append(displayPath);
-                    if (config.hasExportedConfigFile()) {
-                        info.append(" [EXISTS]");
-                    } else {
-                        info.append(" [NOT FOUND]");
-                    }
-                } catch (Exception e) {
-                    info.append(" | External: [ERROR: " + e.getMessage() + "]");
-                }
-            } else {
-                info.append(" | External: [CONFIG NOT AVAILABLE]");
-            }
-            
-            return info.toString();
-        } catch (Exception e) {
-            return "Config storage information unavailable: " + e.getMessage();
-        }
-    }
-    
     private void exportConfigToFile() {
         if (config == null) {
             appendToErrorLog("Config not available for export");
@@ -602,17 +520,19 @@ public class UI {
         
         try {
             String defaultPath = config.getDefaultConfigFilePath();
-            String filePath = JOptionPane.showInputDialog(
-                null,
-                "Enter the path to save the config file:\n\nDefault location: " + defaultPath + "\n\n(Leave empty to use default)",
-                "Export Config to File",
-                JOptionPane.QUESTION_MESSAGE
-            );
+            File defaultFile = new File(defaultPath);
+            File parentDir = defaultFile.getParentFile() != null ? defaultFile.getParentFile() : defaultFile;
+            JFileChooser chooser = new JFileChooser(parentDir);
+            chooser.setDialogTitle("Export Config to File");
+            chooser.setSelectedFile(defaultFile);
+            chooser.setFileFilter(new FileNameExtensionFilter("TOML files", "toml"));
             
-            if (filePath != null) {
-                // Use default path if user just presses OK with empty input
-                if (filePath.trim().isEmpty()) {
-                    filePath = defaultPath;
+            int result = chooser.showSaveDialog(null);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File target = chooser.getSelectedFile();
+                String filePath = target.getAbsolutePath();
+                if (!filePath.toLowerCase().endsWith(".toml")) {
+                    filePath += ".toml";
                 }
                 
                 config.exportConfigToFile(filePath);
@@ -648,18 +568,17 @@ public class UI {
         
         try {
             String defaultPath = config.getDefaultConfigFilePath();
-            String filePath = JOptionPane.showInputDialog(
-                null,
-                "Enter the path to the config file to import:\n\nDefault location: " + defaultPath + "\n\n(Leave empty to use default)",
-                "Import Config from File",
-                JOptionPane.QUESTION_MESSAGE
-            );
+            File defaultFile = new File(defaultPath);
+            File parentDir = defaultFile.getParentFile() != null ? defaultFile.getParentFile() : defaultFile;
+            JFileChooser chooser = new JFileChooser(parentDir);
+            chooser.setDialogTitle("Import Config from File");
+            chooser.setSelectedFile(defaultFile);
+            chooser.setFileFilter(new FileNameExtensionFilter("TOML files", "toml"));
             
-            if (filePath != null) {
-                // Use default path if user just presses OK with empty input
-                if (filePath.trim().isEmpty()) {
-                    filePath = defaultPath;
-                }
+            int result = chooser.showOpenDialog(null);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = chooser.getSelectedFile();
+                String filePath = selectedFile.getAbsolutePath();
                 
                 config.importConfigFromFile(filePath);
                 appendToLog("Configuration imported from: " + filePath);
@@ -686,44 +605,4 @@ public class UI {
         }
     }
     
-    private void createTemplateFile() {
-        if (config == null) {
-            appendToErrorLog("Config not available for template creation");
-            return;
-        }
-        
-        try {
-            config.createReferenceTemplateFileManually();
-            appendToLog("Template file creation triggered - check logs for details");
-            
-            // Check if it was actually created
-            Path templatePath = Paths.get(System.getProperty("user.home"), "burp-ai-secrets-detector", "example-config-template.toml");
-            if (java.nio.file.Files.exists(templatePath)) {
-                appendToLog("Template file successfully created at: " + templatePath.toAbsolutePath());
-                JOptionPane.showMessageDialog(
-                    null,
-                    "Template file created successfully!\n\nFile: " + templatePath.toAbsolutePath() + "\n\nThis file serves as a reference for configuration options.",
-                    "Template Created",
-                    JOptionPane.INFORMATION_MESSAGE
-                );
-            } else {
-                appendToErrorLog("Template file was not created - check error logs for details");
-                JOptionPane.showMessageDialog(
-                    null,
-                    "Template file creation may have failed.\nCheck the error logs for details.",
-                    "Template Creation Status",
-                    JOptionPane.WARNING_MESSAGE
-                );
-            }
-        } catch (Exception e) {
-            String errorMsg = "Failed to create template file: " + e.getMessage();
-            appendToErrorLog(errorMsg);
-            JOptionPane.showMessageDialog(
-                null,
-                errorMsg,
-                "Template Creation Failed",
-                JOptionPane.ERROR_MESSAGE
-            );
-        }
-    }
 } 
