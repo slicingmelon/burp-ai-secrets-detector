@@ -10,11 +10,11 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'net.portswigger.burp.extensions:montoya-api:2025.11'
+    compileOnly 'net.portswigger.burp.extensions:montoya-api:2025.12'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.20.1'
     implementation 'com.electronwill.night-config:toml:3.8.3'
-    testImplementation 'org.junit.jupiter:junit-jupiter:6.0.0'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.13.4'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.4'
 }
 
 // Generate version.properties file during build
